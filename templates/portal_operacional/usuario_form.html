@@ -1,0 +1,209 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if modo_edicao %}Editar usuario{% else %}Novo usuario{% endif %} - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-usuario-form-3">
+</head>
+<body>
+  <main class="portal-shell">
+    <aside class="portal-sidebar" aria-label="Menu principal">
+      <div class="brand-block">
+        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
+        <div>
+          <strong>HUB Agentes</strong>
+          <span>Portal operacional</span>
+        </div>
+      </div>
+
+      <nav class="portal-tabs">
+        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
+        <a class="tab-link" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
+        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
+        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
+        <a class="tab-link" href="{% url 'portal_integracoes' %}">Integracoes</a>
+        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
+        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
+        <a class="tab-link active" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
+      </nav>
+
+      {% include "portal_operacional/_sidebar_footer.html" %}
+    </aside>
+
+    <section class="portal-main" aria-label="{% if modo_edicao %}Editar usuario{% else %}Novo usuario{% endif %}">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Controle de acesso</p>
+          <h1>{% if modo_edicao %}Editar usuario{% else %}Novo usuario{% endif %}</h1>
+        </div>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Perfil operacional</p>
+          <h2>{% if modo_edicao %}Ajuste acesso, grupos e status do usuario.{% else %}Cadastre uma conta para acessar o portal.{% endif %}</h2>
+          <p>
+            Senhas existentes nao sao exibidas. Na edicao, preencha os campos de
+            senha somente quando quiser trocar a senha do usuario.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>US</span>
+          <small>{% if modo_edicao %}editar{% else %}novo{% endif %}</small>
+        </div>
+      </section>
+
+      <form class="agent-builder-form" method="post" autocomplete="off" data-user-form-mode="{% if modo_edicao %}edit{% else %}create{% endif %}">
+        <input class="autofill-decoy" type="text" name="portal_fake_user" autocomplete="username" tabindex="-1" aria-hidden="true">
+        <input class="autofill-decoy" type="password" name="portal_fake_password" autocomplete="current-password" tabindex="-1" aria-hidden="true">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="form-alert">
+            {% for error in form.non_field_errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <section class="builder-card">
+          <div class="form-section-heading">
+            <p class="eyebrow">Identificacao</p>
+            <h2>Dados da conta</h2>
+          </div>
+
+          <div class="execution-grid">
+            <div class="execution-field">
+              <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+              {{ form.username }}
+              {% for error in form.username.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+            <div class="execution-field">
+              <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+              {{ form.email }}
+              {% for error in form.email.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+            <div class="execution-field">
+              <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
+              {{ form.first_name }}
+              {% for error in form.first_name.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+            <div class="execution-field">
+              <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
+              {{ form.last_name }}
+              {% for error in form.last_name.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+          </div>
+        </section>
+
+        <section class="builder-card">
+          <div class="form-section-heading">
+            <p class="eyebrow">Acesso</p>
+            <h2>Papeis e permissoes</h2>
+          </div>
+
+          <div class="execution-grid">
+            <div class="execution-field">
+              <label for="{{ form.papel_principal.id_for_label }}">{{ form.papel_principal.label }}</label>
+              {{ form.papel_principal }}
+              {% for error in form.papel_principal.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+            <div class="user-switch-grid">
+              <label class="user-checkline">
+                {{ form.is_active }}
+                <span>{{ form.is_active.label }}</span>
+              </label>
+              <label class="user-checkline">
+                {{ form.is_staff }}
+                <span>{{ form.is_staff.label }}</span>
+              </label>
+              <label class="user-checkline">
+                {{ form.is_superuser }}
+                <span>{{ form.is_superuser.label }}</span>
+              </label>
+              {% for error in form.is_active.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              {% for error in form.is_staff.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              {% for error in form.is_superuser.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+          </div>
+
+          <div class="execution-field builder-wide">
+            <label>{{ form.groups.label }}</label>
+            <div class="user-groups-panel">
+              {{ form.groups }}
+            </div>
+            {% for error in form.groups.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+          </div>
+        </section>
+
+        <section class="builder-card">
+          <div class="form-section-heading">
+            <p class="eyebrow">Senha</p>
+            <h2>{% if modo_edicao %}Troca opcional{% else %}Senha inicial{% endif %}</h2>
+          </div>
+
+          <div class="execution-grid user-password-grid">
+            <div class="execution-field">
+              <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+              {{ form.password1 }}
+              {% if form.password1.help_text %}<small>{{ form.password1.help_text }}</small>{% endif %}
+              {% for error in form.password1.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+            <div class="execution-field">
+              <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
+              {{ form.password2 }}
+              {% for error in form.password2.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+          </div>
+        </section>
+
+        <div class="execution-actions builder-actions">
+          <a class="secondary-action" href="{% url 'portal_usuarios_acessos' %}">Voltar</a>
+          <button class="start-button" type="submit">
+            {% if modo_edicao %}Salvar usuario{% else %}Criar usuario{% endif %}
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  {% if not modo_edicao and not form.errors %}
+    <script>
+      (() => {
+        const fields = [
+          ["id_username", "off"],
+          ["id_email", "off"],
+          ["id_first_name", "off"],
+          ["id_last_name", "off"],
+          ["id_password1", "new-password"],
+          ["id_password2", "new-password"],
+        ];
+
+        const clearAutofill = () => {
+          fields.forEach(([id, autocomplete]) => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            input.setAttribute("autocomplete", autocomplete);
+            input.value = "";
+          });
+        };
+
+        window.addEventListener("pageshow", clearAutofill);
+        document.addEventListener("DOMContentLoaded", clearAutofill);
+        setTimeout(clearAutofill, 150);
+        setTimeout(clearAutofill, 700);
+      })();
+    </script>
+  {% endif %}
+</body>
+</html>

@@ -1,0 +1,54 @@
+services:
+  db:
+    image: mysql:8.4
+    container_name: HUB_Agentes_mysql
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: ${DATABASE_NAME:-hub_agentes}
+      MYSQL_USER: ${DATABASE_USER:-hub_agentes}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:-hub_agentes_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password_change_me}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  web:
+    build: .
+    container_name: HUB_Agentes_web
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_ENGINE: mysql
+      DATABASE_NAME: ${DATABASE_NAME:-hub_agentes}
+      DATABASE_USER: ${DATABASE_USER:-hub_agentes}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-hub_agentes_password}
+      DATABASE_HOST: db
+      DATABASE_PORT: 3306
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8010:8010"
+    volumes:
+      - media_data:/app/media
+      - staticfiles_data:/app/staticfiles
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8010/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  mysql_data:
+  media_data:
+  staticfiles_data:

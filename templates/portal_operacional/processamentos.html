@@ -1,0 +1,240 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Processamentos - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-sidebar-footer-1">
+  <script src="{% static 'portal_operacional/js/processamentos.js' %}?v=20260524-live-final-1" defer></script>
+</head>
+<body>
+  <main class="portal-shell">
+    <aside class="portal-sidebar" aria-label="Menu principal">
+      <div class="brand-block">
+        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
+        <div>
+          <strong>HUB Agentes</strong>
+          <span>Portal operacional</span>
+        </div>
+      </div>
+
+      <nav class="portal-tabs">
+        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
+        <a class="tab-link" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
+        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
+        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
+        <a class="tab-link" href="{% url 'portal_integracoes' %}">Integracoes</a>
+        <a class="tab-link active" href="{% url 'portal_processamentos' %}">Processamentos</a>
+        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
+        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
+      </nav>
+
+      {% include "portal_operacional/_sidebar_footer.html" %}
+    </aside>
+
+    <section class="portal-main" aria-label="Processamentos">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Esteira de execucao</p>
+          <h1>Processamentos</h1>
+        </div>
+      </header>
+
+      <section class="processing-hero">
+        <div>
+          <p class="eyebrow">Monitor operacional</p>
+          <h2>Acompanhe lotes, documentos e consumo de IA em um unico painel.</h2>
+          <p>
+            Esta tela acompanha as execucoes iniciadas pelos agentes e mostra
+            o andamento operacional de cada processamento.
+          </p>
+        </div>
+        <div class="processing-metrics" aria-label="Resumo dos processamentos">
+          <article>
+            <strong data-summary-total>{{ processamentos.total }}</strong>
+            <span>Total</span>
+          </article>
+          <article>
+            <strong data-summary-em-andamento>{{ processamentos.em_andamento }}</strong>
+            <span>Em andamento</span>
+          </article>
+          <article>
+            <strong data-summary-concluidos>{{ processamentos.concluidos }}</strong>
+            <span>Concluidos</span>
+          </article>
+          <article>
+            <strong data-summary-com-erro>{{ processamentos.com_erro }}</strong>
+            <span>Com erro</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="processing-list" aria-label="Lista de processamentos">
+        {% for processamento in processamentos.processamentos %}
+          <article
+            class="processing-card"
+            data-processing-card
+            data-processing-code="{{ processamento.codigo }}"
+            data-status-endpoint="{% url 'portal_processamento_status' codigo=processamento.codigo %}"
+            data-status-code="{{ processamento.status_codigo }}"
+          >
+            <div class="processing-summary">
+              <div class="processing-card-top">
+                <span class="agent-status" data-status-label>{{ processamento.status }}</span>
+                <span class="agent-type" data-output-format>{{ processamento.formato_saida }}</span>
+                <a
+                  class="agent-type processing-download-pill"
+                  data-output-download
+                  href="{% if processamento.tem_arquivo_saida %}{{ processamento.download_saida_url }}{% else %}#{% endif %}"
+                  aria-label="Baixar arquivo de saida"
+                  title="Baixar arquivo de saida"
+                  {% if not processamento.tem_arquivo_saida %}hidden{% endif %}
+                ></a>
+              </div>
+              <div class="processing-title-block">
+                <p class="processing-code">{{ processamento.codigo }}</p>
+                <h2>{{ processamento.agente }}</h2>
+              </div>
+            </div>
+            <div class="processing-progress-column">
+              <div class="processing-live-panel{% if processamento.possivel_travamento %} is-stalled{% endif %}">
+                <div class="processing-live-header">
+                  <strong data-progress-value>{{ processamento.percentual }}%</strong>
+                </div>
+                <div class="processing-progress-track" aria-hidden="true">
+                  <span class="processing-progress-fill" data-progress-fill style="width: {{ processamento.percentual }}%;"></span>
+                </div>
+                <div class="processing-live-meta">
+                  <small>
+                    Etapa:
+                    <span data-stage-label>{{ processamento.etapa_atual|default:"Aguardando atualizacao" }}</span>
+                  </small>
+                  <small data-current-document-wrap {% if not processamento.documento_atual_nome %}hidden{% endif %}>
+                    Documento atual:
+                    <span data-current-document>{{ processamento.documento_atual_nome }}</span>
+                  </small>
+                  <small data-stall-warning {% if not processamento.possivel_travamento %}hidden{% endif %}>
+                    Sem atividade recente. Verifique se o processamento travou.
+                  </small>
+                </div>
+              </div>
+              {% if not processamento.tem_arquivo_saida %}
+                <div class="processing-output-access" data-output-unavailable>
+                  <small>Arquivo de saida ainda nao disponivel.</small>
+                </div>
+              {% endif %}
+              <details class="processing-error-panel" data-error-panel {% if not processamento.erro_operacional %}hidden{% endif %}>
+                <summary>Ver erro</summary>
+                <div>
+                  <span>Mensagem registrada pelo sistema ou pela IA</span>
+                  <p data-error-message>{{ processamento.erro_operacional|linebreaksbr }}</p>
+                </div>
+              </details>
+            </div>
+            <dl class="processing-meta">
+              <div>
+                <dt>Origem</dt>
+                <dd data-meta-origem>{{ processamento.origem }}</dd>
+              </div>
+              <div>
+                <dt>Documentos</dt>
+                <dd data-meta-documentos>{{ processamento.total_processados }} de {{ processamento.total_documentos }}</dd>
+              </div>
+              <div>
+                <dt>Tokens</dt>
+                <dd data-meta-tokens>{{ processamento.total_tokens|default:"Nao informado" }}</dd>
+              </div>
+              <div>
+                <dt>Duracao</dt>
+                <dd data-meta-duracao>
+                  {% if processamento.duracao_minutos %}
+                    {{ processamento.duracao_minutos }} min
+                  {% else %}
+                    Nao informada
+                  {% endif %}
+                </dd>
+              </div>
+              <div>
+                <dt>Inicio</dt>
+                <dd data-meta-inicio>
+                  {% if processamento.iniciado_em %}
+                    {{ processamento.iniciado_em|date:"d/m/Y H:i" }}
+                  {% else %}
+                    Nao informado
+                  {% endif %}
+                </dd>
+              </div>
+              <div>
+                <dt>Fim</dt>
+                <dd data-meta-fim>
+                  {% if processamento.finalizado_em %}
+                    {{ processamento.finalizado_em|date:"d/m/Y H:i" }}
+                  {% else %}
+                    Em aberto
+                  {% endif %}
+                </dd>
+              </div>
+            </dl>
+          </article>
+        {% empty %}
+          <article class="empty-agents processing-empty">
+            <span class="empty-icon" aria-hidden="true">PX</span>
+            <p class="eyebrow">Estado vazio</p>
+            <h2>Nenhum processamento encontrado</h2>
+            <p>
+              Execute um agente pelo portal para acompanhar a esteira por aqui.
+            </p>
+          </article>
+        {% endfor %}
+      </section>
+
+      {% if processamentos.total_paginas > 1 %}
+        <nav class="portal-pagination" aria-label="Paginacao de processamentos">
+          <div>
+            <span>
+              {{ processamentos.primeiro_item }}-{{ processamentos.ultimo_item }}
+              de {{ processamentos.total }}
+            </span>
+            <small>{{ processamentos.itens_por_pagina }} por pagina</small>
+          </div>
+
+          <div class="pagination-actions">
+            {% if processamentos.tem_pagina_anterior %}
+              <a
+                class="pagination-button"
+                href="?page={{ processamentos.pagina_anterior }}"
+                aria-label="Pagina anterior"
+                title="Pagina anterior"
+              >&lsaquo;</a>
+            {% else %}
+              <span class="pagination-button disabled" aria-hidden="true">&lsaquo;</span>
+            {% endif %}
+
+            {% for pagina in processamentos.paginas %}
+              {% if pagina == "..." %}
+                <span class="pagination-ellipsis">...</span>
+              {% elif pagina == processamentos.pagina_atual %}
+                <span class="pagination-button active" aria-current="page">{{ pagina }}</span>
+              {% else %}
+                <a class="pagination-button" href="?page={{ pagina }}">{{ pagina }}</a>
+              {% endif %}
+            {% endfor %}
+
+            {% if processamentos.tem_proxima_pagina %}
+              <a
+                class="pagination-button"
+                href="?page={{ processamentos.proxima_pagina }}"
+                aria-label="Proxima pagina"
+                title="Proxima pagina"
+              >&rsaquo;</a>
+            {% else %}
+              <span class="pagination-button disabled" aria-hidden="true">&rsaquo;</span>
+            {% endif %}
+          </div>
+        </nav>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>

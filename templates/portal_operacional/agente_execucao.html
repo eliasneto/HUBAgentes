@@ -1,0 +1,134 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Executar agente - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-sidebar-footer-1">
+  <script src="{% static 'portal_operacional/js/agente_execucao.js' %}" defer></script>
+</head>
+<body>
+  <main class="portal-shell">
+    <aside class="portal-sidebar" aria-label="Menu principal">
+      <div class="brand-block">
+        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
+        <div>
+          <strong>HUB Agentes</strong>
+          <span>Portal operacional</span>
+        </div>
+      </div>
+
+      <nav class="portal-tabs">
+        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
+        <a class="tab-link active" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
+        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
+        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
+        <a class="tab-link" href="{% url 'portal_integracoes' %}">Integracoes</a>
+        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
+        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
+        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
+      </nav>
+
+      {% include "portal_operacional/_sidebar_footer.html" %}
+    </aside>
+
+    <section class="portal-main" aria-label="Executar agente de leitura">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Nova execucao</p>
+          <h1>Executar agente</h1>
+        </div>
+      </header>
+
+      <section class="execution-hero">
+        <div>
+          <p class="eyebrow">Agente selecionado</p>
+          <h2>{{ agente.nome }}</h2>
+          <p>{{ agente.objetivo }}</p>
+        </div>
+        <div class="execution-state availability-{{ disponibilidade.cor }}">
+          <span class="availability-light" aria-hidden="true"></span>
+          <strong>{{ disponibilidade.estado }}</strong>
+          <small>{{ disponibilidade.motivo }}</small>
+        </div>
+      </section>
+
+      <section class="execution-layout">
+        <form
+          class="execution-form"
+          method="post"
+          enctype="multipart/form-data"
+          data-execution-form
+          data-show-input-source="false"
+          data-show-upload="{{ runtime_fields_schema.show_file_upload|yesno:'true,false' }}"
+          data-show-output-format="false"
+        >
+          {% csrf_token %}
+          {% if runtime_fields_schema.show_file_upload %}
+            <input type="hidden" name="input_source_type" value="upload_at_execution">
+          {% endif %}
+
+          {% if form.non_field_errors %}
+            <div class="form-alert">
+              {% for error in form.non_field_errors %}
+                <span>{{ error }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="form-section-heading">
+            <p class="eyebrow">Configuracao salva</p>
+            <h2>Este agente sera executado com as regras definidas na criacao.</h2>
+            <p>
+              {% if runtime_fields_schema.show_file_upload %}
+                Este agente permite anexar um documento no momento da execucao.
+                Escolha o arquivo e o sistema usara as demais regras salvas.
+              {% else %}
+                A origem dos documentos, formato de saida e destino ja ficam
+                guardados no agente. Ao iniciar, o sistema cria o processamento
+                e altera o status operacional para execucao.
+              {% endif %}
+            </p>
+          </div>
+
+          {% if runtime_fields_schema.show_file_upload %}
+            <div class="execution-field file-picker-field execution-folder-upload" data-source-field="upload_at_execution">
+              <label>{{ form.arquivo_execucao_upload.label }}</label>
+              <div class="file-picker-shell folder-picker-shell">
+                {{ form.arquivo_execucao_upload }}
+                <label class="file-picker-button folder-picker-button" for="{{ form.arquivo_execucao_upload.id_for_label }}" aria-label="Escolher documento">
+                  <span class="agent-folder-icon" aria-hidden="true"></span>
+                  Escolher documento
+                </label>
+                <span class="file-picker-name" data-file-name>Nenhum arquivo selecionado</span>
+              </div>
+              <small>Escolha o documento na maquina. O caminho local nao sera exibido.</small>
+              {% for error in form.arquivo_execucao_upload.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="execution-actions">
+            <a class="secondary-action" href="{% url 'portal_agentes_leitura' %}">Voltar</a>
+            <button class="start-button" type="submit" {% if not disponibilidade.pode_executar %}disabled{% endif %}>
+              Executar
+            </button>
+          </div>
+        </form>
+
+        <aside class="execution-side-panel" aria-label="Resumo da execucao">
+          <p class="eyebrow">Fluxo de execucao</p>
+          <h2>Um agente pronto, uma execucao rastreavel.</h2>
+          <ol class="execution-steps">
+            <li>Validar disponibilidade do agente.</li>
+            <li>Usar as configuracoes salvas no agente.</li>
+            <li>Iniciar processamento sem pedir configuracao extra.</li>
+            <li>Acompanhar em Processamentos.</li>
+          </ol>
+          <a class="secondary-action full" href="{% url 'portal_processamentos' %}">Ver processamentos</a>
+        </aside>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

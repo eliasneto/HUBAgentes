@@ -1,0 +1,262 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Integracoes - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-integracao-edit-1">
+</head>
+<body>
+  <main class="portal-shell">
+    <aside class="portal-sidebar" aria-label="Menu principal">
+      <div class="brand-block">
+        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
+        <div>
+          <strong>HUB Agentes</strong>
+          <span>Portal operacional</span>
+        </div>
+      </div>
+
+      <nav class="portal-tabs">
+        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
+        <a class="tab-link" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
+        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
+        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
+        <a class="tab-link active" href="{% url 'portal_integracoes' %}">Integracoes</a>
+        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
+        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
+        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
+      </nav>
+
+      {% include "portal_operacional/_sidebar_footer.html" %}
+    </aside>
+
+    <section class="portal-main" aria-label="Integracoes">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Conexoes do sistema</p>
+          <h1>Integracoes</h1>
+        </div>
+        {% if pode_validar_integracoes %}
+          <a class="toolbar-action primary" href="{% url 'portal_integracao_criar' %}">Nova integracao</a>
+        {% endif %}
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if message.tags == 'success' %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="integrations-hero">
+        <div>
+          <p class="eyebrow">Mapa de conexoes</p>
+          <h2>Confira os provedores que sustentam a leitura automatizada.</h2>
+          <p>
+            Esta tela exibe apenas metadados operacionais. Dados sensiveis e
+            credenciais tecnicas permanecem ocultos no Portal.
+          </p>
+        </div>
+        <div class="sources-metrics integrations-metrics" aria-label="Resumo das integracoes">
+          <article>
+            <strong>{{ integracoes.total_integracoes }}</strong>
+            <span>Total</span>
+          </article>
+          <article>
+            <strong>{{ integracoes.total_ia }}</strong>
+            <span>IA</span>
+          </article>
+          <article>
+            <strong>{{ integracoes.total_google_drive }}</strong>
+            <span>Drive</span>
+          </article>
+          <article>
+            <strong>{{ integracoes.total_storage_local }}</strong>
+            <span>Local</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="sources-section" aria-labelledby="ia-title">
+        <div class="section-heading">
+          <p class="eyebrow">Inteligencia artificial</p>
+          <h2 id="ia-title">Provedores de IA</h2>
+        </div>
+
+        <div class="integrations-grid">
+          {% for integracao in integracoes.ia %}
+            <article class="integration-card ai-integration">
+              <div class="source-card-header">
+                <span class="agent-status">{{ integracao.status }}</span>
+                <span class="agent-type">{{ integracao.provedor }}</span>
+              </div>
+              <strong>{{ integracao.nome }}</strong>
+              <p>Modelo padrao: {{ integracao.modelo_padrao }}</p>
+              <dl class="agent-meta">
+                <div>
+                  <dt>Timeout</dt>
+                  <dd>{{ integracao.timeout_seconds }} segundos</dd>
+                </div>
+                <div>
+                  <dt>Ultima validacao</dt>
+                  <dd>
+                    {% if integracao.ultima_validacao %}
+                      {{ integracao.ultima_validacao|date:"d/m/Y H:i" }}
+                    {% else %}
+                      Nao informada
+                    {% endif %}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Ultima conexao</dt>
+                  <dd>
+                    {% if integracao.ultima_conexao %}
+                      {{ integracao.ultima_conexao|date:"d/m/Y H:i" }}
+                    {% else %}
+                      Nao informada
+                    {% endif %}
+                  </dd>
+                </div>
+              </dl>
+              {% if integracao.ultimo_erro %}
+                <p class="integration-error">Ultimo erro: {{ integracao.ultimo_erro }}</p>
+              {% endif %}
+              {% if pode_validar_integracoes %}
+                <div class="integration-actions">
+                  <a class="secondary-action" href="{% url 'portal_integracao_editar' 'ia' integracao.id %}">Editar</a>
+                  <form method="post" action="{{ integracao.validar_url }}">
+                    {% csrf_token %}
+                    <button class="secondary-action" type="submit">Validar integracao</button>
+                  </form>
+                </div>
+              {% endif %}
+            </article>
+          {% empty %}
+            <article class="empty-agents source-empty">
+              <span class="empty-icon" aria-hidden="true">IA</span>
+              <p class="eyebrow">Sem provedor</p>
+              <h2>Nenhuma integracao de IA cadastrada</h2>
+              <p>Nenhuma integracao de IA esta disponivel para o portal.</p>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="sources-section" aria-labelledby="drive-title">
+        <div class="section-heading">
+          <p class="eyebrow">Documentos em nuvem</p>
+          <h2 id="drive-title">Google Drive</h2>
+        </div>
+
+        <div class="integrations-grid">
+          {% for integracao in integracoes.google_drive %}
+            <article class="integration-card drive-integration">
+              <div class="source-card-header">
+                <span class="agent-status">{{ integracao.status }}</span>
+                <span class="agent-type">Google Drive</span>
+              </div>
+              <strong>{{ integracao.nome }}</strong>
+              <p>{{ integracao.service_account_email }}</p>
+              <dl class="agent-meta">
+                <div>
+                  <dt>Autenticacao</dt>
+                  <dd>{{ integracao.modo_autenticacao }}</dd>
+                </div>
+                <div>
+                  <dt>Extensoes</dt>
+                  <dd>{{ integracao.extensoes|default:"Nao informadas" }}</dd>
+                </div>
+                <div>
+                  <dt>Fontes vinculadas</dt>
+                  <dd>{{ integracao.total_fontes }}</dd>
+                </div>
+              </dl>
+              {% if integracao.ultimo_erro %}
+                <p class="integration-error">Ultimo erro: {{ integracao.ultimo_erro }}</p>
+              {% endif %}
+              {% if pode_validar_integracoes %}
+                <div class="integration-actions">
+                  <a class="secondary-action" href="{% url 'portal_integracao_editar' 'google-drive' integracao.id %}">Editar</a>
+                  <form method="post" action="{{ integracao.validar_url }}">
+                    {% csrf_token %}
+                    <button class="secondary-action" type="submit">Validar integracao</button>
+                  </form>
+                </div>
+              {% endif %}
+            </article>
+          {% empty %}
+            <article class="empty-agents source-empty">
+              <span class="empty-icon" aria-hidden="true">GD</span>
+              <p class="eyebrow">Sem Google Drive</p>
+              <h2>Nenhuma integracao Google Drive cadastrada</h2>
+              <p>Nenhuma integracao Google Drive esta disponivel para o portal.</p>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="sources-section" aria-labelledby="local-title">
+        <div class="section-heading">
+          <p class="eyebrow">Arquivos locais</p>
+          <h2 id="local-title">Storage local</h2>
+        </div>
+
+        <div class="integrations-grid">
+          {% for integracao in integracoes.storage_local %}
+            <article class="integration-card local-integration">
+              <div class="source-card-header">
+                <span class="agent-status">{{ integracao.status }}</span>
+                <span class="agent-type">Local</span>
+              </div>
+              <strong>{{ integracao.nome }}</strong>
+              <p>{{ integracao.base_path }}</p>
+              <dl class="agent-meta">
+                <div>
+                  <dt>Extensoes</dt>
+                  <dd>{{ integracao.extensoes|default:"Nao informadas" }}</dd>
+                </div>
+                <div>
+                  <dt>Leitura recursiva</dt>
+                  <dd>{% if integracao.leitura_recursiva %}Sim{% else %}Nao{% endif %}</dd>
+                </div>
+                <div>
+                  <dt>Ultima validacao</dt>
+                  <dd>
+                    {% if integracao.ultima_validacao %}
+                      {{ integracao.ultima_validacao|date:"d/m/Y H:i" }}
+                    {% else %}
+                      Nao informada
+                    {% endif %}
+                  </dd>
+                </div>
+              </dl>
+              {% if integracao.ultimo_erro %}
+                <p class="integration-error">Ultimo erro: {{ integracao.ultimo_erro }}</p>
+              {% endif %}
+              {% if pode_validar_integracoes %}
+                <div class="integration-actions">
+                  <a class="secondary-action" href="{% url 'portal_integracao_editar' 'storage-local' integracao.id %}">Editar</a>
+                  <form method="post" action="{{ integracao.validar_url }}">
+                    {% csrf_token %}
+                    <button class="secondary-action" type="submit">Validar integracao</button>
+                  </form>
+                </div>
+              {% endif %}
+            </article>
+          {% empty %}
+            <article class="empty-agents source-empty">
+              <span class="empty-icon" aria-hidden="true">PC</span>
+              <p class="eyebrow">Sem storage local</p>
+              <h2>Nenhuma integracao local cadastrada</h2>
+              <p>Nenhuma integracao local esta disponivel para o portal.</p>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

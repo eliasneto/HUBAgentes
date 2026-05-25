@@ -1,0 +1,111 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leitura de Licitacao - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-sidebar-footer-1">
+</head>
+<body>
+  <main class="portal-shell">
+    <aside class="portal-sidebar" aria-label="Menu principal">
+      <div class="brand-block">
+        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
+        <div>
+          <strong>HUB Agentes</strong>
+          <span>Portal operacional</span>
+        </div>
+      </div>
+
+      <nav class="portal-tabs">
+        <a class="tab-link active" href="{% url 'portal_painel' %}">Painel inicial</a>
+        <a class="tab-link" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
+        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
+        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
+        <a class="tab-link" href="{% url 'portal_integracoes' %}">Integracoes</a>
+        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
+        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
+        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
+      </nav>
+
+      {% include "portal_operacional/_sidebar_footer.html" %}
+    </aside>
+
+    <section class="portal-main" aria-label="Tela inicial do portal">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Menu inicial</p>
+          <h1>Painel de operacao</h1>
+        </div>
+        <div class="session-pill">
+          <span class="status-dot"></span>
+          Prototipo visual
+        </div>
+      </header>
+
+      <section class="status-band" id="painel">
+        <div class="status-copy">
+          <p class="eyebrow">Esteira de leitura</p>
+          <h2>Organize agentes, documentos e resultados em uma unica entrada.</h2>
+          <p>
+            Esta tela representa o menu inicial do usuario final. Os atalhos ainda
+            nao executam acoes reais ate a proxima etapa de backend.
+          </p>
+        </div>
+        <div class="status-meter" aria-label="Resumo visual da operacao">
+          <span>IA</span>
+        </div>
+      </section>
+
+      <section class="module-grid" aria-label="Areas do sistema">
+        <a class="module-card primary" href="{% url 'portal_agentes_leitura' %}">
+          <span class="module-kicker">Execucao inteligente</span>
+          <strong>Agentes</strong>
+          <small>Agentes de usuario, execucoes e configuracoes reutilizaveis.</small>
+        </a>
+
+        <a class="module-card" href="{% url 'portal_agentes_gerenciar' %}">
+          <span class="module-kicker">Construtor</span>
+          <strong>Gerenciar agentes</strong>
+          <small>Crie, edite e revise agentes de usuario ou tecnicos.</small>
+        </a>
+
+        <a class="module-card" href="{% url 'portal_fontes_documentos' %}">
+          <span class="module-kicker">Entrada</span>
+          <strong>Fontes de documentos</strong>
+          <small>Google Drive, pasta local e arquivos enviados.</small>
+        </a>
+
+        <a class="module-card" href="{% url 'portal_integracoes' %}">
+          <span class="module-kicker">Conexoes</span>
+          <strong>Integracoes</strong>
+          <small>Credenciais, provedores de IA e storages.</small>
+        </a>
+
+        <a class="module-card" href="{% url 'portal_processamentos' %}">
+          <span class="module-kicker">Execucao</span>
+          <strong>Processamentos</strong>
+          <small>Acompanhamento dos lotes e tentativas.</small>
+        </a>
+
+        <a class="module-card" href="#auditoria">
+          <span class="module-kicker">Controle</span>
+          <strong>Historico e auditoria</strong>
+          <small>Eventos, erros, tokens e tempo de execucao.</small>
+        </a>
+
+        <a class="module-card" href="{% url 'portal_usuarios_acessos' %}">
+          <span class="module-kicker">Acesso</span>
+          <strong>Usuarios e acessos</strong>
+          <small>Perfis, grupos e permissao operacional.</small>
+        </a>
+      </section>
+
+      <footer class="prototype-note">
+        <span>Fluxo autenticado ativo em /, /painel/ e /agentes-de-leitura/.</span>
+      </footer>
+    </section>
+  </main>
+</body>
+</html>

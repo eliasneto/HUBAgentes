@@ -1,0 +1,184 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if modo_gerenciamento_agentes %}Gerenciar agentes{% else %}Agentes{% endif %} - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-sidebar-footer-1">
+  <style>
+    .agent-folder-action input[type="file"] {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      min-width: 1px !important;
+      min-height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0 0 0 0) !important;
+      clip-path: inset(50%) !important;
+      border: 0 !important;
+      opacity: 0 !important;
+      appearance: none !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      pointer-events: none !important;
+      white-space: nowrap !important;
+    }
+  </style>
+  <script src="{% static 'portal_operacional/js/agente_execucao.js' %}?v=20260524-agent-status-1" defer></script>
+</head>
+<body>
+  <main class="portal-shell">
+    <aside class="portal-sidebar" aria-label="Menu principal">
+      <div class="brand-block">
+        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
+        <div>
+          <strong>HUB Agentes</strong>
+          <span>Portal operacional</span>
+        </div>
+      </div>
+
+      <nav class="portal-tabs">
+        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
+        <a class="tab-link {% if not modo_gerenciamento_agentes %}active{% endif %}" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
+        <a class="tab-link {% if modo_gerenciamento_agentes %}active{% endif %}" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
+        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
+        <a class="tab-link" href="{% url 'portal_integracoes' %}">Integracoes</a>
+        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
+        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
+        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
+      </nav>
+
+      {% include "portal_operacional/_sidebar_footer.html" %}
+    </aside>
+
+    <section class="portal-main" aria-label="{% if modo_gerenciamento_agentes %}Gerenciar agentes{% else %}Agentes{% endif %}">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">{% if modo_gerenciamento_agentes %}Construtor operacional{% else %}Central operacional{% endif %}</p>
+          <h1>{% if modo_gerenciamento_agentes %}Gerenciar agentes{% else %}Agentes{% endif %}</h1>
+        </div>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="agents-hero">
+        <div>
+          {% if modo_gerenciamento_agentes %}
+            <p class="eyebrow">Todos os agentes</p>
+            <h2>Crie, revise e edite agentes antes de liberar a execucao.</h2>
+            <p>
+              Esta area mostra agentes de usuario e agentes tecnicos. Use a edicao
+              para ajustar identidade, entrada, saida, IA e prompt sem acessar o Admin.
+            </p>
+          {% else %}
+            <p class="eyebrow">Biblioteca de agentes</p>
+            <h2>Execute agentes visiveis ao usuario e mantenha agentes tecnicos fora do painel.</h2>
+            <p>
+              Esta area mostra apenas agentes de usuario liberados para o portal.
+              A criacao e edicao ficam na aba Gerenciar agentes.
+            </p>
+          {% endif %}
+        </div>
+        <div class="agents-orb" aria-label="Quantidade de agentes">
+          <span>{{ agentes|length }}</span>
+          <small>agentes</small>
+        </div>
+      </section>
+
+      <section class="agents-toolbar" aria-label="Resumo da tela">
+        {% if modo_gerenciamento_agentes %}
+          <span>Todos os agentes cadastrados</span>
+          <span>Criacao e edicao no portal</span>
+          <span>Clone visual em sprint futura</span>
+          <a class="toolbar-action primary" href="{% url 'portal_agente_criar' %}">Criar novo agente</a>
+        {% else %}
+          <span>Listagem protegida por login</span>
+          <span>Execucao operacional</span>
+          <span>Sem prompts ou credenciais</span>
+        {% endif %}
+      </section>
+
+      <section class="agents-grid" aria-label="Lista de agentes">
+        {% for agente in agentes %}
+          <article class="agent-card {% if modo_gerenciamento_agentes %}management-card{% endif %}">
+            <div class="agent-card-header">
+              <span class="agent-status">{{ agente.status }}</span>
+              <span class="agent-type">{{ agente.categoria }}</span>
+            </div>
+            <div class="agent-availability availability-{{ agente.disponibilidade_cor }}">
+              <span class="availability-light" aria-hidden="true"></span>
+              <span>{{ agente.motivo_bloqueio }}</span>
+            </div>
+            <strong>{{ agente.nome }}</strong>
+            <p>{{ agente.objetivo }}</p>
+            <dl class="agent-meta">
+              <div>
+                <dt>Tipo</dt>
+                <dd>{{ agente.tipo }}</dd>
+              </div>
+              <div>
+                <dt>Visibilidade</dt>
+                <dd>{{ agente.visibilidade }}</dd>
+              </div>
+              <div>
+                <dt>Integracao</dt>
+                <dd>{{ agente.integracao_ia }}</dd>
+              </div>
+            </dl>
+            <form
+              class="agent-actions agent-execution-card-form"
+              action="{{ agente.executar_url }}"
+              method="post"
+              enctype="multipart/form-data"
+              data-agent-card-form
+            >
+              {% csrf_token %}
+              {% if modo_gerenciamento_agentes %}
+                <a class="secondary-action" href="{{ agente.editar_url }}">Editar</a>
+              {% else %}
+                {% if agente.pode_executar %}
+                  {% if agente.permite_upload_execucao %}
+                    <label class="agent-folder-action" aria-label="Anexar documento antes de executar" title="Anexar documento">
+                      <input type="file" name="arquivo_execucao_upload" accept="application/pdf,.pdf" required data-agent-card-file>
+                      <span class="agent-folder-icon" aria-hidden="true"></span>
+                    </label>
+                    <input type="hidden" name="input_source_type" value="upload_at_execution">
+                  {% endif %}
+                  <button class="agent-run-button" type="submit">Executar</button>
+                {% else %}
+                  <span class="agent-run-button disabled" aria-disabled="true">Indisponivel</span>
+                {% endif %}
+              {% endif %}
+            </form>
+          </article>
+        {% empty %}
+          <article class="empty-agents">
+            <span class="empty-icon" aria-hidden="true">IA</span>
+            <p class="eyebrow">Estado vazio</p>
+            {% if modo_gerenciamento_agentes %}
+              <h2>Nenhum agente cadastrado</h2>
+              <p>Crie o primeiro agente para configurar leituras, decisoes ou acoes automatizadas.</p>
+              <a href="{% url 'portal_agente_criar' %}">Criar novo agente</a>
+            {% else %}
+              <h2>Nenhum agente de usuario disponivel</h2>
+              <p>
+                Agentes criados como tecnicos ou ainda inativos nao aparecem
+                nesta tela operacional.
+              </p>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </section>
+    </section>
+  </main>
+</body>
+</html>

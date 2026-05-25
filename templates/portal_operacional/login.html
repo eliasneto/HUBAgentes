@@ -1,0 +1,100 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HUB Agentes - Login</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/login.css' %}">
+</head>
+<body>
+  <main class="scene">
+    <div class="circuit-line left-1"></div>
+    <div class="circuit-line left-2"></div>
+    <div class="circuit-line right-1"></div>
+    <div class="circuit-line right-2"></div>
+
+    <div class="dot d1"></div>
+    <div class="dot d2"></div>
+    <div class="dot d3"></div>
+    <div class="dot d4"></div>
+
+    <section class="robot" aria-hidden="true">
+      <div class="robot-body"></div>
+      <div class="arm left"></div>
+      <div class="arm right"></div>
+      <div class="robot-head">
+        <div class="ear left"></div>
+        <div class="ear right"></div>
+        <div class="face">
+          <div class="eye left"></div>
+          <div class="eye right"></div>
+          <div class="mouth"></div>
+        </div>
+      </div>
+      <div class="hand left"></div>
+      <div class="hand right"></div>
+    </section>
+
+    <section class="login-panel" aria-label="Tela de login futurista">
+      <div class="particles"></div>
+
+      <form class="form-core" action="{% url 'portal_login' %}" method="post" autocomplete="off" data-login-form>
+        {% csrf_token %}
+        {% if redirect_field_value %}
+          <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+        {% elif request.GET.next %}
+          <input type="hidden" name="{{ redirect_field_name|default:'next' }}" value="{{ request.GET.next }}">
+        {% endif %}
+        <div class="ring"></div>
+        <div class="ring second"></div>
+
+        <h1 class="login-title">LOGIN</h1>
+
+        <label class="input-group">
+          <span aria-hidden="true">U</span>
+          <input class="js-clear-login" type="text" name="username" value="" placeholder="Usuario" autocomplete="new-password" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" required>
+        </label>
+
+        <label class="input-group">
+          <span aria-hidden="true">#</span>
+          <input class="js-clear-login" type="password" name="password" value="" placeholder="Senha" autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" required>
+        </label>
+
+        <button class="login-btn" type="submit">ENTRAR</button>
+        {% if messages %}
+          {% for message in messages %}
+            <div class="login-error" role="alert">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      </form>
+    </section>
+  </main>
+  <script>
+    function clearLoginFields() {
+      document.querySelectorAll(".js-clear-login").forEach(function (input) {
+        input.value = "";
+        input.removeAttribute("value");
+      });
+    }
+
+    document.querySelectorAll(".js-clear-login").forEach(function (input) {
+      input.dataset.wasFocused = "false";
+      input.addEventListener("focus", function () {
+        if (input.dataset.wasFocused === "false") {
+          input.value = "";
+          input.dataset.wasFocused = "true";
+        }
+      });
+    });
+
+    window.addEventListener("DOMContentLoaded", clearLoginFields);
+    window.addEventListener("pageshow", clearLoginFields);
+    window.setTimeout(clearLoginFields, 100);
+    window.setTimeout(clearLoginFields, 500);
+    window.setTimeout(clearLoginFields, 1200);
+  </script>
+</body>
+</html>

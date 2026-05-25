@@ -1,0 +1,160 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usuarios e acessos - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-usuarios-acessos-1">
+</head>
+<body>
+  <main class="portal-shell">
+    <aside class="portal-sidebar" aria-label="Menu principal">
+      <div class="brand-block">
+        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
+        <div>
+          <strong>HUB Agentes</strong>
+          <span>Portal operacional</span>
+        </div>
+      </div>
+
+      <nav class="portal-tabs">
+        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
+        <a class="tab-link" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
+        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
+        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
+        <a class="tab-link" href="{% url 'portal_integracoes' %}">Integracoes</a>
+        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
+        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
+        <a class="tab-link active" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
+      </nav>
+
+      {% include "portal_operacional/_sidebar_footer.html" %}
+    </aside>
+
+    <section class="portal-main" aria-label="Usuarios e acessos">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Controle de acesso</p>
+          <h1>Usuarios e acessos</h1>
+        </div>
+      </header>
+
+      <section class="access-hero">
+        <div>
+          <p class="eyebrow">Mapa de permissoes</p>
+          <h2>Veja quem acessa o portal e quais grupos estao em uso.</h2>
+          <p>
+            Esta tela e uma visao operacional segura. Senhas, tokens e dados
+            sensiveis nao sao exibidos aqui.
+          </p>
+        </div>
+        <div class="access-metrics" aria-label="Resumo de usuarios">
+          <article>
+            <strong>{{ usuarios_acessos.total_usuarios }}</strong>
+            <span>Usuarios</span>
+          </article>
+          <article>
+            <strong>{{ usuarios_acessos.total_ativos }}</strong>
+            <span>Ativos</span>
+          </article>
+          <article>
+            <strong>{{ usuarios_acessos.total_admins }}</strong>
+            <span>Admins</span>
+          </article>
+          <article>
+            <strong>{{ usuarios_acessos.total_grupos }}</strong>
+            <span>Grupos</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="access-section" aria-label="Lista de usuarios">
+        <div class="section-title-row">
+          <div>
+            <p class="eyebrow">Usuarios</p>
+            <h2>Contas cadastradas</h2>
+          </div>
+          <div class="section-actions">
+            <span>{{ usuarios_acessos.total_usuarios }} registro(s)</span>
+            <a class="toolbar-action primary" href="{% url 'portal_usuario_criar' %}">Novo usuario</a>
+          </div>
+        </div>
+
+        <div class="access-list">
+          {% for usuario in usuarios_acessos.usuarios %}
+            <article class="access-card">
+              <div class="access-card-top">
+                <span class="agent-status">{{ usuario.status }}</span>
+                {% if usuario.is_superuser %}
+                  <span class="agent-type">Administrador</span>
+                {% elif usuario.is_staff %}
+                  <span class="agent-type">Staff</span>
+                {% else %}
+                  <span class="agent-type">Operacional</span>
+                {% endif %}
+              </div>
+              <strong>{{ usuario.nome }}</strong>
+              <small>@{{ usuario.username }}</small>
+              <dl>
+                <div>
+                  <dt>Papel</dt>
+                  <dd>{{ usuario.papel }}</dd>
+                </div>
+                <div>
+                  <dt>Grupos</dt>
+                  <dd>{{ usuario.grupos }}</dd>
+                </div>
+                <div>
+                  <dt>Ultimo acesso</dt>
+                  <dd>
+                    {% if usuario.ultimo_acesso %}
+                      {{ usuario.ultimo_acesso|date:"d/m/Y H:i" }}
+                    {% else %}
+                      Nao informado
+                    {% endif %}
+                  </dd>
+                </div>
+              </dl>
+              <div class="access-card-actions">
+                <a class="secondary-action" href="{{ usuario.editar_url }}">Editar usuario</a>
+              </div>
+            </article>
+          {% empty %}
+            <article class="empty-agents">
+              <span class="empty-icon" aria-hidden="true">US</span>
+              <p class="eyebrow">Estado vazio</p>
+              <h2>Nenhum usuario encontrado</h2>
+              <p>Use a opcao Novo usuario para liberar acessos ao portal.</p>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="access-section" aria-label="Lista de grupos">
+        <div class="section-title-row">
+          <div>
+            <p class="eyebrow">Grupos</p>
+            <h2>Perfis de acesso</h2>
+          </div>
+          <span>{{ usuarios_acessos.total_grupos }} grupo(s)</span>
+        </div>
+
+        <div class="group-chip-list">
+          {% for grupo in usuarios_acessos.grupos %}
+            <article class="group-chip">
+              <strong>{{ grupo.nome }}</strong>
+              <span>{{ grupo.total_usuarios }} usuario(s)</span>
+            </article>
+          {% empty %}
+            <article class="group-chip">
+              <strong>Nenhum grupo cadastrado</strong>
+              <span>Crie grupos para organizar permissoes.</span>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

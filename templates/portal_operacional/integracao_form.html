@@ -1,0 +1,208 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if modo_edicao %}Editar integracao{% else %}Nova integracao{% endif %} - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-integracao-edit-1">
+</head>
+<body>
+  <main class="portal-shell">
+    <aside class="portal-sidebar" aria-label="Menu principal">
+      <div class="brand-block">
+        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
+        <div>
+          <strong>HUB Agentes</strong>
+          <span>Portal operacional</span>
+        </div>
+      </div>
+
+      <nav class="portal-tabs">
+        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
+        <a class="tab-link" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
+        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
+        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
+        <a class="tab-link active" href="{% url 'portal_integracoes' %}">Integracoes</a>
+        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
+        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
+        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
+      </nav>
+
+      {% include "portal_operacional/_sidebar_footer.html" %}
+    </aside>
+
+    <section class="portal-main" aria-label="{% if modo_edicao %}Editar integracao{% else %}Nova integracao{% endif %}">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Conexoes do sistema</p>
+          <h1>{% if modo_edicao %}Editar integracao{% else %}Nova integracao{% endif %}</h1>
+        </div>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if message.tags == 'success' %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Cadastro operacional</p>
+          <h2>{% if modo_edicao %}Ajuste {{ integration_edicao.nome }}.{% else %}{{ integration_metadata.title }}{% endif %}</h2>
+          <p>
+            {{ integration_metadata.description }}
+            As credenciais ficam ocultas na listagem. Na edicao, deixe o campo
+            secreto em branco para manter a credencial atual. Depois de salvar, use o
+            botao Validar integracao para conferir a conexao.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>{{ integration_metadata.orb }}</span>
+          <small>{% if modo_edicao %}editar{% else %}nova{% endif %}</small>
+        </div>
+      </section>
+
+      {% if not modo_edicao %}
+        <nav class="integration-type-tabs" aria-label="Tipo de integracao">
+          {% for tab in integration_type_tabs %}
+            <a class="integration-type-tab {% if tab.active %}active{% endif %}" href="{{ tab.url }}">
+              {{ tab.label }}
+            </a>
+          {% endfor %}
+        </nav>
+      {% endif %}
+
+      <form class="agent-builder-form" method="post" autocomplete="off">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="form-alert">
+            {% for error in form.non_field_errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <section class="builder-card">
+          <div class="form-section-heading">
+            <p class="eyebrow">Identificacao</p>
+            <h2>Dados principais</h2>
+          </div>
+
+          <div class="execution-grid">
+            <div class="execution-field">
+              <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+              {{ form.nome }}
+              {% for error in form.nome.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+            <div class="execution-field">
+              <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+              {{ form.status }}
+              {% for error in form.status.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+          </div>
+        </section>
+
+        {% if integration_type == "ia" %}
+          <section class="builder-card">
+            <div class="form-section-heading">
+              <p class="eyebrow">IA</p>
+              <h2>Provedor e credencial</h2>
+            </div>
+
+            <div class="execution-grid">
+              <div class="execution-field">
+                <label for="{{ form.provider_type.id_for_label }}">{{ form.provider_type.label }}</label>
+                {{ form.provider_type }}
+                {% for error in form.provider_type.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+              <div class="execution-field">
+                <label for="{{ form.default_model.id_for_label }}">{{ form.default_model.label }}</label>
+                {{ form.default_model }}
+                {% for error in form.default_model.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+              <div class="execution-field">
+                <label for="{{ form.timeout_seconds.id_for_label }}">{{ form.timeout_seconds.label }}</label>
+                {{ form.timeout_seconds }}
+                {% for error in form.timeout_seconds.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+              <div class="execution-field">
+                <label for="{{ form.api_key.id_for_label }}">{{ form.api_key.label }}</label>
+                {{ form.api_key }}
+                <small>{% if form.api_key.help_text %}{{ form.api_key.help_text }}{% else %}A chave nao sera exibida novamente na listagem.{% endif %}</small>
+                {% for error in form.api_key.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+              <div class="execution-field">
+                <label for="{{ form.api_base_url.id_for_label }}">{{ form.api_base_url.label }}</label>
+                {{ form.api_base_url }}
+                {% for error in form.api_base_url.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+              <div class="execution-field">
+                <label for="{{ form.organization_id.id_for_label }}">{{ form.organization_id.label }}</label>
+                {{ form.organization_id }}
+                {% for error in form.organization_id.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+              <div class="execution-field">
+                <label for="{{ form.project_id.id_for_label }}">{{ form.project_id.label }}</label>
+                {{ form.project_id }}
+                {% for error in form.project_id.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+            </div>
+          </section>
+        {% elif integration_type == "google-drive" %}
+          <section class="builder-card">
+            <div class="form-section-heading">
+              <p class="eyebrow">Google Drive</p>
+              <h2>Conta tecnica</h2>
+            </div>
+
+            <div class="execution-grid">
+              <div class="execution-field">
+                <label for="{{ form.service_account_email.id_for_label }}">{{ form.service_account_email.label }}</label>
+                {{ form.service_account_email }}
+                {% for error in form.service_account_email.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+              <div class="execution-field builder-wide">
+                <label for="{{ form.credentials_json.id_for_label }}">{{ form.credentials_json.label }}</label>
+                {{ form.credentials_json }}
+                <small>{% if form.credentials_json.help_text %}{{ form.credentials_json.help_text }}{% else %}Cole o JSON da service account. O Portal nao exibe este conteudo na listagem.{% endif %}</small>
+                {% for error in form.credentials_json.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+            </div>
+          </section>
+        {% else %}
+          <section class="builder-card">
+            <div class="form-section-heading">
+              <p class="eyebrow">Storage local</p>
+              <h2>Pasta autorizada</h2>
+            </div>
+
+            <div class="execution-grid">
+              <div class="execution-field">
+                <label for="{{ form.base_path.id_for_label }}">{{ form.base_path.label }}</label>
+                {{ form.base_path }}
+                <small>Informe um caminho absoluto, por exemplo: C:\licitacao.</small>
+                {% for error in form.base_path.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+              <label class="user-checkline integration-checkline">
+                {{ form.recursive_scan }}
+                <span>{{ form.recursive_scan.label }}</span>
+              </label>
+            </div>
+          </section>
+        {% endif %}
+
+        <div class="execution-actions builder-actions">
+          <a class="secondary-action" href="{% url 'portal_integracoes' %}">Voltar</a>
+          <button class="start-button" type="submit">
+            {% if modo_edicao %}Salvar integracao{% else %}Criar integracao{% endif %}
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

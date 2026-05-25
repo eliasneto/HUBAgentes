@@ -1,0 +1,164 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fontes de documentos - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-sidebar-footer-1">
+</head>
+<body>
+  <main class="portal-shell">
+    <aside class="portal-sidebar" aria-label="Menu principal">
+      <div class="brand-block">
+        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
+        <div>
+          <strong>HUB Agentes</strong>
+          <span>Portal operacional</span>
+        </div>
+      </div>
+
+      <nav class="portal-tabs">
+        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
+        <a class="tab-link" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
+        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
+        <a class="tab-link active" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
+        <a class="tab-link" href="{% url 'portal_integracoes' %}">Integracoes</a>
+        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
+        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
+        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
+      </nav>
+
+      {% include "portal_operacional/_sidebar_footer.html" %}
+    </aside>
+
+    <section class="portal-main" aria-label="Fontes de documentos">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Entrada de documentos</p>
+          <h1>Fontes de documentos</h1>
+        </div>
+      </header>
+
+      <section class="sources-hero">
+        <div>
+          <p class="eyebrow">Mapa de entrada</p>
+          <h2>Controle de onde os PDFs chegam antes da leitura pela IA.</h2>
+          <p>
+            Esta tela lista as fontes ja cadastradas para operacao e ajuda a
+            conferir de onde os documentos serao lidos.
+          </p>
+        </div>
+        <div class="sources-metrics" aria-label="Resumo das fontes">
+          <article>
+            <strong>{{ fontes.total_fontes }}</strong>
+            <span>Total</span>
+          </article>
+          <article>
+            <strong>{{ fontes.total_google_drive }}</strong>
+            <span>Google Drive</span>
+          </article>
+          <article>
+            <strong>{{ fontes.total_storage_local }}</strong>
+            <span>Storage local</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="sources-section" aria-labelledby="google-drive-title">
+        <div class="section-heading">
+          <p class="eyebrow">Nuvem</p>
+          <h2 id="google-drive-title">Pastas Google Drive</h2>
+        </div>
+
+        <div class="sources-grid">
+          {% for fonte in fontes.google_drive %}
+            <article class="source-card">
+              <div class="source-card-header">
+                <span class="agent-status">{{ fonte.status }}</span>
+                <span class="agent-type">Google Drive</span>
+              </div>
+              <strong>{{ fonte.nome }}</strong>
+              <p>{{ fonte.pasta }}</p>
+              <dl class="agent-meta">
+                <div>
+                  <dt>Integracao</dt>
+                  <dd>{{ fonte.integracao }}</dd>
+                </div>
+                <div>
+                  <dt>Itens sincronizados</dt>
+                  <dd>{{ fonte.total_itens }} itens, {{ fonte.total_pdfs }} PDFs, {{ fonte.total_disponiveis_ia }} para IA</dd>
+                </div>
+                <div>
+                  <dt>Ultima validacao</dt>
+                  <dd>
+                    {% if fonte.ultima_validacao %}
+                      {{ fonte.ultima_validacao|date:"d/m/Y H:i" }}
+                    {% else %}
+                      Nao informada
+                    {% endif %}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          {% empty %}
+            <article class="empty-agents source-empty">
+              <span class="empty-icon" aria-hidden="true">GD</span>
+              <p class="eyebrow">Sem Google Drive</p>
+              <h2>Nenhuma pasta do Google Drive cadastrada</h2>
+              <p>Nenhuma origem de Google Drive esta disponivel para o portal.</p>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="sources-section" aria-labelledby="local-storage-title">
+        <div class="section-heading">
+          <p class="eyebrow">Ambiente local</p>
+          <h2 id="local-storage-title">Storages locais</h2>
+        </div>
+
+        <div class="sources-grid">
+          {% for fonte in fontes.storage_local %}
+            <article class="source-card local-source">
+              <div class="source-card-header">
+                <span class="agent-status">{{ fonte.status }}</span>
+                <span class="agent-type">Local</span>
+              </div>
+              <strong>{{ fonte.nome }}</strong>
+              <p>{{ fonte.base_path }}</p>
+              <dl class="agent-meta">
+                <div>
+                  <dt>Extensoes</dt>
+                  <dd>{{ fonte.extensoes|default:"Nao informadas" }}</dd>
+                </div>
+                <div>
+                  <dt>Leitura recursiva</dt>
+                  <dd>{% if fonte.leitura_recursiva %}Sim{% else %}Nao{% endif %}</dd>
+                </div>
+                <div>
+                  <dt>Ultima validacao</dt>
+                  <dd>
+                    {% if fonte.ultima_validacao %}
+                      {{ fonte.ultima_validacao|date:"d/m/Y H:i" }}
+                    {% else %}
+                      Nao informada
+                    {% endif %}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          {% empty %}
+            <article class="empty-agents source-empty">
+              <span class="empty-icon" aria-hidden="true">PC</span>
+              <p class="eyebrow">Sem storage local</p>
+              <h2>Nenhuma pasta local cadastrada</h2>
+              <p>Nenhuma integracao de storage local esta disponivel para o portal.</p>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

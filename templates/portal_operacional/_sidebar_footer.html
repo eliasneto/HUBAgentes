@@ -1,0 +1,14 @@
+<div class="sidebar-account" aria-label="Sessao do usuario">
+  <div class="sidebar-account-row">
+    <span>Usuario</span>
+    <strong>{{ request.user.get_full_name|default:request.user.get_username }}</strong>
+  </div>
+  <div class="sidebar-account-row">
+    <span>Versao</span>
+    <strong>v0.1.0</strong>
+  </div>
+  <form action="{% url 'portal_logout' %}" method="post">
+    {% csrf_token %}
+    <button class="sidebar-logout" type="submit">Sair</button>
+  </form>
+</div>
