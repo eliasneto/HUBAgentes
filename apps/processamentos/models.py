@@ -66,6 +66,7 @@ class ProcessingInputSourceType(models.TextChoices):
 
 
 class ProcessingOutputFormat(models.TextChoices):
+    AI_DEFINED = "ai_defined", "Definido pela IA"
     JSON = "json", "JSON"
     XLSX = "xlsx", "Excel"
     CSV = "csv", "CSV"

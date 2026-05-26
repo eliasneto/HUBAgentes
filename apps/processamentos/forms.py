@@ -47,6 +47,7 @@ class AgenteExecucaoForm(forms.Form):
     output_format = forms.ChoiceField(
         label="Formato de saida",
         choices=(
+            (ProcessingOutputFormat.AI_DEFINED, "Definido pela IA"),
             (ProcessingOutputFormat.JSON, "JSON"),
             (ProcessingOutputFormat.XLSX, "Excel"),
             (ProcessingOutputFormat.CSV, "CSV"),

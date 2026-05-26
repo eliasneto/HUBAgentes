@@ -228,7 +228,7 @@
             <div class="execution-field">
               <label for="{{ form.default_output_format.id_for_label }}">{{ form.default_output_format.label }}</label>
               {{ form.default_output_format }}
-              <small>Este e o tipo do arquivo gerado individualmente ou dentro do ZIP. Suporta JSON, Excel, CSV, PDF e TXT.</small>
+              <small>Escolha um formato fixo ou permita que a IA informe `formato_saida` no JSON. O sistema valida e gera JSON, Excel, CSV, PDF ou TXT.</small>
               {% for error in form.default_output_format.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
 

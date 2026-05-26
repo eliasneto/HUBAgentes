@@ -28,6 +28,7 @@ from apps.processamentos.models import (
     OutputDocumentStatus,
     ProcessamentoExecucaoIA,
     ProcessingInputSourceType,
+    ProcessingOutputFormat,
     ProcessingStatus,
 )
 from apps.processamentos.services.document_sources import (
@@ -50,6 +51,26 @@ class ProcessamentoExecutionError(Exception):
     def __init__(self, message, *, technical_message=""):
         super().__init__(message)
         self.technical_message = technical_message
+
+
+AI_DEFINED_OUTPUT_INSTRUCTION_MARKER = "FORMATO DE SAIDA DEFINIDO PELA IA"
+SUPPORTED_AI_DEFINED_OUTPUT_FORMATS = {
+    ProcessingOutputFormat.JSON,
+    ProcessingOutputFormat.XLSX,
+    ProcessingOutputFormat.CSV,
+    ProcessingOutputFormat.PDF,
+    ProcessingOutputFormat.TXT,
+}
+AI_DEFINED_OUTPUT_ALIASES = {
+    "json": ProcessingOutputFormat.JSON,
+    "xlsx": ProcessingOutputFormat.XLSX,
+    "excel": ProcessingOutputFormat.XLSX,
+    "xls": ProcessingOutputFormat.XLSX,
+    "csv": ProcessingOutputFormat.CSV,
+    "pdf": ProcessingOutputFormat.PDF,
+    "txt": ProcessingOutputFormat.TXT,
+    "texto": ProcessingOutputFormat.TXT,
+}
 
 
 def _registrar_atividade_processamento(
@@ -82,10 +103,7 @@ def execute_processing(processamento, actor):
     execution_params = _build_execution_params(processamento)
     if not processamento.ai_provider_integration_snapshot_id:
         processamento.ai_provider_integration_snapshot = integration
-    if (
-        not processamento.prompt_snapshot
-        or processamento.prompt_snapshot == processamento.agente.prompt_base
-    ):
+    if _deve_reconstruir_prompt_snapshot(processamento):
         processamento.prompt_snapshot = _build_prompt_snapshot(processamento)
     if not processamento.modelo_snapshot:
         processamento.modelo_snapshot = model_name
@@ -259,9 +277,41 @@ def _usa_execucao_individual(processamento):
 
 def _build_prompt_snapshot(processamento):
     configuracao = obter_ou_criar_configuracao_operacional(processamento.agente)
-    return renderizar_prompt_com_parametros(
+    prompt = renderizar_prompt_com_parametros(
         processamento.agente.prompt_base,
         configuracao.prompt_parameters,
+    )
+    if processamento.output_format == ProcessingOutputFormat.AI_DEFINED:
+        prompt = _adicionar_instrucao_formato_definido_pela_ia(prompt)
+    return prompt
+
+
+def _deve_reconstruir_prompt_snapshot(processamento):
+    if not processamento.prompt_snapshot:
+        return True
+    if processamento.prompt_snapshot == processamento.agente.prompt_base:
+        return True
+    return (
+        processamento.output_format == ProcessingOutputFormat.AI_DEFINED
+        and AI_DEFINED_OUTPUT_INSTRUCTION_MARKER not in processamento.prompt_snapshot
+    )
+
+
+def _adicionar_instrucao_formato_definido_pela_ia(prompt):
+    if AI_DEFINED_OUTPUT_INSTRUCTION_MARKER in prompt:
+        return prompt
+    return (
+        f"{prompt.rstrip()}\n\n"
+        f"{AI_DEFINED_OUTPUT_INSTRUCTION_MARKER}:\n"
+        "- Como o formato de saida esta configurado como definido pela IA, "
+        "responda obrigatoriamente com um JSON valido contendo o campo "
+        '"formato_saida".\n'
+        '- O campo "formato_saida" deve ser exatamente um destes valores: '
+        '"json", "xlsx", "csv", "pdf" ou "txt".\n'
+        "- O conteudo a ser convertido pelo sistema deve ficar no campo "
+        '"dados".\n'
+        "- Nao use outros formatos e nao gere arquivo diretamente; o sistema "
+        "validara o formato e criara o arquivo final."
     )
 
 
@@ -470,7 +520,7 @@ def _execute_without_document(
         execution_finished_at=execution_finished_at,
     )
     parsed_output = _parse_structured_output(execution_result.output_text)
-    output_filename, output_bytes = render_output_file(
+    output_filename, output_bytes, output_format, render_payload = _render_output_file(
         parsed_output,
         processamento.output_format,
         f"{processamento.codigo}_resultado.{processamento.output_format}",
@@ -503,7 +553,7 @@ def _execute_without_document(
             save=False,
         )
         processamento.arquivo_saida_nome = output_filename
-        processamento.arquivo_saida_formato = processamento.output_format
+        processamento.arquivo_saida_formato = output_format
         processamento.arquivo_saida_liberado_em = timezone.now()
         processamento.execucao_finalizada_em = execution_finished_at
         processamento.duracao_processamento_ms = telemetry["duracao_processamento_ms"]
@@ -529,6 +579,7 @@ def _execute_without_document(
         model_name=model_name,
         execution_result=execution_result,
         parsed_output=parsed_output,
+        render_payload=render_payload,
         telemetry=telemetry,
         execution_record=execution_record,
     )
@@ -537,7 +588,7 @@ def _execute_without_document(
         "documentos_processados": 0,
         "documentos_com_erro": 0,
         "saidas_geradas": 1,
-        "formato_saida": processamento.output_format,
+        "formato_saida": output_format,
         "batch_started_at": execution_started_at,
     }
 
@@ -595,7 +646,7 @@ def _execute_document(
         execution_finished_at=execution_finished_at,
     )
     parsed_output = _parse_structured_output(execution_result.output_text)
-    output_filename, output_bytes = render_output_file(
+    output_filename, output_bytes, output_format, render_payload = _render_output_file(
         parsed_output,
         processamento.output_format,
         _build_output_basename(processamento, documento, processamento.output_format),
@@ -626,7 +677,7 @@ def _execute_document(
             processamento=processamento,
             documento=documento,
             execucao_ia=execution_record,
-            formato=processamento.output_format,
+            formato=output_format,
             status=OutputDocumentStatus.GERADO,
             scope_type=ExecutionScopeType.INDIVIDUAL,
             documentos_referencia=_build_document_references([documento]),
@@ -681,6 +732,7 @@ def _execute_document(
         model_name=model_name,
         execution_result=execution_result,
         parsed_output=parsed_output,
+        render_payload=render_payload,
         telemetry=telemetry,
         execution_record=execution_record,
         output_record=output_record,
@@ -754,7 +806,7 @@ def _execute_document_group(
         execution_finished_at=execution_finished_at,
     )
     parsed_output = _parse_structured_output(execution_result.output_text)
-    output_filename, output_bytes = render_output_file(
+    output_filename, output_bytes, output_format, render_payload = _render_output_file(
         parsed_output,
         processamento.output_format,
         f"{processamento.codigo}_grupo.{processamento.output_format}",
@@ -785,7 +837,7 @@ def _execute_document_group(
             processamento=processamento,
             documento=None,
             execucao_ia=execution_record,
-            formato=processamento.output_format,
+            formato=output_format,
             status=OutputDocumentStatus.GERADO,
             scope_type=ExecutionScopeType.GRUPO,
             documentos_referencia=documentos_referencia,
@@ -839,6 +891,7 @@ def _execute_document_group(
         model_name=model_name,
         execution_result=execution_result,
         parsed_output=parsed_output,
+        render_payload=render_payload,
         telemetry=telemetry,
         execution_record=execution_record,
         output_record=output_record,
@@ -896,6 +949,94 @@ def _parse_structured_output(output_text):
                 f"Erro: {exc}. Trecho da resposta: {raw_excerpt}"
             ),
         ) from exc
+
+
+def _render_output_file(parsed_output, requested_output_format, output_basename):
+    output_format, render_payload = _resolver_formato_e_payload_saida(
+        parsed_output,
+        requested_output_format,
+    )
+    output_filename, output_bytes = render_output_file(
+        render_payload,
+        output_format,
+        output_basename,
+    )
+    return output_filename, output_bytes, output_format, render_payload
+
+
+def _resolver_formato_e_payload_saida(parsed_output, requested_output_format):
+    if requested_output_format != ProcessingOutputFormat.AI_DEFINED:
+        return requested_output_format, parsed_output
+
+    if not isinstance(parsed_output, dict):
+        raise ProcessamentoExecutionError(
+            (
+                "Quando o formato de saida e definido pela IA, a resposta precisa "
+                "ser um objeto JSON com o campo formato_saida."
+            )
+        )
+
+    raw_format = (
+        parsed_output.get("formato_saida")
+        or parsed_output.get("output_format")
+        or parsed_output.get("tipo_arquivo_saida")
+    )
+    output_format = _normalizar_formato_saida_definido_pela_ia(raw_format)
+    render_payload = _extrair_payload_saida_definido_pela_ia(parsed_output)
+    return output_format, render_payload
+
+
+def _normalizar_formato_saida_definido_pela_ia(raw_format):
+    normalized_format = str(raw_format or "").strip().lower().lstrip(".")
+    output_format = AI_DEFINED_OUTPUT_ALIASES.get(normalized_format)
+    if output_format not in SUPPORTED_AI_DEFINED_OUTPUT_FORMATS:
+        allowed = ", ".join(sorted(SUPPORTED_AI_DEFINED_OUTPUT_FORMATS))
+        raise ProcessamentoExecutionError(
+            (
+                "A IA nao informou um formato de saida permitido. "
+                f"Use um destes valores em formato_saida: {allowed}."
+            ),
+            technical_message=(
+                "Formato de saida definido pela IA invalido ou ausente: "
+                f"{raw_format!r}."
+            ),
+        )
+    return output_format
+
+
+def _extrair_payload_saida_definido_pela_ia(parsed_output):
+    for payload_key in ("dados", "conteudo", "resultado", "arquivo", "payload", "data"):
+        if payload_key in parsed_output:
+            payload = parsed_output[payload_key]
+            if payload in (None, ""):
+                raise ProcessamentoExecutionError(
+                    (
+                        "A IA informou o formato de saida, mas nao enviou dados "
+                        "para gerar o arquivo."
+                    )
+                )
+            return payload
+
+    ignored_keys = {
+        "formato_saida",
+        "output_format",
+        "tipo_arquivo_saida",
+        "status",
+        "mensagem",
+    }
+    payload = {
+        key: value
+        for key, value in parsed_output.items()
+        if key not in ignored_keys
+    }
+    if not payload:
+        raise ProcessamentoExecutionError(
+            (
+                "A IA informou o formato de saida, mas nao enviou conteudo "
+                "estruturado para gerar o arquivo."
+            )
+        )
+    return payload
 
 
 def _truncate_error_excerpt(value, limit=1800):
@@ -1080,6 +1221,7 @@ def _log_execution_event(
     model_name,
     execution_result,
     parsed_output,
+    render_payload,
     telemetry,
     execution_record,
     output_record,
@@ -1115,6 +1257,9 @@ def _log_execution_event(
                 "total_tokens": telemetry["total_tokens"],
                 "output_format": output_record.formato,
                 "output_keys": (
+                    list(render_payload.keys()) if isinstance(render_payload, dict) else []
+                ),
+                "raw_output_keys": (
                     list(parsed_output.keys()) if isinstance(parsed_output, dict) else []
                 ),
             },
@@ -1145,6 +1290,7 @@ def _log_group_execution_event(
     model_name,
     execution_result,
     parsed_output,
+    render_payload,
     telemetry,
     execution_record,
     output_record,
@@ -1178,6 +1324,9 @@ def _log_group_execution_event(
                 "total_tokens": telemetry["total_tokens"],
                 "output_format": output_record.formato,
                 "output_keys": (
+                    list(render_payload.keys()) if isinstance(render_payload, dict) else []
+                ),
+                "raw_output_keys": (
                     list(parsed_output.keys()) if isinstance(parsed_output, dict) else []
                 ),
             },
@@ -1207,6 +1356,7 @@ def _log_execution_without_document_event(
     model_name,
     execution_result,
     parsed_output,
+    render_payload,
     telemetry,
     execution_record,
 ):
@@ -1235,8 +1385,11 @@ def _log_execution_without_document_event(
                 "processing_tokens": telemetry["processing_tokens"],
                 "output_tokens": telemetry["output_tokens"],
                 "total_tokens": telemetry["total_tokens"],
-                "output_format": processamento.output_format,
+                "output_format": processamento.arquivo_saida_formato,
                 "output_keys": (
+                    list(render_payload.keys()) if isinstance(render_payload, dict) else []
+                ),
+                "raw_output_keys": (
                     list(parsed_output.keys()) if isinstance(parsed_output, dict) else []
                 ),
             },
