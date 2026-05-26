@@ -38,6 +38,8 @@ services:
         condition: service_healthy
     ports:
       - "8010:8010"
+      - "61622:8010"
+
     volumes:
       - media_data:/app/media
       - staticfiles_data:/app/staticfiles

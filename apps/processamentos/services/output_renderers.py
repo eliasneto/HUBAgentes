@@ -32,6 +32,14 @@ def render_output_file(parsed_output, output_format, output_basename):
 
 
 def _rows_from_output(parsed_output):
+    workbook_sheets = _extract_workbook_sheets(parsed_output)
+    if workbook_sheets:
+        return workbook_sheets[0]["rows"]
+
+    return _rows_from_generic_output(parsed_output)
+
+
+def _rows_from_generic_output(parsed_output):
     if isinstance(parsed_output, list):
         if all(isinstance(item, dict) for item in parsed_output):
             return parsed_output
@@ -76,19 +84,34 @@ def _render_txt_bytes(parsed_output):
 
 
 def _render_xlsx_bytes(parsed_output):
-    rows = _rows_from_output(parsed_output)
-    headers = _collect_headers(rows)
-    table_rows = [headers]
-    for row in rows:
-        table_rows.append([row.get(header, "") for header in headers])
+    workbook_sheets = _extract_workbook_sheets(parsed_output)
+    if not workbook_sheets:
+        workbook_sheets = [
+            {
+                "name": "Resultado",
+                "rows": _rows_from_generic_output(parsed_output),
+            }
+        ]
 
     workbook = io.BytesIO()
     with ZipFile(workbook, "w", compression=ZIP_DEFLATED) as archive:
-        archive.writestr("[Content_Types].xml", _content_types_xml())
+        archive.writestr("[Content_Types].xml", _content_types_xml(len(workbook_sheets)))
         archive.writestr("_rels/.rels", _root_rels_xml())
-        archive.writestr("xl/workbook.xml", _workbook_xml())
-        archive.writestr("xl/_rels/workbook.xml.rels", _workbook_rels_xml())
-        archive.writestr("xl/worksheets/sheet1.xml", _worksheet_xml(table_rows))
+        archive.writestr("xl/workbook.xml", _workbook_xml(workbook_sheets))
+        archive.writestr(
+            "xl/_rels/workbook.xml.rels",
+            _workbook_rels_xml(len(workbook_sheets)),
+        )
+        for sheet_index, sheet in enumerate(workbook_sheets, start=1):
+            rows = sheet["rows"]
+            headers = _collect_headers(rows)
+            table_rows = [headers]
+            for row in rows:
+                table_rows.append([row.get(header, "") for header in headers])
+            archive.writestr(
+                f"xl/worksheets/sheet{sheet_index}.xml",
+                _worksheet_xml(table_rows),
+            )
     return workbook.getvalue()
 
 
@@ -161,13 +184,80 @@ def _pdf_content_stream(lines):
     return f"<< /Length {len(content)} >>\nstream\n".encode("latin-1") + content + b"\nendstream"
 
 
-def _content_types_xml():
+def _extract_workbook_sheets(parsed_output):
+    workbook_payload = parsed_output
+    if isinstance(parsed_output, dict) and isinstance(parsed_output.get("arquivo"), dict):
+        workbook_payload = parsed_output["arquivo"]
+
+    if not isinstance(workbook_payload, dict):
+        return []
+
+    sheets_payload = workbook_payload.get("abas") or workbook_payload.get("sheets")
+    if not isinstance(sheets_payload, list):
+        return []
+
+    workbook_sheets = []
+    used_names = set()
+    for index, sheet_payload in enumerate(sheets_payload, start=1):
+        if not isinstance(sheet_payload, dict):
+            continue
+
+        raw_name = (
+            sheet_payload.get("nome_aba")
+            or sheet_payload.get("nome")
+            or sheet_payload.get("name")
+            or f"Resultado {index}"
+        )
+        sheet_name = _unique_sheet_name(raw_name, used_names)
+        sheet_data = (
+            sheet_payload.get("dados")
+            or sheet_payload.get("linhas")
+            or sheet_payload.get("rows")
+            or []
+        )
+        workbook_sheets.append(
+            {
+                "name": sheet_name,
+                "rows": _rows_from_generic_output(sheet_data),
+            }
+        )
+    return workbook_sheets
+
+
+def _unique_sheet_name(raw_name, used_names):
+    base_name = _sanitize_sheet_name(raw_name)
+    sheet_name = base_name
+    counter = 2
+    while sheet_name.lower() in used_names:
+        suffix = f" {counter}"
+        sheet_name = f"{base_name[:31 - len(suffix)]}{suffix}"
+        counter += 1
+    used_names.add(sheet_name.lower())
+    return sheet_name
+
+
+def _sanitize_sheet_name(raw_name):
+    sanitized = str(raw_name or "Resultado").strip()
+    for invalid_char in ("\\", "/", "?", "*", "[", "]", ":"):
+        sanitized = sanitized.replace(invalid_char, "-")
+    sanitized = sanitized.strip("'") or "Resultado"
+    return sanitized[:31]
+
+
+def _content_types_xml(sheet_count=1):
+    worksheet_overrides = "".join(
+        (
+            f'<Override PartName="/xl/worksheets/sheet{index}.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        )
+        for index in range(1, sheet_count + 1)
+    )
     return """<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  """ + worksheet_overrides + """
 </Types>"""
 
 
@@ -178,20 +268,34 @@ def _root_rels_xml():
 </Relationships>"""
 
 
-def _workbook_xml():
+def _workbook_xml(workbook_sheets=None):
+    workbook_sheets = workbook_sheets or [{"name": "Resultado"}]
+    sheets_xml = "".join(
+        (
+            f'<sheet name="{xml_escape(sheet["name"])}" '
+            f'sheetId="{index}" r:id="rId{index}"/>'
+        )
+        for index, sheet in enumerate(workbook_sheets, start=1)
+    )
     return """<?xml version="1.0" encoding="UTF-8"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <sheets>
-    <sheet name="Resultado" sheetId="1" r:id="rId1"/>
-  </sheets>
+  <sheets>""" + sheets_xml + """</sheets>
 </workbook>"""
 
 
-def _workbook_rels_xml():
+def _workbook_rels_xml(sheet_count=1):
+    relationships_xml = "".join(
+        (
+            f'<Relationship Id="rId{index}" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            f'Target="worksheets/sheet{index}.xml"/>'
+        )
+        for index in range(1, sheet_count + 1)
+    )
     return """<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  """ + relationships_xml + """
 </Relationships>"""
 
 
