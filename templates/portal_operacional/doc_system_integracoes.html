@@ -1,0 +1,259 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Integracoes</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-integracoes-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_integracoes" %}
+
+    <section class="portal-main" aria-label="Documentacao de Integracoes">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Integracoes</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia operacional</p>
+          <h2>Como cadastrar e validar as conexoes do sistema sem expor credenciais ou depender de tentativa e erro.</h2>
+          <p>
+            Esta tela documenta o modulo de Integracoes do portal. Ela explica os tipos de conexao,
+            os campos aceitos em cada cadastro, exemplos de preenchimento e os principais cuidados de seguranca e validacao.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>DOC</span>
+          <small>integracoes</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo a passo</p>
+          <h2>Fluxo recomendado para criar uma conexao</h2>
+        </div>
+
+        <ol class="doc-step-list">
+          <li>Abra <strong>Administrador &gt; Integracoes</strong> e clique em <strong>Nova conexao</strong>.</li>
+          <li>Escolha o tipo: <strong>IA</strong>, <strong>Google Drive</strong> ou <strong>Pasta local</strong>.</li>
+          <li>Preencha nome e status da conexao.</li>
+          <li>Informe os campos tecnicos obrigatorios do tipo escolhido.</li>
+          <li>Salve o cadastro.</li>
+          <li>Use o botao <strong>Validar conexao</strong> para confirmar a comunicacao com o sistema externo ou com a pasta autorizada.</li>
+          <li>Se a validacao falhar, revise a credencial, o caminho ou as permissoes antes de liberar uso pelos agentes.</li>
+        </ol>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Tipos</p>
+          <h2>Quais conexoes existem hoje</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">IA</span>
+            <p>Usada pelos agentes para conversar com o provedor de inteligencia artificial.</p>
+            <small>Exemplos de provedor: <code>OpenAI</code>, <code>Anthropic</code>, <code>Gemini</code>.</small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Google Drive</span>
+            <p>Usada para acessar pastas em nuvem compartilhadas com a conta tecnica.</p>
+            <small>Depende de <code>service account</code> e credenciais JSON validas.</small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Pasta local</span>
+            <p>Autoriza o sistema a ler uma pasta existente no servidor.</p>
+            <small>Hoje o escopo operacional aceito nessa conexao continua focado em arquivos <code>PDF</code>.</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Campos comuns</p>
+          <h2>Dados presentes em todos os tipos de conexao</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Observacoes</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Nome</strong></div>
+            <div>Texto livre com ate 120 caracteres</div>
+            <div>Use um nome que ajude a identificar o uso da conexao, por exemplo <code>OpenAI Producao</code>.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Status</strong></div>
+            <div><code>ativa</code>, <code>inativa</code> ou <code>erro</code></div>
+            <div>No portal normalmente voce ativa ou inativa. O status de erro pode surgir apos validacao com falha.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">IA</p>
+          <h2>Campos do cadastro de provedor de IA</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Exemplo ou uso</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Provedor</strong></div>
+            <div><code>openai</code>, <code>anthropic</code>, <code>gemini</code></div>
+            <div>Define qual adaptador tecnico sera usado na comunicacao.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Modelo padrao</strong></div>
+            <div>Nome tecnico do modelo</div>
+            <div>Exemplo: <code>gpt-4.1-mini</code> ou <code>gemini-2.0-flash</code>.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Timeout em segundos</strong></div>
+            <div>Numero inteiro</div>
+            <div>Exemplo: <code>90</code>.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Chave de API</strong></div>
+            <div>Texto secreto</div>
+            <div>Fica oculto na listagem. Em edicao, pode ficar em branco para manter o valor atual.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>URL base da API</strong></div>
+            <div>URL opcional</div>
+            <div>Usada apenas quando houver endpoint customizado.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Organization ID</strong></div>
+            <div>Texto opcional</div>
+            <div>Nem todo provedor exige esse campo.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Project ID</strong></div>
+            <div>Texto opcional</div>
+            <div>Pode ser usado em provedores que exigem identificador de projeto.</div>
+          </div>
+        </div>
+
+        <div class="doc-code-panel">
+          <strong>Exemplo de conexao de IA</strong>
+          <pre><code>Nome: OpenAI Producao
+Status: ativa
+Provedor: openai
+Modelo padrao: gpt-4.1-mini
+Timeout em segundos: 90
+Chave de API: sk-...
+URL base da API: em branco
+Organization ID: em branco
+Project ID: em branco</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Google Drive</p>
+          <h2>Campos do cadastro de conta tecnica</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Exemplo ou uso</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>E-mail da service account</strong></div>
+            <div>E-mail tecnico do JSON</div>
+            <div>Use o valor de <code>client_email</code>.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Credenciais JSON</strong></div>
+            <div>Conteudo completo do arquivo JSON</div>
+            <div>O portal nao mostra esse conteudo na listagem.</div>
+          </div>
+        </div>
+
+        <div class="doc-code-panel">
+          <strong>Exemplo de conexao Google Drive</strong>
+          <pre><code>Nome: Drive Editais Producao
+Status: ativa
+E-mail da service account: hub-agentes@projeto.iam.gserviceaccount.com
+Credenciais JSON: { ...conteudo completo do arquivo... }</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Pasta local</p>
+          <h2>Campos do cadastro de pasta autorizada</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Exemplo ou uso</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Caminho local autorizado</strong></div>
+            <div>Caminho absoluto do servidor</div>
+            <div>Exemplo: <code>/app/media/entradas</code> ou <code>C:\licitacao</code>.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Ler subpastas automaticamente</strong></div>
+            <div>Marcado ou desmarcado</div>
+            <div>Ative quando os arquivos puderem estar em pastas filhas.</div>
+          </div>
+        </div>
+
+        <div class="doc-code-panel">
+          <strong>Exemplo de conexao de pasta local</strong>
+          <pre><code>Nome: Pasta de entrada do servidor
+Status: ativa
+Caminho local autorizado: /app/media/entradas
+Ler subpastas automaticamente: Sim</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Observacoes importantes</p>
+          <h2>Cuidados antes de validar ou liberar para uso</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>O botao <strong>Validar conexao</strong> deve ser usado sempre depois de criar ou editar uma conexao.</li>
+          <li>Em edicao, campos secretos como <strong>Chave de API</strong> e <strong>Credenciais JSON</strong> podem ficar em branco para preservar o valor atual.</li>
+          <li>Para Google Drive, a pasta precisa estar compartilhada com o e-mail da <code>service account</code>.</li>
+          <li>Para pasta local, o caminho precisa existir no servidor e ser absoluto.</li>
+          <li>No escopo atual, a conexao de pasta local permanece orientada a <code>PDF</code>.</li>
+          <li>Uma conexao inativa ou com erro pode impedir uso por agentes ou fontes documentais vinculadas.</li>
+          <li>A listagem do portal exibe apenas metadados operacionais; credenciais sensiveis continuam ocultas.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_integracoes' %}">Abrir integracoes</a>
+        <a class="start-button" href="/doc-system/integracoes/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

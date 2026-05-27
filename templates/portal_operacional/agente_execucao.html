@@ -10,28 +10,7 @@
 </head>
 <body>
   <main class="portal-shell">
-    <aside class="portal-sidebar" aria-label="Menu principal">
-      <div class="brand-block">
-        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
-        <div>
-          <strong>HUB Agentes</strong>
-          <span>Portal operacional</span>
-        </div>
-      </div>
-
-      <nav class="portal-tabs">
-        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
-        <a class="tab-link active" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
-        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
-        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
-        <a class="tab-link" href="{% url 'portal_integracoes' %}">Integracoes</a>
-        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
-        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
-        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
-      </nav>
-
-      {% include "portal_operacional/_sidebar_footer.html" %}
-    </aside>
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="agentes" %}
 
     <section class="portal-main" aria-label="Executar agente de leitura">
       <header class="portal-topbar">

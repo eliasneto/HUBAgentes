@@ -1,0 +1,271 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Gerenciar agentes</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-gerenciar-agentes-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_gerenciar_agentes" %}
+
+    <section class="portal-main" aria-label="Documentacao de Gerenciar agentes">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Gerenciar agentes</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia operacional</p>
+          <h2>Como criar um agente no sistema, campo por campo, sem depender de tentativa e erro.</h2>
+          <p>
+            Esta tela documenta o cadastro de agentes do portal. Ela mostra a ordem recomendada
+            de preenchimento, os valores aceitos, exemplos prontos e as validacoes que impedem o salvamento.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>DOC</span>
+          <small>gerenciar agentes</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo a passo</p>
+          <h2>Fluxo recomendado para criar um agente</h2>
+        </div>
+
+        <ol class="doc-step-list">
+          <li>Abra <strong>Operacao &gt; Gerenciar agentes</strong> e clique em <strong>Novo agente</strong>.</li>
+          <li>Preencha a identidade do agente: nome, tipo, categoria, visibilidade, acionamento e status.</li>
+          <li>Descreva com clareza o objetivo operacional do agente.</li>
+          <li>Escolha a origem de entrada: Google Drive, pasta local, arquivo local fixo ou sem origem documental.</li>
+          <li>Defina como os documentos serao processados: individual, grupo unico ou lote por pasta.</li>
+          <li>Selecione a integracao de IA e o formato padrao de saida.</li>
+          <li>Escreva o prompt base e, se necessario, crie parametros reutilizaveis.</li>
+          <li>Revise as combinacoes de entrada e saida antes de salvar.</li>
+        </ol>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Identidade</p>
+          <h2>Campos iniciais do cadastro</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Nome do agente</span>
+            <p>Texto livre com ate 120 caracteres.</p>
+            <small>Exemplo: <code>Leitor de edital PDF</code></small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Tipo</span>
+            <p>Valores aceitos: <code>classificador</code>, <code>extrator</code>, <code>validador</code>, <code>estruturador</code>, <code>generico</code>.</p>
+            <small>Exemplo recomendado: <code>extrator</code></small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Categoria operacional</span>
+            <p>Valores aceitos: <code>leitura_documento</code>, <code>decisao_documento</code>, <code>acao_sistema</code>, <code>leitura_arquivo</code>, <code>generico</code>.</p>
+            <small>Padrao da tela: <code>leitura_documento</code></small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Visibilidade</span>
+            <p>Valores aceitos: <code>usuario</code> e <code>tecnico</code>.</p>
+            <small><code>tecnico</code> nao aparece na lista operacional comum.</small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Modo de acionamento</span>
+            <p>Valores aceitos: <code>portal</code>, <code>botao_contextual</code>, <code>evento_sistema</code>, <code>agendado</code>, <code>interno</code>.</p>
+            <small>Padrao da tela: <code>portal</code></small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Status</span>
+            <p>Na tela do portal o cadastro usa <code>ativo</code> e <code>inativo</code>.</p>
+            <small>Agente inativo nao aparece para execucao operacional.</small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Modelo preferencial</span>
+            <p>Campo opcional para informar o modelo desejado na integracao de IA.</p>
+            <small>Exemplo: <code>gpt-4.1-mini</code></small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Objetivo</span>
+            <p>Texto descritivo do que o agente deve entregar.</p>
+            <small>Exemplo: <code>Extrair objeto, valor, prazo e anexos principais do edital.</code></small>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Entrada</p>
+          <h2>Como o agente recebe os documentos</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Observacoes</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Origem padrao</strong></div>
+            <div><code>google_drive_folder</code>, <code>local_folder</code>, <code>local_file</code>, <code>none</code></div>
+            <div>Define quais campos extras aparecem no formulario.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Pasta padrao do Google Drive</strong></div>
+            <div>Fonte ativa cadastrada no sistema</div>
+            <div>Obrigatoria quando a origem padrao for <code>google_drive_folder</code>.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Pasta local padrao</strong></div>
+            <div>Integracao local ativa</div>
+            <div>Obrigatorio para <code>local_folder</code> e <code>local_file</code>.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Caminho relativo padrao</strong></div>
+            <div>Texto com o caminho dentro da pasta autorizada</div>
+            <div>Exemplo: <code>entrada/editais/2026</code> ou <code>entrada/arquivo.pdf</code>.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Permitir documento na execucao</strong></div>
+            <div>Marcado ou desmarcado</div>
+            <div>Usado quando o agente nao tem origem fixa e o usuario anexa o arquivo no momento da execucao.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Modo de entrada</strong></div>
+            <div><code>individual</code>, <code>grupo_unico</code>, <code>lote_por_pasta</code></div>
+            <div>Controla se a IA analisa um arquivo, um grupo unico ou um lote organizado por pasta.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Saida e IA</p>
+          <h2>Como o resultado sera produzido</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Integracao de IA</span>
+            <p>Seleciona uma integracao ativa cadastrada no sistema.</p>
+            <small>Sem integracao ativa, o agente nao consegue ser configurado corretamente.</small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Formato padrao de saida</span>
+            <p>Valores aceitos: <code>ai_defined</code>, <code>json</code>, <code>xlsx</code>, <code>csv</code>, <code>pdf</code>, <code>txt</code>.</p>
+            <small>Hoje a tela ainda nao suporta <code>jpg</code> como formato nativo.</small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Modo de saida</span>
+            <p>Valores aceitos: <code>uma_por_entrada</code>, <code>uma_por_grupo</code>, <code>uma_saida_final</code>.</p>
+            <small>Escolhe se o sistema gera uma saida por arquivo ou uma consolidacao.</small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Empacotamento da saida</span>
+            <p>Valores aceitos: <code>arquivo_unico</code>, <code>zip_se_multiplos</code>, <code>sempre_zip</code>.</p>
+            <small>Quando ha multiplos arquivos, o ZIP preserva cada item separadamente.</small>
+          </article>
+        </div>
+
+        <div class="prompt-parameters-panel">
+          <div class="prompt-parameters-head">
+            <div>
+              <p class="eyebrow">Prompt</p>
+              <h3>Prompt base e parametros reutilizaveis</h3>
+              <small>O prompt e a instrucao principal que orienta o agente na leitura, classificacao ou extracao.</small>
+            </div>
+          </div>
+
+          <div class="doc-two-columns">
+            <div class="doc-code-panel">
+              <strong>Exemplo de prompt base</strong>
+              <pre><code>{% verbatim %}Voce e um agente de leitura de edital.
+Leia o documento informado e retorne:
+- objeto da contratacao
+- valor estimado
+- prazo
+- exigencias de habilitacao
+
+Considere tambem a pergunta do usuario:
+{{pergunta_usuario}}{% endverbatim %}</code></pre>
+            </div>
+
+            <div class="doc-code-panel">
+              <strong>Exemplo de parametro do prompt</strong>
+              <pre><code>{% verbatim %}Rotulo: Pergunta do usuario
+Slug gerado: pergunta_usuario
+Uso no prompt: {{pergunta_usuario}}{% endverbatim %}</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Exemplo completo</p>
+          <h2>Preenchimento sugerido para um agente de leitura</h2>
+        </div>
+
+        <div class="doc-code-panel">
+          <pre><code>Nome: Leitor de edital PDF
+Tipo: extrator
+Categoria operacional: leitura_documento
+Visibilidade: usuario
+Modo de acionamento: portal
+Status: ativo
+Objetivo: Extrair os principais dados de editais em PDF.
+Integracao de IA: OpenAI Producao
+Modelo preferencial: gpt-4.1-mini
+Origem padrao: google_drive_folder
+Pasta padrao do Google Drive: Editais de entrada
+Modo de entrada: individual
+Formato padrao de saida: json
+Modo de saida: uma_por_entrada
+Empacotamento da saida: zip_se_multiplos</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Observacoes importantes</p>
+          <h2>Validacoes que podem bloquear o salvamento</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>Se a origem for <code>google_drive_folder</code>, a pasta do Google Drive e obrigatoria.</li>
+          <li>Se a origem for <code>local_folder</code> ou <code>local_file</code>, a pasta local e o caminho relativo sao obrigatorios.</li>
+          <li><code>uma_por_entrada</code> nao combina com <code>grupo_unico</code>.</li>
+          <li><code>uma_saida_final</code> exige <code>grupo_unico</code> ou <code>lote_por_pasta</code>.</li>
+          <li><code>uma_por_entrada</code> nao pode usar <code>arquivo_unico</code> no empacotamento.</li>
+          <li>A integracao de IA precisa estar ativa para um agente ativo funcionar corretamente.</li>
+          <li>Hoje o fluxo padrao de entrada documental continua orientado a PDF nas configuracoes operacionais existentes.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_agentes_gerenciar' %}">Abrir gerenciar agentes</a>
+        <a class="start-button" href="/doc-system/gerenciar-agentes/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -74,7 +74,7 @@ class AgentDefaultOutputFormat(models.TextChoices):
 
 
 class AgentOutputDestination(models.TextChoices):
-    INTERNAL_MEDIA = "internal_media", "Storage interno do sistema"
+    INTERNAL_MEDIA = "internal_media", "Pasta interna do sistema"
 
 
 class AgentDocumentExecutionMode(models.TextChoices):
@@ -317,7 +317,7 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
                 raise ValidationError(
                     {
                         "default_local_storage_integration": (
-                            "Selecione o storage local padrao."
+                            "Selecione a pasta local padrao."
                         )
                     }
                 )

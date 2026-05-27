@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -27,11 +28,14 @@ from apps.integracoes.selectors import (
 )
 from apps.integracoes.forms import (
     AIProviderIntegrationPortalForm,
+    GoogleDriveFolderSourcePortalForm,
     GoogleDriveIntegrationPortalForm,
+    LocalStorageFontePortalForm,
     LocalStorageIntegrationPortalForm,
 )
 from apps.integracoes.models import (
     AIProviderIntegration,
+    GoogleDriveFolderSource,
     GoogleDriveIntegration,
     LocalStorageIntegration,
 )
@@ -52,6 +56,8 @@ from apps.processamentos.services.operational_execution import (
 )
 from apps.usuarios.selectors import listar_usuarios_acessos_para_portal
 from apps.usuarios.forms import UsuarioPortalForm
+
+logger = logging.getLogger(__name__)
 
 
 class PortalAdministradorRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -264,6 +270,105 @@ class FontesDocumentosView(LoginRequiredMixin, TemplateView):
         return context
 
 
+class FonteDocumentoPortalFormMixin(PortalAdministradorRequiredMixin):
+    template_name = "portal_operacional/fonte_documento_form.html"
+    login_url = reverse_lazy("portal_login")
+
+    form_classes = {
+        "google-drive-folder": GoogleDriveFolderSourcePortalForm,
+        "storage-local": LocalStorageFontePortalForm,
+    }
+    model_classes = {
+        "google-drive-folder": GoogleDriveFolderSource,
+        "storage-local": LocalStorageIntegration,
+    }
+    type_metadata = {
+        "google-drive-folder": {
+            "label": "Google Drive",
+            "title": "Cadastrar fonte Google Drive",
+            "description": (
+                "Cadastre a pasta do Google Drive que sera usada como origem documental."
+            ),
+            "orb": "GD",
+        },
+        "storage-local": {
+            "label": "Pasta local",
+            "title": "Cadastrar fonte local",
+            "description": (
+                "Cadastre uma pasta local autorizada para leitura de documentos."
+            ),
+            "orb": "PC",
+        },
+    }
+
+    def get_form_class(self):
+        return self.form_classes[self.source_type]
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["actor"] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        source = form.save()
+        action_message = "atualizada" if self.get_modo_edicao() else "criada"
+        messages.success(
+            self.request,
+            f"Fonte de documentos {source.nome} {action_message} com sucesso.",
+        )
+        return redirect("portal_fontes_documentos")
+
+    def get_modo_edicao(self):
+        return False
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["source_type"] = self.source_type
+        context["source_metadata"] = self.type_metadata[self.source_type]
+        context["modo_edicao"] = self.get_modo_edicao()
+        context["source_type_tabs"] = [
+            {
+                "key": key,
+                "label": metadata["label"],
+                "url": f"{reverse('portal_fonte_documento_criar')}?{urlencode({'tipo': key})}",
+                "active": key == self.source_type,
+            }
+            for key, metadata in self.type_metadata.items()
+        ]
+        return context
+
+
+class FonteDocumentoCreateView(FonteDocumentoPortalFormMixin, FormView):
+    def dispatch(self, request, *args, **kwargs):
+        self.source_type = request.GET.get("tipo") or "google-drive-folder"
+        if self.source_type not in self.form_classes:
+            self.source_type = "google-drive-folder"
+        return super().dispatch(request, *args, **kwargs)
+
+
+class FonteDocumentoUpdateView(FonteDocumentoPortalFormMixin, FormView):
+    def dispatch(self, request, *args, **kwargs):
+        self.source_type = kwargs["tipo"]
+        model_class = self.model_classes.get(self.source_type)
+        if model_class is None:
+            raise Http404("Tipo de fonte documental nao suportado.")
+        self.source = get_object_or_404(model_class, pk=kwargs["fonte_id"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["instance"] = self.source
+        return kwargs
+
+    def get_modo_edicao(self):
+        return True
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["source_edicao"] = self.source
+        return context
+
+
 class IntegracoesView(LoginRequiredMixin, TemplateView):
     template_name = "portal_operacional/integracoes.html"
     login_url = reverse_lazy("portal_login")
@@ -310,8 +415,8 @@ class IntegracaoPortalFormMixin(PortalAdministradorRequiredMixin):
             "orb": "GD",
         },
         "storage-local": {
-            "label": "Storage local",
-            "title": "Cadastrar storage local",
+            "label": "Pasta local",
+            "title": "Cadastrar pasta local",
             "description": (
                 "Autorize uma pasta local para leitura de documentos pelo sistema."
             ),
@@ -332,7 +437,7 @@ class IntegracaoPortalFormMixin(PortalAdministradorRequiredMixin):
         action_message = "atualizada" if self.get_modo_edicao() else "criada"
         messages.success(
             self.request,
-            f"Integracao {integration.nome} {action_message} com sucesso.",
+            f"Conexao {integration.nome} {action_message} com sucesso.",
         )
         return redirect("portal_integracoes")
 
@@ -396,6 +501,13 @@ class IntegracaoValidarView(PortalAdministradorRequiredMixin, View):
         "storage-local": (LocalStorageIntegration, validate_local_storage),
     }
 
+    def get(self, request, tipo, integracao_id):
+        messages.info(
+            request,
+            "Use o botao Validar conexao para conferir a comunicacao.",
+        )
+        return redirect("portal_integracoes")
+
     def post(self, request, tipo, integracao_id):
         model_and_validator = self.validators.get(tipo)
         if model_and_validator is None:
@@ -403,7 +515,22 @@ class IntegracaoValidarView(PortalAdministradorRequiredMixin, View):
 
         model_class, validator = model_and_validator
         integration = get_object_or_404(model_class, pk=integracao_id)
-        result = validator(integration)
+        try:
+            result = validator(integration)
+        except Exception:
+            logger.exception(
+                "Falha inesperada ao validar integracao %s %s.",
+                tipo,
+                integracao_id,
+            )
+            messages.error(
+                request,
+                (
+                    f"{integration.nome}: falha tecnica ao validar a integracao. "
+                    "Contate o administrador do sistema."
+                ),
+            )
+            return redirect("portal_integracoes")
         if result.success:
             messages.success(request, result.message)
         else:

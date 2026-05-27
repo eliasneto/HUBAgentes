@@ -1,0 +1,218 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Fontes de documentos</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-fontes-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_fontes_documentos" %}
+
+    <section class="portal-main" aria-label="Documentacao de Fontes de documentos">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Fontes de documentos</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia operacional</p>
+          <h2>Como cadastrar, revisar e manter as origens documentais que alimentam a leitura dos agentes.</h2>
+          <p>
+            Esta tela documenta o modulo de Fontes de documentos do portal. Ela explica os tipos de origem,
+            os campos do cadastro, exemplos de preenchimento e os cuidados para garantir que os documentos certos
+            cheguem na esteira operacional.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>DOC</span>
+          <small>fontes</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo a passo</p>
+          <h2>Fluxo recomendado para cadastrar uma fonte</h2>
+        </div>
+
+        <ol class="doc-step-list">
+          <li>Abra <strong>Administrador &gt; Fontes de documentos</strong>.</li>
+          <li>Clique em <strong>Nova fonte</strong> ou escolha diretamente <strong>Nova fonte Google Drive</strong> ou <strong>Nova fonte local</strong>.</li>
+          <li>Defina o tipo da fonte documental.</li>
+          <li>Preencha nome, status e os campos especificos da origem.</li>
+          <li>Salve a fonte.</li>
+          <li>Revise a listagem para confirmar se a origem ficou visivel com o tipo correto.</li>
+        </ol>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Tipos</p>
+          <h2>Quais origens documentais existem hoje</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Google Drive</span>
+            <p>Usada quando os documentos ficam em uma pasta na nuvem compartilhada com a conta tecnica.</p>
+            <small>Ideal para fluxos colaborativos e recebimento centralizado.</small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Pasta local</span>
+            <p>Usada quando os documentos estao em uma pasta existente no servidor ou no ambiente autorizado.</p>
+            <small>Ideal para integracoes locais, pastas montadas ou volumes internos.</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Campos comuns</p>
+          <h2>Dados presentes em qualquer fonte</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Observacoes</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Nome</strong></div>
+            <div>Texto livre com ate 120 caracteres</div>
+            <div>Use um nome facil de identificar, por exemplo <code>Editais Prefeitura X</code>.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Status</strong></div>
+            <div><code>ativa</code>, <code>inativa</code> ou <code>erro</code></div>
+            <div>Ajuda a controlar se a origem pode ou nao ser usada pelos fluxos do sistema.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Google Drive</p>
+          <h2>Campos do cadastro de pasta em nuvem</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Exemplo ou uso</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Conexao Google Drive</strong></div>
+            <div>Uma conexao ativa ja cadastrada</div>
+            <div>Escolha a conta tecnica que tem permissao de acessar a pasta.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>URL da pasta</strong></div>
+            <div>Link completo da pasta no Google Drive</div>
+            <div>O sistema usa essa URL para identificar a pasta monitorada.</div>
+          </div>
+        </div>
+
+        <div class="doc-code-panel">
+          <strong>Exemplo de fonte Google Drive</strong>
+          <pre><code>Nome: Editais em nuvem
+Status: ativa
+Conexao Google Drive: Drive Editais Producao
+URL da pasta: https://drive.google.com/drive/folders/xxxxxxxxxxxx</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Pasta local</p>
+          <h2>Campos do cadastro de origem local</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Exemplo ou uso</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Caminho local autorizado</strong></div>
+            <div>Caminho absoluto do servidor</div>
+            <div>Exemplo: <code>/app/media/entradas</code> ou <code>C:\licitacao</code>.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Ler subpastas automaticamente</strong></div>
+            <div>Marcado ou desmarcado</div>
+            <div>Ative quando os arquivos puderem estar organizados em subpastas abaixo da raiz.</div>
+          </div>
+        </div>
+
+        <div class="doc-code-panel">
+          <strong>Exemplo de fonte local</strong>
+          <pre><code>Nome: Pasta de entrada do servidor
+Status: ativa
+Caminho local autorizado: /app/media/entradas
+Ler subpastas automaticamente: Sim</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">O que aparece na listagem</p>
+          <h2>Como interpretar os cards da tela principal</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Google Drive</span>
+            <p>Mostra nome, status, pasta vinculada, conexao usada, quantidade de itens sincronizados e ultima validacao.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Pasta local</span>
+            <p>Mostra nome, status, caminho base, extensoes permitidas, leitura recursiva e ultima validacao.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Editar</span>
+            <p>Permite ajustar a fonte ja cadastrada sem precisar recriar a origem inteira.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Estado vazio</span>
+            <p>Quando nao ha fontes cadastradas, a tela mostra o estado vazio para orientar o primeiro cadastro.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Observacoes importantes</p>
+          <h2>Cuidados antes de liberar uma fonte para uso</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>Uma fonte documental depende de uma conexao valida e ativa quando o tipo usa Google Drive.</li>
+          <li>Para Google Drive, a pasta deve estar compartilhada com a conta tecnica correta.</li>
+          <li>Para pasta local, o caminho informado precisa existir no servidor e ser absoluto.</li>
+          <li>Ativar leitura recursiva amplia o alcance da busca para subpastas, entao use com intencao.</li>
+          <li>Revise o tipo da fonte com cuidado, porque isso muda a forma como o sistema localiza os documentos.</li>
+          <li>As fontes de documentos sao a base da entrada operacional; se a origem estiver errada, o agente pode processar arquivos incorretos ou nao encontrar nenhum documento.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_fontes_documentos' %}">Abrir fontes de documentos</a>
+        <a class="start-button" href="/doc-system/fontes-documentos/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

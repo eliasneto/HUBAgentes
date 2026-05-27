@@ -1,0 +1,219 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Usuarios e acessos</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-usuarios-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_usuarios_acessos" %}
+
+    <section class="portal-main" aria-label="Documentacao de Usuarios e acessos">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Usuarios e acessos</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia operacional</p>
+          <h2>Como cadastrar usuarios, organizar grupos e controlar quem pode operar cada parte do portal.</h2>
+          <p>
+            Esta tela documenta o modulo de usuarios e acessos. Ela explica o que aparece na listagem,
+            os campos do cadastro, os papeis de acesso e os cuidados ao editar status, grupos ou senha.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>DOC</span>
+          <small>acessos</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo a passo</p>
+          <h2>Fluxo recomendado para criar ou ajustar um usuario</h2>
+        </div>
+
+        <ol class="doc-step-list">
+          <li>Abra <strong>Administrador &gt; Usuarios e acessos</strong>.</li>
+          <li>Use <strong>Novo usuario</strong> para criar uma conta ou <strong>Editar usuario</strong> para ajustar uma existente.</li>
+          <li>Preencha identificacao, papel principal e grupos.</li>
+          <li>Defina se a conta esta ativa, se possui acesso tecnico e se e administradora total.</li>
+          <li>Preencha senha apenas quando estiver criando a conta ou trocando a senha atual.</li>
+          <li>Salve e revise a listagem para confirmar status, grupos e papel exibidos.</li>
+        </ol>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Indicadores</p>
+          <h2>Resumo exibido no topo da tela</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Usuarios</span>
+            <p>Total de contas cadastradas no portal.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Ativos</span>
+            <p>Contas liberadas para autenticacao e uso.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Admins</span>
+            <p>Usuarios com privilegio administrativo total.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Grupos</span>
+            <p>Quantidade de grupos organizacionais disponiveis.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Listagem</p>
+          <h2>O que aparece nos cards de usuarios</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>Origem do dado</div>
+            <div>Como interpretar</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Status</strong></div>
+            <div><code>is_active</code></div>
+            <div>Mostra se o usuario esta ativo ou inativo.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Tipo de conta</strong></div>
+            <div><code>is_superuser</code> e <code>is_staff</code></div>
+            <div>Pode aparecer como Administrador, Staff ou Operacional.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Nome e @usuario</strong></div>
+            <div>Nome completo e login</div>
+            <div>Ajuda a identificar rapidamente a conta certa.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Papel</strong></div>
+            <div>Campo de perfil principal</div>
+            <div>Resume a funcao operacional predominante do usuario.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Grupos</strong></div>
+            <div>Associacoes do Django</div>
+            <div>Mostra os grupos usados para organizar acesso e governanca.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Ultimo acesso</strong></div>
+            <div><code>last_login</code></div>
+            <div>Ajuda a perceber contas sem uso recente ou nunca acessadas.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Campos do cadastro</p>
+          <h2>O que cada parte do formulario aceita</h2>
+        </div>
+
+        <div class="doc-two-columns">
+          <div class="doc-code-panel">
+            <strong>Identificacao</strong>
+            <pre><code>Usuario: login unico
+Nome: primeiro nome
+Sobrenome: complemento do nome
+E-mail: opcional, mas recomendado</code></pre>
+          </div>
+
+          <div class="doc-code-panel">
+            <strong>Acesso</strong>
+            <pre><code>Papel principal: perfil operacional
+Grupos: multiplas selecoes
+Usuario ativo: libera login
+Acesso tecnico/staff: libera recursos tecnicos
+Administrador total: privilegio maximo</code></pre>
+          </div>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Observacoes</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Usuario</strong></div>
+            <div>Texto unico</div>
+            <div>O sistema bloqueia duplicidade de login.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Papel principal</strong></div>
+            <div>Uma opcao do perfil do usuario</div>
+            <div>Serve para classificar a funcao principal da conta.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Grupos</strong></div>
+            <div>Uma ou mais selecoes</div>
+            <div>Permite combinar perfis de permissao.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Senha</strong></div>
+            <div>Texto secreto</div>
+            <div>Na edicao, so precisa ser preenchida quando houver troca.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Exemplo</p>
+          <h2>Exemplo de leitura de um cadastro de usuario</h2>
+        </div>
+
+        <div class="doc-code-panel">
+          <pre><code>Usuario: maria.oliveira
+Nome: Maria
+Sobrenome: Oliveira
+E-mail: maria@empresa.com
+Papel principal: Operadora
+Grupos: portal_operacao, leitura_licitacao
+Usuario ativo: Sim
+Acesso tecnico/staff: Nao
+Administrador total: Nao</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Observacoes importantes</p>
+          <h2>Cuidados ao editar usuarios e permissoes</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>Senhas existentes nao aparecem na tela e nao devem ser expostas na listagem.</li>
+          <li>Desativar um usuario impede o acesso ao portal, mas nao apaga a conta.</li>
+          <li>Marcar <strong>Administrador total</strong> amplia bastante os privilegios, entao use com criterio.</li>
+          <li>O proprio administrador nao deve remover seu proprio acesso critico sem validacao cuidadosa.</li>
+          <li>Grupos ajudam a organizar permissao de forma mais governavel do que liberar tudo diretamente.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_usuarios_acessos' %}">Abrir usuarios e acessos</a>
+        <a class="start-button" href="/doc-system/usuarios-e-acessos/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

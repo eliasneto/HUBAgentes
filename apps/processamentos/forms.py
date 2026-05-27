@@ -31,7 +31,7 @@ class AgenteExecucaoForm(forms.Form):
         required=False,
     )
     local_storage_integration = forms.ModelChoiceField(
-        label="Storage local autorizado",
+        label="Pasta local autorizada",
         queryset=LocalStorageIntegration.objects.none(),
         required=False,
     )
@@ -59,7 +59,7 @@ class AgenteExecucaoForm(forms.Form):
     )
     output_destination = forms.ChoiceField(
         label="Local de salvamento da saida",
-        choices=((OUTPUT_DESTINATION_INTERNAL, "Storage interno do sistema"),),
+        choices=((OUTPUT_DESTINATION_INTERNAL, "Pasta interna do sistema"),),
         initial=OUTPUT_DESTINATION_INTERNAL,
         required=False,
     )
@@ -173,7 +173,7 @@ class AgenteExecucaoForm(forms.Form):
             ):
                 self.add_error(
                     "local_storage_integration",
-                    "Selecione o storage local autorizado.",
+                    "Selecione a pasta local autorizada.",
                 )
             if not cleaned_data.get("local_relative_input_path") and not (
                 configuracao and configuracao.default_local_relative_input_path

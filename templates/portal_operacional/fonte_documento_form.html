@@ -1,0 +1,179 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if modo_edicao %}Editar fonte de documentos{% else %}Nova fonte de documentos{% endif %} - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-fonte-documento-form-1">
+</head>
+<body>
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="fontes_documentos" %}
+
+    <section class="portal-main" aria-label="{% if modo_edicao %}Editar fonte de documentos{% else %}Nova fonte de documentos{% endif %}">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Entrada de documentos</p>
+          <h1>{% if modo_edicao %}Editar fonte de documentos{% else %}Nova fonte de documentos{% endif %}</h1>
+        </div>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if message.tags == 'success' %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Cadastro operacional</p>
+          <h2>{% if modo_edicao %}Ajuste {{ source_edicao.nome }}.{% else %}{{ source_metadata.title }}{% endif %}</h2>
+          <p>
+            {{ source_metadata.description }}
+            Depois de salvar, a fonte fica disponivel na esteira operacional conforme o tipo selecionado.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>{{ source_metadata.orb }}</span>
+          <small>{% if modo_edicao %}editar{% else %}nova{% endif %}</small>
+        </div>
+      </section>
+
+      {% if not modo_edicao %}
+        <nav class="integration-type-tabs" aria-label="Tipo de fonte documental">
+          {% for tab in source_type_tabs %}
+            <a class="integration-type-tab {% if tab.active %}active{% endif %}" href="{{ tab.url }}">
+              {{ tab.label }}
+            </a>
+          {% endfor %}
+        </nav>
+      {% endif %}
+
+      <form class="agent-builder-form" method="post" autocomplete="off">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="form-alert">
+            {% for error in form.non_field_errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <section class="builder-card">
+          <div class="form-section-heading">
+            <p class="eyebrow">Identificacao</p>
+            <h2>Dados principais</h2>
+          </div>
+
+          <div class="execution-grid">
+            <div class="execution-field">
+              <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}{% if form.nome.field.required %}<span class="field-required">*</span>{% endif %}</label>
+              {{ form.nome }}
+              {% for error in form.nome.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+            <div class="execution-field">
+              <label for="{{ form.status.id_for_label }}">{{ form.status.label }}{% if form.status.field.required %}<span class="field-required">*</span>{% endif %}</label>
+              {{ form.status }}
+              {% for error in form.status.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+          </div>
+        </section>
+
+        {% if source_type == "google-drive-folder" %}
+          <section class="builder-card">
+            <div class="form-section-heading">
+              <p class="eyebrow">Google Drive</p>
+              <h2>Pasta vinculada</h2>
+            </div>
+
+            <div class="execution-grid">
+              <div class="execution-field">
+                <label for="{{ form.google_drive_integration.id_for_label }}">{{ form.google_drive_integration.label }}{% if form.google_drive_integration.field.required %}<span class="field-required">*</span>{% endif %}</label>
+                {{ form.google_drive_integration }}
+                {% for error in form.google_drive_integration.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+              <div class="execution-field">
+                <label for="{{ form.folder_url.id_for_label }}">{{ form.folder_url.label }}{% if form.folder_url.field.required %}<span class="field-required">*</span>{% endif %}</label>
+                {{ form.folder_url }}
+                <small>Cole a URL completa da pasta do Google Drive que deve ser monitorada.</small>
+                {% for error in form.folder_url.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+            </div>
+
+            <aside class="integration-field-guide" aria-label="Modelo de preenchimento para fonte Google Drive">
+              <div>
+                <p class="eyebrow">Modelo de preenchimento</p>
+                <h3>Como configurar a origem na nuvem</h3>
+                <small>Campos marcados com <span class="field-required">*</span> sao obrigatorios para salvar a fonte.</small>
+              </div>
+              <dl>
+                <div>
+                  <dt>Integracao Google Drive</dt>
+                  <dd>Escolha a credencial tecnica ja cadastrada e ativa no portal.</dd>
+                </div>
+                <div>
+                  <dt>URL da pasta</dt>
+                  <dd>Use a URL da pasta compartilhada no Drive. O sistema extrai o identificador automaticamente.</dd>
+                </div>
+                <div>
+                  <dt>Permissao da conta</dt>
+                  <dd>Garanta que a pasta esteja compartilhada com a service account da integracao selecionada.</dd>
+                </div>
+              </dl>
+            </aside>
+          </section>
+        {% else %}
+          <section class="builder-card">
+            <div class="form-section-heading">
+              <p class="eyebrow">Pasta local</p>
+              <h2>Pasta autorizada</h2>
+            </div>
+
+            <div class="execution-grid">
+              <div class="execution-field">
+                <label for="{{ form.base_path.id_for_label }}">{{ form.base_path.label }}{% if form.base_path.field.required %}<span class="field-required">*</span>{% endif %}</label>
+                {{ form.base_path }}
+                <small>Informe um caminho absoluto, por exemplo: C:\licitacao.</small>
+                {% for error in form.base_path.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
+              <label class="user-checkline integration-checkline">
+                {{ form.recursive_scan }}
+                <span>{{ form.recursive_scan.label }}</span>
+              </label>
+            </div>
+
+            <aside class="integration-field-guide" aria-label="Modelo de preenchimento para fonte local">
+              <div>
+                <p class="eyebrow">Modelo de preenchimento</p>
+                <h3>Como configurar a origem local</h3>
+                <small>Campos marcados com <span class="field-required">*</span> sao obrigatorios para salvar a fonte.</small>
+              </div>
+              <dl>
+                <div>
+                  <dt>Caminho local autorizado</dt>
+                  <dd>Use um caminho existente no servidor, por exemplo: <code>/app/media/entradas</code>.</dd>
+                </div>
+                <div>
+                  <dt>Ler subpastas automaticamente</dt>
+                  <dd>Ative quando os PDFs puderem estar organizados em subpastas abaixo da raiz.</dd>
+                </div>
+              </dl>
+            </aside>
+          </section>
+        {% endif %}
+
+        <div class="execution-actions builder-actions">
+          <a class="secondary-action" href="{% url 'portal_fontes_documentos' %}">Voltar</a>
+          <button class="start-button" type="submit">
+            {% if modo_edicao %}Salvar fonte{% else %}Criar fonte{% endif %}
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

@@ -9,28 +9,7 @@
 </head>
 <body>
   <main class="portal-shell">
-    <aside class="portal-sidebar" aria-label="Menu principal">
-      <div class="brand-block">
-        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
-        <div>
-          <strong>HUB Agentes</strong>
-          <span>Portal operacional</span>
-        </div>
-      </div>
-
-      <nav class="portal-tabs">
-        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
-        <a class="tab-link" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
-        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
-        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
-        <a class="tab-link active" href="{% url 'portal_integracoes' %}">Integracoes</a>
-        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
-        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
-        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
-      </nav>
-
-      {% include "portal_operacional/_sidebar_footer.html" %}
-    </aside>
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="integracoes" %}
 
     <section class="portal-main" aria-label="Integracoes">
       <header class="portal-topbar">
@@ -39,7 +18,7 @@
           <h1>Integracoes</h1>
         </div>
         {% if pode_validar_integracoes %}
-          <a class="toolbar-action primary" href="{% url 'portal_integracao_criar' %}">Nova integracao</a>
+          <a class="toolbar-action primary" href="{% url 'portal_integracao_criar' %}">Nova conexao</a>
         {% endif %}
       </header>
 
@@ -129,7 +108,7 @@
                   <a class="secondary-action" href="{% url 'portal_integracao_editar' 'ia' integracao.id %}">Editar</a>
                   <form method="post" action="{{ integracao.validar_url }}">
                     {% csrf_token %}
-                    <button class="secondary-action" type="submit">Validar integracao</button>
+                    <button class="secondary-action" type="submit">Validar conexao</button>
                   </form>
                 </div>
               {% endif %}
@@ -139,7 +118,7 @@
               <span class="empty-icon" aria-hidden="true">IA</span>
               <p class="eyebrow">Sem provedor</p>
               <h2>Nenhuma integracao de IA cadastrada</h2>
-              <p>Nenhuma integracao de IA esta disponivel para o portal.</p>
+              <p>Nenhuma conexao de IA esta disponivel para o portal.</p>
             </article>
           {% endfor %}
         </div>
@@ -182,7 +161,7 @@
                   <a class="secondary-action" href="{% url 'portal_integracao_editar' 'google-drive' integracao.id %}">Editar</a>
                   <form method="post" action="{{ integracao.validar_url }}">
                     {% csrf_token %}
-                    <button class="secondary-action" type="submit">Validar integracao</button>
+                    <button class="secondary-action" type="submit">Validar conexao</button>
                   </form>
                 </div>
               {% endif %}
@@ -192,7 +171,7 @@
               <span class="empty-icon" aria-hidden="true">GD</span>
               <p class="eyebrow">Sem Google Drive</p>
               <h2>Nenhuma integracao Google Drive cadastrada</h2>
-              <p>Nenhuma integracao Google Drive esta disponivel para o portal.</p>
+              <p>Nenhuma conexao Google Drive esta disponivel para o portal.</p>
             </article>
           {% endfor %}
         </div>
@@ -201,7 +180,7 @@
       <section class="sources-section" aria-labelledby="local-title">
         <div class="section-heading">
           <p class="eyebrow">Arquivos locais</p>
-          <h2 id="local-title">Storage local</h2>
+          <h2 id="local-title">Pasta local</h2>
         </div>
 
         <div class="integrations-grid">
@@ -241,7 +220,7 @@
                   <a class="secondary-action" href="{% url 'portal_integracao_editar' 'storage-local' integracao.id %}">Editar</a>
                   <form method="post" action="{{ integracao.validar_url }}">
                     {% csrf_token %}
-                    <button class="secondary-action" type="submit">Validar integracao</button>
+                    <button class="secondary-action" type="submit">Validar conexao</button>
                   </form>
                 </div>
               {% endif %}
@@ -249,9 +228,9 @@
           {% empty %}
             <article class="empty-agents source-empty">
               <span class="empty-icon" aria-hidden="true">PC</span>
-              <p class="eyebrow">Sem storage local</p>
-              <h2>Nenhuma integracao local cadastrada</h2>
-              <p>Nenhuma integracao local esta disponivel para o portal.</p>
+              <p class="eyebrow">Sem pasta local</p>
+              <h2>Nenhuma conexao local cadastrada</h2>
+              <p>Nenhuma conexao local esta disponivel para o portal.</p>
             </article>
           {% endfor %}
         </div>

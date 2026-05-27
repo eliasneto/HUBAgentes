@@ -1,0 +1,165 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Painel inicial</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-painel-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_painel" %}
+
+    <section class="portal-main" aria-label="Documentacao do Painel inicial">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Painel inicial</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia operacional</p>
+          <h2>Como usar a tela inicial do portal como ponto de entrada, navegacao e leitura rapida das areas principais.</h2>
+          <p>
+            Esta pagina documenta o painel inicial do portal. Ela explica o objetivo da tela,
+            o papel dos cards de acesso rapido e como o usuario deve usar esse painel como mapa geral do sistema.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>DOC</span>
+          <small>painel</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Objetivo</p>
+          <h2>Para que serve o painel inicial</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>Ser a porta de entrada principal do portal depois do login.</li>
+          <li>Apresentar rapidamente as areas operacionais e administrativas.</li>
+          <li>Permitir navegacao direta para os modulos mais importantes sem depender de menu lateral apenas.</li>
+          <li>Funcionar como uma visao geral para usuarios que estao se orientando no sistema.</li>
+        </ul>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Estrutura</p>
+          <h2>Blocos principais exibidos na tela</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Cabecalho</span>
+            <p>Mostra o nome da tela e o estado visual da sessao.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Faixa principal</span>
+            <p>Resume a proposta do portal como esteira de leitura e organizacao operacional.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Cards de acesso rapido</span>
+            <p>Atalhos visuais para os modulos mais usados do sistema.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Rodape da tela</span>
+            <p>Indica observacoes de fluxo ou estado do prototipo quando aplicavel.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Cards</p>
+          <h2>O que cada card do painel representa</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Card</div>
+            <div>Destino</div>
+            <div>Uso principal</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Agentes</strong></div>
+            <div>Tela operacional de agentes</div>
+            <div>Executar agentes visiveis ao usuario.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Gerenciar agentes</strong></div>
+            <div>Tela administrativa de configuracao</div>
+            <div>Criar, revisar e editar agentes.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Fontes de documentos</strong></div>
+            <div>Cadastro de origens documentais</div>
+            <div>Definir de onde os documentos serao lidos.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Integracoes</strong></div>
+            <div>Cadastro de conexoes</div>
+            <div>Manter IA, Google Drive e pasta local.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Processamentos</strong></div>
+            <div>Painel de acompanhamento</div>
+            <div>Monitorar progresso, erro e saida final.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Historico e auditoria</strong></div>
+            <div>Espaco previsto</div>
+            <div>Reservado para trilha de eventos e rastreabilidade.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Usuarios e acessos</strong></div>
+            <div>Gestao de contas</div>
+            <div>Controlar perfis, grupos e permissoes.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Fluxo recomendado</p>
+          <h2>Como um usuario costuma usar o painel inicial</h2>
+        </div>
+
+        <ol class="doc-step-list">
+          <li>Entrar no sistema e confirmar que o login foi realizado com sucesso.</li>
+          <li>Escolher o card da area desejada.</li>
+          <li>Navegar para a tela operacional ou administrativa correspondente.</li>
+          <li>Voltar ao painel quando quiser trocar rapidamente de contexto.</li>
+        </ol>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Observacoes importantes</p>
+          <h2>Cuidados ao interpretar essa tela</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>O painel inicial e um ponto de orientacao, nao uma tela de execucao detalhada.</li>
+          <li>Alguns cards representam areas operacionais, outros representam areas administrativas.</li>
+          <li>Se uma area ainda estiver em evolucao, o painel pode apontar para uma tela reservada ou prototipada.</li>
+          <li>O menu lateral continua sendo a navegacao principal persistente, enquanto os cards funcionam como atalhos.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_painel' %}">Abrir painel inicial</a>
+        <a class="start-button" href="/doc-system/painel-inicial/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

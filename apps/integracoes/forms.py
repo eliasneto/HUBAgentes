@@ -2,7 +2,9 @@ from django import forms
 
 from apps.integracoes.models import (
     AIProviderIntegration,
+    GoogleDriveFolderSource,
     GoogleDriveIntegration,
+    IntegrationStatus,
     LocalStorageIntegration,
 )
 
@@ -135,3 +137,31 @@ class LocalStorageIntegrationPortalForm(IntegrationPortalFormMixin, forms.ModelF
             "base_path": "Caminho local autorizado",
             "recursive_scan": "Ler subpastas automaticamente",
         }
+
+
+class GoogleDriveFolderSourcePortalForm(IntegrationPortalFormMixin, forms.ModelForm):
+    class Meta:
+        model = GoogleDriveFolderSource
+        fields = [
+            "nome",
+            "status",
+            "google_drive_integration",
+            "folder_url",
+        ]
+        labels = {
+            "nome": "Nome",
+            "status": "Status",
+            "google_drive_integration": "Integracao Google Drive",
+            "folder_url": "URL da pasta",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["google_drive_integration"].queryset = (
+            GoogleDriveIntegration.objects.filter(status=IntegrationStatus.ATIVA)
+            .order_by("nome")
+        )
+
+
+class LocalStorageFontePortalForm(LocalStorageIntegrationPortalForm):
+    pass

@@ -93,7 +93,7 @@ class AgentePortalCreateForm(forms.Form):
         required=False,
     )
     default_local_storage_integration = forms.ModelChoiceField(
-        label="Storage local padrao",
+        label="Pasta local padrao",
         queryset=LocalStorageIntegration.objects.none(),
         required=False,
     )
@@ -237,7 +237,7 @@ class AgentePortalCreateForm(forms.Form):
             if not cleaned_data.get("default_local_storage_integration"):
                 self.add_error(
                     "default_local_storage_integration",
-                    "Selecione o storage local padrao para este agente.",
+                    "Selecione a pasta local padrao para este agente.",
                 )
             if not cleaned_data.get("default_local_relative_input_path"):
                 self.add_error(

@@ -1,0 +1,235 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Agentes</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-agentes-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_agentes" %}
+
+    <section class="portal-main" aria-label="Documentacao de Agentes">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Agentes</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia operacional</p>
+          <h2>Como usar a tela de agentes para executar fluxos de leitura sem expor configuracoes tecnicas ou credenciais.</h2>
+          <p>
+            Esta pagina documenta a tela operacional de agentes. Ela mostra quais agentes aparecem para o usuario,
+            como interpretar os cards, quando um agente pode ser executado e como funciona o envio de documento na execucao.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>DOC</span>
+          <small>agentes</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo a passo</p>
+          <h2>Fluxo recomendado para executar um agente</h2>
+        </div>
+
+        <ol class="doc-step-list">
+          <li>Abra <strong>Operacao &gt; Agentes</strong>.</li>
+          <li>Localize o agente desejado pela finalidade, pelo tipo ou pelo objetivo.</li>
+          <li>Leia o bloco de disponibilidade para confirmar se ele esta apto a executar.</li>
+          <li>Se o agente exigir envio de documento, anexe o arquivo PDF pelo icone de pasta.</li>
+          <li>Clique em <strong>Executar</strong>.</li>
+          <li>Acompanhe o andamento na tela de <strong>Processamentos</strong>.</li>
+        </ol>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Quem aparece</p>
+          <h2>Regras da tela operacional de agentes</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>A tela operacional mostra apenas agentes ativos.</li>
+          <li>Tambem exibe apenas agentes com visibilidade para usuario.</li>
+          <li>O modo de acionamento precisa ser compativel com uso no portal.</li>
+          <li>Agentes tecnicos ou inativos ficam fora dessa lista comum.</li>
+        </ul>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Card do agente</p>
+          <h2>O que cada informacao do card significa</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>Origem do dado</div>
+            <div>Como interpretar</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Status</strong></div>
+            <div>Situacao operacional do agente</div>
+            <div>Normalmente aparece como ativo quando esta liberado para uso.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Categoria</strong></div>
+            <div>Categoria operacional do agente</div>
+            <div>Ajuda a entender se ele le documento, toma decisao ou executa outro tipo de tarefa.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Disponibilidade</strong></div>
+            <div>Resultado do calculo operacional do backend</div>
+            <div>Mostra se o agente esta pronto para executar ou se existe algum bloqueio.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Nome</strong></div>
+            <div>Identificacao do agente</div>
+            <div>Deve deixar clara a funcao principal do agente.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Objetivo</strong></div>
+            <div>Descricao de alto nivel</div>
+            <div>Resume o que o agente entrega ao final da execucao.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Tipo</strong></div>
+            <div>Tipo funcional do agente</div>
+            <div>Pode indicar se ele extrai, classifica, valida ou estrutura dados.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Visibilidade</strong></div>
+            <div>Escopo de exibicao</div>
+            <div>Ajuda a diferenciar agentes para usuario e agentes tecnicos.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Conexao de IA</strong></div>
+            <div>Integracao vinculada ao agente</div>
+            <div>Mostra qual provedor ou credencial esta por tras da execucao.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Disponibilidade</p>
+          <h2>Como entender o bloco operacional de bloqueio ou liberacao</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Pode executar</span>
+            <p>Quando o agente esta pronto, o botao <strong>Executar</strong> fica disponivel.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Indisponivel</span>
+            <p>Quando ha bloqueio, o sistema mostra o motivo no proprio card e o botao fica travado.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Motivo do bloqueio</span>
+            <p>Pode apontar falta de conexao ativa, fonte ausente, configuracao incompleta ou outra dependencia operacional.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Cor da disponibilidade</span>
+            <p>A cor do bloco ajuda a diferenciar visualmente situacoes normais, alertas e falhas.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Documento na execucao</p>
+          <h2>Quando aparece o icone de pasta para anexar PDF</h2>
+        </div>
+
+        <div class="doc-two-columns">
+          <div class="doc-code-panel">
+            <strong>Quando o anexo aparece</strong>
+            <pre><code>O icone de pasta aparece quando:
+- o agente permite envio de documento na execucao
+- o fluxo depende de upload manual
+- o backend libera esse comportamento para o portal</code></pre>
+          </div>
+
+          <div class="doc-code-panel">
+            <strong>O que o usuario faz</strong>
+            <pre><code>1. Clicar no icone de pasta
+2. Escolher um arquivo PDF
+3. Confirmar o envio pelo botao Executar
+4. Acompanhar o processamento depois</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Exemplo</p>
+          <h2>Exemplo de leitura de um card operacional</h2>
+        </div>
+
+        <div class="doc-code-panel">
+          <pre><code>Nome: Leitor de edital PDF
+Status: Ativo
+Categoria: Leitura de documento
+Disponibilidade: pronto para executar
+Objetivo: Extrair dados principais do edital
+Tipo: Extrator
+Visibilidade: Agente para usuario
+Conexao de IA: OpenAI Producao</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Diferenca entre telas</p>
+          <h2>Agentes x Gerenciar agentes</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Agentes</span>
+            <p>Tela operacional de uso. O foco aqui e executar agentes ja preparados para o portal.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Gerenciar agentes</span>
+            <p>Tela administrativa de configuracao. O foco ali e criar, editar e revisar o comportamento do agente.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Observacoes importantes</p>
+          <h2>Cuidados antes de executar</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>A tela de agentes nao mostra prompt nem credenciais tecnicas.</li>
+          <li>Se um agente estiver indisponivel, revise sua configuracao em <strong>Gerenciar agentes</strong>.</li>
+          <li>Quando houver upload manual, use apenas arquivos no formato permitido pelo fluxo atual.</li>
+          <li>Depois de clicar em executar, o acompanhamento principal deve ser feito em <strong>Processamentos</strong>.</li>
+          <li>Agentes tecnicos ficam fora da lista operacional comum para evitar uso indevido.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_agentes_leitura' %}">Abrir agentes</a>
+        <a class="start-button" href="/doc-system/agentes/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

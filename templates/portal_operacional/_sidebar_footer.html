@@ -5,7 +5,7 @@
   </div>
   <div class="sidebar-account-row">
     <span>Versao</span>
-    <strong>v0.1.0</strong>
+    <strong>v{{ APP_VERSION }}</strong>
   </div>
   <form action="{% url 'portal_logout' %}" method="post">
     {% csrf_token %}

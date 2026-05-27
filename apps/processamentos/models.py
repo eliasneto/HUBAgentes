@@ -267,11 +267,11 @@ class Processamento(TimestampedModel):
             if self.local_storage_integration.status != IntegrationStatus.ATIVA:
                 raise ValidationError(
                     {
-                        "local_storage_integration": (
-                            "A integracao de storage local precisa estar ativa."
-                        )
-                    }
-                )
+                            "local_storage_integration": (
+                            "A integracao de pasta local precisa estar ativa."
+                            )
+                        }
+                    )
         elif self.input_source_type == ProcessingInputSourceType.UPLOAD_AT_EXECUTION:
             if self.arquivo_execucao_upload and not self.arquivo_execucao_upload.name.lower().endswith(".pdf"):
                 raise ValidationError(

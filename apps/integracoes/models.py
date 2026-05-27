@@ -42,8 +42,8 @@ class LocalStorageIntegration(UserStampedModel):
     last_error = models.TextField(blank=True)
 
     class Meta:
-        verbose_name = "Integracao de storage local"
-        verbose_name_plural = "Integracoes de storage local"
+        verbose_name = "Conexao de pasta local"
+        verbose_name_plural = "Conexoes de pasta local"
         indexes = [
             models.Index(fields=["status"]),
         ]

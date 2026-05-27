@@ -16,6 +16,9 @@ from apps.integracoes.services.local_storage import (
     validate_local_storage_integration,
 )
 
+MAX_LAST_ERROR_LENGTH = 12000
+MAX_PORTAL_ERROR_LENGTH = 900
+
 
 @dataclass(frozen=True)
 class IntegrationValidationResult:
@@ -28,21 +31,16 @@ def validate_ai_provider_integration(integration) -> IntegrationValidationResult
         adapter = get_ai_provider_adapter(integration)
         validation_result = adapter.validate_connection()
     except AIProviderServiceError as exc:
-        integration.last_validated_at = timezone.now()
-        integration.last_error = str(exc)
-        integration.last_validation_summary = ""
-        if integration.status == IntegrationStatus.ATIVA:
-            integration.status = IntegrationStatus.ERRO
-        integration.save(
-            update_fields=[
-                "last_validated_at",
-                "last_error",
-                "last_validation_summary",
-                "status",
-                "updated_at",
-            ]
+        return _mark_ai_provider_error(integration, str(exc))
+    except Exception as exc:  # pragma: no cover
+        return _mark_ai_provider_error(
+            integration,
+            f"Falha inesperada ao validar a integracao de IA: {exc}",
+            user_message=(
+                "falha tecnica ao validar a integracao. "
+                "Contate o administrador do sistema."
+            ),
         )
-        return IntegrationValidationResult(False, f"{integration.nome}: {exc}")
 
     integration.last_validated_at = timezone.now()
     integration.last_connection_at = integration.last_validated_at
@@ -64,6 +62,60 @@ def validate_ai_provider_integration(integration) -> IntegrationValidationResult
         True,
         f"{integration.nome}: integracao de IA validada com sucesso.",
     )
+
+
+def _mark_ai_provider_error(integration, error_message, user_message=None):
+    integration.last_validated_at = timezone.now()
+    integration.last_error = _truncate_error(error_message, MAX_LAST_ERROR_LENGTH)
+    integration.last_validation_summary = ""
+    if integration.status == IntegrationStatus.ATIVA:
+        integration.status = IntegrationStatus.ERRO
+    integration.save(
+        update_fields=[
+            "last_validated_at",
+            "last_error",
+            "last_validation_summary",
+            "status",
+            "updated_at",
+        ]
+    )
+    return IntegrationValidationResult(
+        False,
+        f"{integration.nome}: {user_message or _build_ai_provider_user_message(error_message)}",
+    )
+
+
+def _build_ai_provider_user_message(error_message):
+    normalized_error = error_message.lower()
+    if "429" in normalized_error or "resource_exhausted" in normalized_error:
+        return (
+            "cota do provedor excedida. Verifique o plano, billing ou limites "
+            "do projeto no provedor de IA."
+        )
+    if "403" in normalized_error or "permission_denied" in normalized_error:
+        return (
+            "acesso negado pelo provedor. Verifique se a chave, o projeto e "
+            "as permissoes estao liberados."
+        )
+    if "404" in normalized_error or "not_found" in normalized_error:
+        return (
+            "modelo nao encontrado ou nao suportado pelo provedor. Verifique "
+            "o campo Modelo padrao."
+        )
+    if "modelo padrao" in normalized_error or "credencial principal" in normalized_error:
+        return _truncate_error(error_message, MAX_PORTAL_ERROR_LENGTH)
+    return (
+        "falha ao validar a integracao. O erro tecnico foi salvo no cadastro "
+        "para consulta do administrador."
+    )
+
+
+def _truncate_error(error_message, limit):
+    if not error_message:
+        return ""
+    if len(error_message) <= limit:
+        return error_message
+    return f"{error_message[: limit - 3]}..."
 
 
 def validate_google_drive_integration(integration) -> IntegrationValidationResult:
@@ -128,7 +180,7 @@ def validate_local_storage(integration) -> IntegrationValidationResult:
     )
     return IntegrationValidationResult(
         True,
-        f"{integration.nome}: storage local validado em {resolved_path}.",
+        f"{integration.nome}: pasta local validada em {resolved_path}.",
     )
 
 

@@ -9,28 +9,7 @@
 </head>
 <body>
   <main class="portal-shell">
-    <aside class="portal-sidebar" aria-label="Menu principal">
-      <div class="brand-block">
-        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
-        <div>
-          <strong>HUB Agentes</strong>
-          <span>Portal operacional</span>
-        </div>
-      </div>
-
-      <nav class="portal-tabs">
-        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
-        <a class="tab-link" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
-        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
-        <a class="tab-link active" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
-        <a class="tab-link" href="{% url 'portal_integracoes' %}">Integracoes</a>
-        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
-        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
-        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
-      </nav>
-
-      {% include "portal_operacional/_sidebar_footer.html" %}
-    </aside>
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="fontes_documentos" %}
 
     <section class="portal-main" aria-label="Fontes de documentos">
       <header class="portal-topbar">
@@ -38,6 +17,7 @@
           <p class="eyebrow">Entrada de documentos</p>
           <h1>Fontes de documentos</h1>
         </div>
+        <a class="toolbar-action primary" href="{% url 'portal_fonte_documento_criar' %}">Nova fonte</a>
       </header>
 
       <section class="sources-hero">
@@ -60,15 +40,20 @@
           </article>
           <article>
             <strong>{{ fontes.total_storage_local }}</strong>
-            <span>Storage local</span>
+            <span>Pasta local</span>
           </article>
         </div>
       </section>
 
       <section class="sources-section" aria-labelledby="google-drive-title">
-        <div class="section-heading">
-          <p class="eyebrow">Nuvem</p>
-          <h2 id="google-drive-title">Pastas Google Drive</h2>
+        <div class="section-title-row">
+          <div class="section-heading">
+            <p class="eyebrow">Nuvem</p>
+            <h2 id="google-drive-title">Pastas Google Drive</h2>
+          </div>
+          <div class="section-actions">
+            <a class="secondary-action" href="{% url 'portal_fonte_documento_criar' %}?tipo=google-drive-folder">Nova fonte Google Drive</a>
+          </div>
         </div>
 
         <div class="sources-grid">
@@ -100,6 +85,11 @@
                   </dd>
                 </div>
               </dl>
+              {% if fonte.id %}
+                <div class="integration-actions">
+                  <a class="secondary-action" href="{% url 'portal_fonte_documento_editar' 'google-drive-folder' fonte.id %}">Editar</a>
+                </div>
+              {% endif %}
             </article>
           {% empty %}
             <article class="empty-agents source-empty">
@@ -113,9 +103,14 @@
       </section>
 
       <section class="sources-section" aria-labelledby="local-storage-title">
-        <div class="section-heading">
-          <p class="eyebrow">Ambiente local</p>
-          <h2 id="local-storage-title">Storages locais</h2>
+        <div class="section-title-row">
+          <div class="section-heading">
+            <p class="eyebrow">Ambiente local</p>
+            <h2 id="local-storage-title">Pastas locais</h2>
+          </div>
+          <div class="section-actions">
+            <a class="secondary-action" href="{% url 'portal_fonte_documento_criar' %}?tipo=storage-local">Nova fonte local</a>
+          </div>
         </div>
 
         <div class="sources-grid">
@@ -147,13 +142,18 @@
                   </dd>
                 </div>
               </dl>
+              {% if fonte.id %}
+                <div class="integration-actions">
+                  <a class="secondary-action" href="{% url 'portal_fonte_documento_editar' 'storage-local' fonte.id %}">Editar</a>
+                </div>
+              {% endif %}
             </article>
           {% empty %}
             <article class="empty-agents source-empty">
               <span class="empty-icon" aria-hidden="true">PC</span>
-              <p class="eyebrow">Sem storage local</p>
+              <p class="eyebrow">Sem pasta local</p>
               <h2>Nenhuma pasta local cadastrada</h2>
-              <p>Nenhuma integracao de storage local esta disponivel para o portal.</p>
+              <p>Nenhuma conexao de pasta local esta disponivel para o portal.</p>
             </article>
           {% endfor %}
         </div>

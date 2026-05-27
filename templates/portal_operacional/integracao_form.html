@@ -9,28 +9,7 @@
 </head>
 <body>
   <main class="portal-shell">
-    <aside class="portal-sidebar" aria-label="Menu principal">
-      <div class="brand-block">
-        <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
-        <div>
-          <strong>HUB Agentes</strong>
-          <span>Portal operacional</span>
-        </div>
-      </div>
-
-      <nav class="portal-tabs">
-        <a class="tab-link" href="{% url 'portal_painel' %}">Painel inicial</a>
-        <a class="tab-link" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
-        <a class="tab-link" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>
-        <a class="tab-link" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
-        <a class="tab-link active" href="{% url 'portal_integracoes' %}">Integracoes</a>
-        <a class="tab-link" href="{% url 'portal_processamentos' %}">Processamentos</a>
-        <a class="tab-link" href="#auditoria">Historico e auditoria</a>
-        <a class="tab-link" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
-      </nav>
-
-      {% include "portal_operacional/_sidebar_footer.html" %}
-    </aside>
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="integracoes" %}
 
     <section class="portal-main" aria-label="{% if modo_edicao %}Editar integracao{% else %}Nova integracao{% endif %}">
       <header class="portal-topbar">
@@ -56,7 +35,7 @@
             {{ integration_metadata.description }}
             As credenciais ficam ocultas na listagem. Na edicao, deixe o campo
             secreto em branco para manter a credencial atual. Depois de salvar, use o
-            botao Validar integracao para conferir a conexao.
+            botao Validar conexao para conferir a comunicacao com o sistema externo.
           </p>
         </div>
         <div class="builder-orb" aria-hidden="true">
@@ -94,12 +73,12 @@
 
           <div class="execution-grid">
             <div class="execution-field">
-              <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+              <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}{% if form.nome.field.required %}<span class="field-required">*</span>{% endif %}</label>
               {{ form.nome }}
               {% for error in form.nome.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
             <div class="execution-field">
-              <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+              <label for="{{ form.status.id_for_label }}">{{ form.status.label }}{% if form.status.field.required %}<span class="field-required">*</span>{% endif %}</label>
               {{ form.status }}
               {% for error in form.status.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
@@ -115,42 +94,72 @@
 
             <div class="execution-grid">
               <div class="execution-field">
-                <label for="{{ form.provider_type.id_for_label }}">{{ form.provider_type.label }}</label>
+                <label for="{{ form.provider_type.id_for_label }}">{{ form.provider_type.label }}{% if form.provider_type.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.provider_type }}
                 {% for error in form.provider_type.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
               <div class="execution-field">
-                <label for="{{ form.default_model.id_for_label }}">{{ form.default_model.label }}</label>
+                <label for="{{ form.default_model.id_for_label }}">{{ form.default_model.label }}{% if form.default_model.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.default_model }}
                 {% for error in form.default_model.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
               <div class="execution-field">
-                <label for="{{ form.timeout_seconds.id_for_label }}">{{ form.timeout_seconds.label }}</label>
+                <label for="{{ form.timeout_seconds.id_for_label }}">{{ form.timeout_seconds.label }}{% if form.timeout_seconds.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.timeout_seconds }}
                 {% for error in form.timeout_seconds.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
               <div class="execution-field">
-                <label for="{{ form.api_key.id_for_label }}">{{ form.api_key.label }}</label>
+                <label for="{{ form.api_key.id_for_label }}">{{ form.api_key.label }}{% if form.api_key.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.api_key }}
                 <small>{% if form.api_key.help_text %}{{ form.api_key.help_text }}{% else %}A chave nao sera exibida novamente na listagem.{% endif %}</small>
                 {% for error in form.api_key.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
               <div class="execution-field">
-                <label for="{{ form.api_base_url.id_for_label }}">{{ form.api_base_url.label }}</label>
+                <label for="{{ form.api_base_url.id_for_label }}">{{ form.api_base_url.label }}{% if form.api_base_url.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.api_base_url }}
                 {% for error in form.api_base_url.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
               <div class="execution-field">
-                <label for="{{ form.organization_id.id_for_label }}">{{ form.organization_id.label }}</label>
+                <label for="{{ form.organization_id.id_for_label }}">{{ form.organization_id.label }}{% if form.organization_id.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.organization_id }}
                 {% for error in form.organization_id.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
               <div class="execution-field">
-                <label for="{{ form.project_id.id_for_label }}">{{ form.project_id.label }}</label>
+                <label for="{{ form.project_id.id_for_label }}">{{ form.project_id.label }}{% if form.project_id.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.project_id }}
                 {% for error in form.project_id.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
             </div>
+
+            <aside class="integration-field-guide" aria-label="Modelo de preenchimento para IA">
+              <div>
+                <p class="eyebrow">Modelo de preenchimento</p>
+                <h3>Onde colocar cada dado da API</h3>
+                <small>Campos marcados com <span class="field-required">*</span> sao obrigatorios para salvar e validar a conexao.</small>
+              </div>
+              <dl>
+                <div>
+                  <dt>Chave de API</dt>
+                  <dd>Cole no campo <strong>Chave de API</strong>.</dd>
+                </div>
+                <div>
+                  <dt>Modelo padrao</dt>
+                  <dd>Use o nome tecnico do modelo, exemplo: <code>gemini-2.0-flash</code>.</dd>
+                </div>
+                <div>
+                  <dt>Nome do projeto</dt>
+                  <dd>Cole em <strong>Project ID</strong>, exemplo: <code>projects/123456789</code>.</dd>
+                </div>
+                <div>
+                  <dt>URL base da API</dt>
+                  <dd>Deixe em branco, salvo se estiver usando endpoint customizado.</dd>
+                </div>
+                <div>
+                  <dt>Organization ID</dt>
+                  <dd>Normalmente fica em branco para Gemini.</dd>
+                </div>
+              </dl>
+            </aside>
           </section>
         {% elif integration_type == "google-drive" %}
           <section class="builder-card">
@@ -161,28 +170,50 @@
 
             <div class="execution-grid">
               <div class="execution-field">
-                <label for="{{ form.service_account_email.id_for_label }}">{{ form.service_account_email.label }}</label>
+                <label for="{{ form.service_account_email.id_for_label }}">{{ form.service_account_email.label }}{% if form.service_account_email.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.service_account_email }}
                 {% for error in form.service_account_email.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
               <div class="execution-field builder-wide">
-                <label for="{{ form.credentials_json.id_for_label }}">{{ form.credentials_json.label }}</label>
+                <label for="{{ form.credentials_json.id_for_label }}">{{ form.credentials_json.label }}{% if form.credentials_json.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.credentials_json }}
                 <small>{% if form.credentials_json.help_text %}{{ form.credentials_json.help_text }}{% else %}Cole o JSON da service account. O Portal nao exibe este conteudo na listagem.{% endif %}</small>
                 {% for error in form.credentials_json.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
             </div>
+
+            <aside class="integration-field-guide" aria-label="Modelo de preenchimento para Google Drive">
+              <div>
+                <p class="eyebrow">Modelo de preenchimento</p>
+                <h3>Credencial de service account</h3>
+                <small>Campos marcados com <span class="field-required">*</span> sao obrigatorios para validar o acesso.</small>
+              </div>
+              <dl>
+                <div>
+                  <dt>E-mail da service account</dt>
+                  <dd>Use o valor do JSON em <code>client_email</code>.</dd>
+                </div>
+                <div>
+                  <dt>Credenciais JSON</dt>
+                  <dd>Cole o conteudo completo do arquivo JSON baixado no Google Cloud.</dd>
+                </div>
+                <div>
+                  <dt>Permissao no Drive</dt>
+                  <dd>Compartilhe a pasta do Drive com o e-mail da service account.</dd>
+                </div>
+              </dl>
+            </aside>
           </section>
         {% else %}
           <section class="builder-card">
             <div class="form-section-heading">
-              <p class="eyebrow">Storage local</p>
+              <p class="eyebrow">Pasta local</p>
               <h2>Pasta autorizada</h2>
             </div>
 
             <div class="execution-grid">
               <div class="execution-field">
-                <label for="{{ form.base_path.id_for_label }}">{{ form.base_path.label }}</label>
+                <label for="{{ form.base_path.id_for_label }}">{{ form.base_path.label }}{% if form.base_path.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.base_path }}
                 <small>Informe um caminho absoluto, por exemplo: C:\licitacao.</small>
                 {% for error in form.base_path.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
@@ -192,6 +223,24 @@
                 <span>{{ form.recursive_scan.label }}</span>
               </label>
             </div>
+
+            <aside class="integration-field-guide" aria-label="Modelo de preenchimento para pasta local">
+              <div>
+                <p class="eyebrow">Modelo de preenchimento</p>
+                <h3>Pasta autorizada no servidor</h3>
+                <small>Campos marcados com <span class="field-required">*</span> sao obrigatorios para validar o caminho.</small>
+              </div>
+              <dl>
+                <div>
+                  <dt>Caminho local autorizado</dt>
+                  <dd>Use um caminho existente no servidor, exemplo: <code>/app/media/entradas</code>.</dd>
+                </div>
+                <div>
+                  <dt>Ler subpastas automaticamente</dt>
+                  <dd>Ative quando os PDFs puderem estar dentro de pastas filhas.</dd>
+                </div>
+              </dl>
+            </aside>
           </section>
         {% endif %}
 

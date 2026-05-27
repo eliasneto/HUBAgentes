@@ -219,7 +219,7 @@ def obter_bloqueio_execucao_padrao(agente):
     }:
         if not configuracao.default_local_storage_integration_id:
             return (
-                "Agente sem storage local padrao configurado. "
+                "Agente sem pasta local padrao configurada. "
                 "Atualize a configuracao operacional antes de executar."
             )
         if not configuracao.default_local_relative_input_path:
@@ -231,7 +231,7 @@ def obter_bloqueio_execucao_padrao(agente):
             configuracao.default_local_storage_integration.status
             != IntegrationStatus.ATIVA
         ):
-            return "O storage local padrao deste agente esta inativo."
+            return "A pasta local padrao deste agente esta inativa."
 
     return ""
 

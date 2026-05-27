@@ -4,6 +4,7 @@ from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+VERSION_FILE = BASE_DIR / "VERSION"
 
 
 # Quick-start development settings - unsuitable for production
@@ -17,6 +18,13 @@ SECRET_KEY = config(
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DJANGO_DEBUG", default=True, cast=bool)
+
+APP_VERSION = config(
+    "APP_VERSION",
+    default=VERSION_FILE.read_text(encoding="utf-8").strip()
+    if VERSION_FILE.exists()
+    else "1.0.0",
+)
 
 ALLOWED_HOSTS = config(
     "DJANGO_ALLOWED_HOSTS",
@@ -47,6 +55,7 @@ INSTALLED_APPS = [
     'apps.agentes_ia',
     'apps.processamentos',
     'apps.auditoria',
+    'apps.doc_system',
 ]
 
 MIDDLEWARE = [
@@ -72,6 +81,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.core.context_processors.app_version',
             ],
         },
     },

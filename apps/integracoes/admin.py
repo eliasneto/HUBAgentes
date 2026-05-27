@@ -137,7 +137,7 @@ class LocalStorageIntegrationAdmin(AdminOnlyGoogleDriveCredentialMixin, UserStam
     readonly_fields = ("last_validated_at", "last_error")
     actions = ("validar_storage_local",)
 
-    @admin.action(description="Validar storage local")
+    @admin.action(description="Validar pasta local")
     def validar_storage_local(self, request, queryset):
         success_count = 0
         for integration in queryset:
@@ -421,7 +421,7 @@ class AIProviderIntegrationAdmin(AdminOnlyGoogleDriveCredentialMixin, UserStampe
             payload=safe_payload,
         )
 
-    @admin.action(description="Validar integracao de IA")
+    @admin.action(description="Validar conexao de IA")
     def validar_integracao_ia(self, request, queryset):
         success_count = 0
         for integration in queryset:

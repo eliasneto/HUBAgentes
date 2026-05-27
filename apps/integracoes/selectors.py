@@ -14,6 +14,7 @@ from apps.integracoes.models import (
 
 @dataclass(frozen=True)
 class GoogleDriveFonteResumo:
+    id: int
     nome: str
     status: str
     integracao: str
@@ -26,6 +27,7 @@ class GoogleDriveFonteResumo:
 
 @dataclass(frozen=True)
 class LocalStorageFonteResumo:
+    id: int
     nome: str
     status: str
     base_path: str
@@ -135,6 +137,7 @@ def listar_fontes_documentos_para_portal() -> FontesDocumentosResumo:
     return FontesDocumentosResumo(
         google_drive=[
             GoogleDriveFonteResumo(
+                id=fonte.pk,
                 nome=fonte.nome,
                 status=fonte.get_status_display(),
                 integracao=str(fonte.google_drive_integration),
@@ -148,6 +151,7 @@ def listar_fontes_documentos_para_portal() -> FontesDocumentosResumo:
         ],
         storage_local=[
             LocalStorageFonteResumo(
+                id=fonte.pk,
                 nome=fonte.nome,
                 status=fonte.get_status_display(),
                 base_path=fonte.base_path,

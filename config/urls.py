@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path
+from django.urls import include, path
 
 from apps.core.views import (
     AgenteExecucaoView,
@@ -26,6 +26,8 @@ from apps.core.views import (
     AgentePortalUpdateView,
     AgentesLeituraView,
     AgentesGerenciamentoView,
+    FonteDocumentoCreateView,
+    FonteDocumentoUpdateView,
     FontesDocumentosView,
     IntegracaoCreateView,
     IntegracaoUpdateView,
@@ -44,6 +46,7 @@ from apps.core.views import (
 
 urlpatterns = [
     path('', PortalLoginView.as_view(), name='portal_login'),
+    path('doc-system/', include('apps.doc_system.urls')),
     path('painel/', PortalPainelView.as_view(), name='portal_painel'),
     path('agentes-de-leitura/', AgentesLeituraView.as_view(), name='portal_agentes_leitura'),
     path('agentes/', AgentesGerenciamentoView.as_view(), name='portal_agentes_gerenciar'),
@@ -52,6 +55,8 @@ urlpatterns = [
     path('agentes-de-leitura/novo/', AgentePortalLegacyCreateRedirectView.as_view(), name='portal_agente_criar_legacy'),
     path('agentes-de-leitura/<slug:slug>/executar/', AgenteExecucaoView.as_view(), name='portal_agente_executar'),
     path('fontes-de-documentos/', FontesDocumentosView.as_view(), name='portal_fontes_documentos'),
+    path('fontes-de-documentos/nova/', FonteDocumentoCreateView.as_view(), name='portal_fonte_documento_criar'),
+    path('fontes-de-documentos/<str:tipo>/<int:fonte_id>/editar/', FonteDocumentoUpdateView.as_view(), name='portal_fonte_documento_editar'),
     path('integracoes/', IntegracoesView.as_view(), name='portal_integracoes'),
     path('integracoes/novo/', IntegracaoCreateView.as_view(), name='portal_integracao_criar'),
     path('integracoes/<str:tipo>/<int:integracao_id>/editar/', IntegracaoUpdateView.as_view(), name='portal_integracao_editar'),

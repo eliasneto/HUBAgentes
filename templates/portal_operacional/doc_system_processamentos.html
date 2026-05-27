@@ -1,0 +1,260 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Processamentos</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-processamentos-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_processamentos" %}
+
+    <section class="portal-main" aria-label="Documentacao de Processamentos">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Processamentos</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia operacional</p>
+          <h2>Como acompanhar a esteira de execucao, entender o status de cada lote e localizar erros ou arquivos finais.</h2>
+          <p>
+            Esta tela documenta o modulo de Processamentos do portal. Ela explica o que cada indicador mostra,
+            quais estados existem, como interpretar o progresso e quando um arquivo final fica disponivel para download.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>DOC</span>
+          <small>processamentos</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo a passo</p>
+          <h2>Fluxo recomendado de acompanhamento</h2>
+        </div>
+
+        <ol class="doc-step-list">
+          <li>Execute um agente pela tela de <strong>Agentes</strong>.</li>
+          <li>Abra <strong>Operacao &gt; Processamentos</strong> para acompanhar o andamento.</li>
+          <li>Localize o card do processamento pelo codigo e pelo nome do agente.</li>
+          <li>Observe o status, o percentual, a etapa atual e o documento atual.</li>
+          <li>Se houver falha, abra <strong>Ver erro</strong> para ler a mensagem operacional registrada.</li>
+          <li>Quando o arquivo final estiver pronto, use o botao de download no proprio card.</li>
+        </ol>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Indicadores</p>
+          <h2>Resumo exibido no topo da tela</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Total</span>
+            <p>Quantidade total de processamentos listados no contexto atual.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Em andamento</span>
+            <p>Processamentos ainda em fila ou em execucao.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Concluidos</span>
+            <p>Processamentos finalizados com sucesso.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Com erro</span>
+            <p>Processamentos finalizados com falha operacional.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Status</p>
+          <h2>Estados que um processamento pode assumir</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Status tecnico</div>
+            <div>Como aparece</div>
+            <div>O que significa</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>criado</code></div>
+            <div>Criado</div>
+            <div>O processamento foi registrado, mas ainda nao entrou na fila real.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>em_fila</code></div>
+            <div>Em fila</div>
+            <div>O sistema recebeu a solicitacao e aguarda a vez de executar.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>em_processamento</code></div>
+            <div>Em processamento</div>
+            <div>O agente esta lendo documentos, chamando a IA ou montando a saida.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>concluido_sucesso</code></div>
+            <div>Concluido com sucesso</div>
+            <div>A execucao terminou e, se aplicavel, o arquivo final ja pode estar disponivel.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>concluido_erro</code></div>
+            <div>Concluido com erro</div>
+            <div>Houve falha operacional ou tecnica durante a execucao.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>cancelado</code></div>
+            <div>Cancelado</div>
+            <div>O fluxo foi interrompido antes da finalizacao normal.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Card do processamento</p>
+          <h2>Campos que aparecem em cada item da lista</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>Origem do dado</div>
+            <div>Como interpretar</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Codigo</strong></div>
+            <div><code>processamento.codigo</code></div>
+            <div>Identificador unico do processamento para consulta e download.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Agente</strong></div>
+            <div>Nome do agente executado</div>
+            <div>Ajuda a localizar rapidamente qual configuracao originou o lote.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Origem</strong></div>
+            <div>Tipo de entrada documental</div>
+            <div>Pode indicar Google Drive, pasta local, arquivo local fixo, arquivo enviado ou sem origem documental.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Formato de saida</strong></div>
+            <div>Formato final resolvido do arquivo</div>
+            <div>Pode ser JSON, Excel, CSV, PDF, TXT, ZIP ou outro formato permitido pelo fluxo.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Documentos</strong></div>
+            <div><code>total_processados</code> de <code>total_documentos</code></div>
+            <div>Mostra quantos arquivos ja passaram pela etapa principal.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Tokens</strong></div>
+            <div><code>total_tokens</code></div>
+            <div>Resume o consumo registrado da IA quando esse dado esta disponivel.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Duracao</strong></div>
+            <div><code>duracao_processamento_ms</code></div>
+            <div>No portal ela aparece convertida para minutos.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Inicio e fim</strong></div>
+            <div><code>iniciado_em</code> e <code>finalizado_em</code></div>
+            <div>Permite verificar se o fluxo ainda esta aberto ou ja foi encerrado.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Progresso</p>
+          <h2>Como entender a barra e os avisos do painel</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Percentual</span>
+            <p>Calculado a partir da relacao entre documentos processados e total previsto.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Etapa atual</span>
+            <p>Texto operacional salvo pelo backend para mostrar em que fase o processamento esta.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Documento atual</span>
+            <p>Nome do arquivo que esta sendo tratado no momento, quando houver processamento documental.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Possivel travamento</span>
+            <p>Aviso exibido quando o sistema detecta ausencia de atividade recente acima do limite esperado.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Saida e erro</p>
+          <h2>Quando baixar o arquivo final e quando abrir o detalhe do erro</h2>
+        </div>
+
+        <div class="doc-two-columns">
+          <div class="doc-code-panel">
+            <strong>Arquivo final</strong>
+            <pre><code>O botao de download aparece quando:
+- existe arquivo de saida vinculado
+- o processamento concluiu a geracao
+- a rota segura do portal libera o arquivo</code></pre>
+          </div>
+
+          <div class="doc-code-panel">
+            <strong>Ver erro</strong>
+            <pre><code>O painel de erro aparece quando:
+- existe mensagem operacional registrada
+- houve falha da IA
+- houve erro em documento
+- houve erro ao gerar a saida final</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Observacoes importantes</p>
+          <h2>Cuidados ao interpretar a tela</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>Nem todo processamento gera arquivo final imediatamente; alguns fluxos ainda estao consolidando a saida.</li>
+          <li>O formato exibido no card e o formato final resolvido para aquele processamento.</li>
+          <li>Um processamento pode concluir com erro mesmo tendo tratado parte dos documentos.</li>
+          <li>O aviso de possivel travamento e um alerta operacional; ele nao confirma sozinho que houve falha definitiva.</li>
+          <li>Se houver erro, a mensagem mostrada no portal e uma versao operacional do problema, sem expor detalhes tecnicos sensiveis.</li>
+          <li>Para acompanhar execucoes longas, use a pagina de Processamentos como painel principal de monitoramento.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_processamentos' %}">Abrir processamentos</a>
+        <a class="start-button" href="/doc-system/processamentos/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
