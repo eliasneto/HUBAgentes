@@ -1,7 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
-from apps.core.models import UserStampedModel
+from apps.core.models import SoftDeleteModel, TimestampedModel, UserStampedModel
 from apps.integracoes.models import AIProviderIntegration, IntegrationStatus
 
 
@@ -107,7 +109,42 @@ def default_prompt_parameters():
     return []
 
 
-class AgenteIA(UserStampedModel):
+# Schema minimo esperado para concurrency_policy.
+_CONCURRENCY_POLICY_REQUIRED_KEY = "block_parallel_per_agent"
+
+
+def _validate_concurrency_policy(value):
+    if not isinstance(value, dict):
+        raise ValidationError(
+            {"concurrency_policy": "concurrency_policy deve ser um objeto JSON."}
+        )
+    if _CONCURRENCY_POLICY_REQUIRED_KEY not in value:
+        raise ValidationError(
+            {
+                "concurrency_policy": (
+                    f"concurrency_policy deve conter a chave '{_CONCURRENCY_POLICY_REQUIRED_KEY}'."
+                )
+            }
+        )
+    if not isinstance(value[_CONCURRENCY_POLICY_REQUIRED_KEY], bool):
+        raise ValidationError(
+            {
+                "concurrency_policy": (
+                    f"'{_CONCURRENCY_POLICY_REQUIRED_KEY}' deve ser um booleano."
+                )
+            }
+        )
+
+
+def _validate_fields_schema(value):
+    """Valida que runtime_fields_schema e builder_schema sao objetos JSON validos."""
+    if value is None:
+        return
+    if not isinstance(value, dict):
+        raise ValidationError("O schema de campos deve ser um objeto JSON.")
+
+
+class AgenteIA(SoftDeleteModel, UserStampedModel):
     nome = models.CharField(max_length=120)
     slug = models.SlugField(unique=True)
     tipo = models.CharField(max_length=30, choices=AgentType.choices)
@@ -265,6 +302,11 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
     )
     prompt_parameters = models.JSONField(default=default_prompt_parameters, blank=True)
     concurrency_policy = models.JSONField(default=default_concurrency_policy, blank=True)
+    # U3: limite de tentativas de execucao por documento. 0 = sem limite.
+    max_tentativas = models.PositiveSmallIntegerField(
+        default=3,
+        help_text="Numero maximo de tentativas de execucao por documento. 0 = sem limite.",
+    )
 
     class Meta:
         verbose_name = "Configuracao operacional do agente"
@@ -286,6 +328,19 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
             str(extension).lower().lstrip(".")
             for extension in self.allowed_input_extensions
         ]
+
+        # M4: valida schema de concurrency_policy
+        _validate_concurrency_policy(self.concurrency_policy)
+
+        # M5: valida schemas de campos de runtime e builder
+        try:
+            _validate_fields_schema(self.runtime_fields_schema)
+        except ValidationError as exc:
+            raise ValidationError({"runtime_fields_schema": exc.message}) from exc
+        try:
+            _validate_fields_schema(self.builder_schema)
+        except ValidationError as exc:
+            raise ValidationError({"builder_schema": exc.message}) from exc
 
         if (
             self.input_policy == AgentInputPolicy.FIXA
@@ -368,3 +423,62 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
 
     def __str__(self):
         return f"Configuracao operacional - {self.agente}"
+
+
+class VersaoPrompt(TimestampedModel):
+    """
+    Historico de versoes do prompt de um agente.
+    Uma nova entrada e criada automaticamente a cada alteracao de prompt_base.
+    """
+
+    agente = models.ForeignKey(
+        AgenteIA,
+        on_delete=models.CASCADE,
+        related_name="versoes_prompt",
+    )
+    versao = models.CharField(max_length=30)
+    prompt = models.TextField()
+    criado_por = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="versoes_prompt_criadas",
+    )
+    nota = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Versao de prompt"
+        verbose_name_plural = "Versoes de prompt"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["agente", "versao"],
+                name="unique_versao_prompt_por_agente",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["agente"]),
+        ]
+
+    def __str__(self):
+        return f"{self.agente.nome} — {self.versao}"
+
+
+@receiver(post_save, sender=AgenteIA)
+def registrar_versao_prompt(sender, instance, created, **kwargs):
+    """Cria VersaoPrompt sempre que prompt_base for salvo pela primeira vez ou alterado."""
+    if not instance.prompt_base:
+        return
+
+    ultima = VersaoPrompt.objects.filter(agente=instance).order_by("-created_at").first()
+    if ultima and ultima.prompt == instance.prompt_base:
+        return
+
+    versao_numero = VersaoPrompt.objects.filter(agente=instance).count() + 1
+    VersaoPrompt.objects.create(
+        agente=instance,
+        versao=f"v{versao_numero}",
+        prompt=instance.prompt_base,
+        criado_por=instance.updated_by or instance.created_by,
+    )

@@ -221,6 +221,81 @@ Uso no prompt: {{pergunta_usuario}}{% endverbatim %}</code></pre>
 
       <section class="builder-card">
         <div class="form-section-heading">
+          <p class="eyebrow">Combinacoes</p>
+          <h2>Como entrada e saida funcionam juntas</h2>
+        </div>
+
+        <ul class="doc-note-list" style="margin-bottom: 1.5rem;">
+          <li><strong>O sistema gerencia o recebimento dos arquivos de entrada e a entrega dos arquivos de saida. O processamento e a transformacao do conteudo sao responsabilidade exclusiva do prompt.</strong> Escreva o prompt de acordo com o volume e o formato que a combinacao escolhida vai exigir da IA.</li>
+        </ul>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Combinacao</div>
+            <div>Configuracao</div>
+            <div>Exemplo de entrada</div>
+            <div>Exemplo de saida</div>
+          </div>
+
+          <div class="doc-table-row">
+            <div><strong>1 arquivo → 1 saida</strong></div>
+            <div>
+              Modo de entrada: <code>individual</code><br>
+              Modo de saida: <code>uma_por_entrada</code><br>
+              Empacotamento: <code>zip_se_multiplos</code>
+            </div>
+            <div><code>edital_01.pdf</code></div>
+            <div><code>edital_01.json</code></div>
+          </div>
+
+          <div class="doc-table-row">
+            <div><strong>N arquivos → N saidas em ZIP</strong></div>
+            <div>
+              Modo de entrada: <code>individual</code><br>
+              Modo de saida: <code>uma_por_entrada</code><br>
+              Empacotamento: <code>zip_se_multiplos</code>
+            </div>
+            <div><code>edital_01.pdf</code>, <code>edital_02.pdf</code>, <code>edital_03.pdf</code></div>
+            <div><code>resultados.zip</code> com <code>edital_01.json</code>, <code>edital_02.json</code>, <code>edital_03.json</code></div>
+          </div>
+
+          <div class="doc-table-row">
+            <div><strong>N arquivos → 1 saida sempre em ZIP</strong></div>
+            <div>
+              Modo de entrada: <code>individual</code><br>
+              Modo de saida: <code>uma_por_entrada</code><br>
+              Empacotamento: <code>sempre_zip</code>
+            </div>
+            <div><code>edital_01.pdf</code>, <code>edital_02.pdf</code></div>
+            <div><code>resultados.zip</code> com <code>edital_01.json</code>, <code>edital_02.json</code></div>
+          </div>
+
+          <div class="doc-table-row">
+            <div><strong>N arquivos → 1 saida consolidada</strong></div>
+            <div>
+              Modo de entrada: <code>grupo_unico</code><br>
+              Modo de saida: <code>uma_saida_final</code><br>
+              Empacotamento: <code>arquivo_unico</code>
+            </div>
+            <div><code>edital_01.pdf</code>, <code>edital_02.pdf</code>, <code>edital_03.pdf</code></div>
+            <div><code>consolidado.xlsx</code> com dados de todos os editais em uma unica planilha</div>
+          </div>
+
+          <div class="doc-table-row">
+            <div><strong>N arquivos → 1 saida consolidada em ZIP</strong></div>
+            <div>
+              Modo de entrada: <code>grupo_unico</code><br>
+              Modo de saida: <code>uma_saida_final</code><br>
+              Empacotamento: <code>sempre_zip</code>
+            </div>
+            <div><code>edital_01.pdf</code>, <code>edital_02.pdf</code>, <code>edital_03.pdf</code></div>
+            <div><code>resultado.zip</code> contendo <code>consolidado.xlsx</code></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
           <p class="eyebrow">Exemplo completo</p>
           <h2>Preenchimento sugerido para um agente de leitura</h2>
         </div>
@@ -258,6 +333,21 @@ Empacotamento da saida: zip_se_multiplos</code></pre>
           <li><code>uma_por_entrada</code> nao pode usar <code>arquivo_unico</code> no empacotamento.</li>
           <li>A integracao de IA precisa estar ativa para um agente ativo funcionar corretamente.</li>
           <li>Hoje o fluxo padrao de entrada documental continua orientado a PDF nas configuracoes operacionais existentes.</li>
+        </ul>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Dicas</p>
+          <h2>Boas praticas ao configurar o agente</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li><strong>Escolha o modo de entrada de acordo com o que o prompt precisa enxergar.</strong> Se o prompt precisa comparar ou cruzar informacoes entre documentos, use <code>grupo_unico</code>. Se cada documento e independente, use <code>individual</code>.</li>
+          <li><strong>O prompt e responsavel pelo processamento, nao o sistema.</strong> O sistema entrega os arquivos para a IA e coleta a resposta. O que acontece entre a entrada e a saida depende exclusivamente de como o prompt esta escrito.</li>
+          <li><strong>Prefira <code>zip_se_multiplos</code> quando o volume de arquivos varia.</strong> Quando ha apenas um arquivo a saida e entregue diretamente, sem necessidade de descompactar. Quando ha varios, o ZIP organiza tudo automaticamente.</li>
+          <li><strong>Use <code>grupo_unico</code> com cuidado para lotes grandes.</strong> Todos os arquivos sao enviados juntos em uma unica chamada para a IA. O contexto cresce proporcionalmente ao numero e tamanho dos arquivos. Avalie o limite do modelo escolhido antes de usar esse modo com muitos documentos.</li>
+          <li><strong>Alinhe o formato de saida com o modo de montagem.</strong> Se a saida e consolidada (<code>uma_saida_final</code>), o prompt deve retornar um unico bloco de dados. Se a saida e por entrada (<code>uma_por_entrada</code>), o prompt deve retornar apenas os dados relativos ao arquivo recebido naquela chamada.</li>
         </ul>
       </section>
 

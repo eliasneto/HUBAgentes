@@ -19,6 +19,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 
+from apps.auditoria.views import AuditoriaView
 from apps.core.views import (
     AgenteExecucaoView,
     AgentePortalCreateView,
@@ -64,6 +65,7 @@ urlpatterns = [
     path('processamentos/', ProcessamentosView.as_view(), name='portal_processamentos'),
     path('processamentos/<str:codigo>/status/', ProcessamentoStatusView.as_view(), name='portal_processamento_status'),
     path('processamentos/<str:codigo>/saida/', ProcessamentoSaidaDownloadView.as_view(), name='portal_processamento_download_saida'),
+    path('historico-e-auditoria/', AuditoriaView.as_view(), name='portal_auditoria'),
     path('usuarios-e-acessos/', UsuariosAcessosView.as_view(), name='portal_usuarios_acessos'),
     path('usuarios-e-acessos/novo/', UsuarioPortalCreateView.as_view(), name='portal_usuario_criar'),
     path('usuarios-e-acessos/<int:user_id>/editar/', UsuarioPortalUpdateView.as_view(), name='portal_usuario_editar'),

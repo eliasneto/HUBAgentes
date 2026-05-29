@@ -79,6 +79,8 @@ def _render_csv_bytes(parsed_output):
 
 
 def _render_txt_bytes(parsed_output):
+    if isinstance(parsed_output, str):
+        return parsed_output.encode("utf-8")
     pretty_text = json.dumps(parsed_output, ensure_ascii=False, indent=2)
     return pretty_text.encode("utf-8")
 
@@ -116,8 +118,11 @@ def _render_xlsx_bytes(parsed_output):
 
 
 def _render_pdf_bytes(parsed_output):
-    pretty_json = json.dumps(parsed_output, ensure_ascii=False, indent=2)
-    lines = [line[:120] for line in pretty_json.splitlines()] or ["{}"]
+    if isinstance(parsed_output, str):
+        text = parsed_output
+    else:
+        text = json.dumps(parsed_output, ensure_ascii=False, indent=2)
+    lines = [line[:120] for line in text.splitlines()] or [""]
     pages = list(_chunked(lines, 42))
 
     objects = []
@@ -135,7 +140,7 @@ def _render_pdf_bytes(parsed_output):
     pages_object_id = 2 + (len(pages) * 2)
     catalog_object_id = pages_object_id + 1
 
-    objects.insert(0, (font_object_id, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"))
+    objects.insert(0, (font_object_id, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"))
     for content_object_id, page_object_id in zip(content_object_ids, page_object_ids):
         page_payload = (
             f"<< /Type /Page /Parent {pages_object_id} 0 R /MediaBox [0 0 595 842] "

@@ -1,0 +1,182 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historico e Auditoria - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260529-auditoria-1">
+</head>
+<body>
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="auditoria" %}
+
+    <section class="portal-main" aria-label="Historico e Auditoria">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Rastreabilidade</p>
+          <h1>Historico e Auditoria</h1>
+        </div>
+      </header>
+
+      <section class="audit-hero">
+        <div>
+          <p class="eyebrow">Trilha de eventos</p>
+          <h2>Consulte acoes, falhas e atividades registradas pelo sistema.</h2>
+          <p>
+            Cada acao relevante — execucoes de agentes, alteracoes de configuracao,
+            atividades de usuarios — fica registrada aqui para consulta e rastreabilidade operacional.
+          </p>
+        </div>
+        <div class="audit-metrics" aria-label="Resumo dos eventos">
+          <article>
+            <strong>{{ auditoria.total }}</strong>
+            <span>Total de eventos</span>
+          </article>
+          <article>
+            <strong>{{ auditoria.hoje }}</strong>
+            <span>Hoje</span>
+          </article>
+          <article>
+            <strong>{{ auditoria.modulos_count }}</strong>
+            <span>Modulos ativos</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="audit-filters" aria-label="Filtros">
+        <form method="get" action="" class="audit-filter-form">
+          <div class="execution-field">
+            <label for="filtro-modulo">Modulo</label>
+            <select id="filtro-modulo" name="modulo">
+              <option value="">Todos os modulos</option>
+              {% for modulo in auditoria.modulos_disponiveis %}
+                <option value="{{ modulo }}" {% if auditoria.filtro_modulo == modulo %}selected{% endif %}>
+                  {{ modulo }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="execution-field audit-filter-search">
+            <label for="filtro-busca">Buscar</label>
+            <input
+              id="filtro-busca"
+              type="search"
+              name="busca"
+              value="{{ auditoria.filtro_busca }}"
+              placeholder="Buscar por acao, objeto ou descricao..."
+              autocomplete="off"
+            >
+          </div>
+          <button type="submit" class="start-button audit-filter-btn">Filtrar</button>
+          {% if auditoria.filtro_modulo or auditoria.filtro_busca %}
+            <a href="{% url 'portal_auditoria' %}" class="secondary-action audit-filter-btn">Limpar</a>
+          {% endif %}
+        </form>
+      </section>
+
+      <section class="audit-list" aria-label="Lista de eventos">
+        {% for evento in auditoria.eventos %}
+          <article class="audit-card">
+            <div class="audit-card-left">
+              <span class="audit-module-badge audit-module-{{ evento.modulo }}">{{ evento.modulo }}</span>
+              <span class="audit-action">{{ evento.acao }}</span>
+            </div>
+
+            <div class="audit-card-body">
+              <p class="audit-descricao">
+                {% if evento.descricao %}
+                  {{ evento.descricao }}
+                {% else %}
+                  {{ evento.objeto_tipo }}{% if evento.objeto_id %} #{{ evento.objeto_id }}{% endif %}
+                {% endif %}
+              </p>
+              {% if evento.objeto_tipo %}
+                <small class="audit-objeto">
+                  {{ evento.objeto_tipo }}{% if evento.objeto_id %} &middot; #{{ evento.objeto_id }}{% endif %}
+                </small>
+              {% endif %}
+            </div>
+
+            <dl class="audit-card-meta">
+              <div>
+                <dt>Usuario</dt>
+                <dd>{{ evento.actor }}</dd>
+              </div>
+              <div>
+                <dt>Data</dt>
+                <dd title="{{ evento.criado_em_formatado }}">{{ evento.criado_em_formatado }}</dd>
+              </div>
+              <div>
+                <dt>Tempo</dt>
+                <dd>{{ evento.tempo_relativo }}</dd>
+              </div>
+            </dl>
+          </article>
+        {% empty %}
+          <article class="empty-agents">
+            <span class="empty-icon" aria-hidden="true">AU</span>
+            <p class="eyebrow">Estado vazio</p>
+            <h2>Nenhum evento encontrado</h2>
+            <p>
+              {% if auditoria.filtro_modulo or auditoria.filtro_busca %}
+                Nenhum evento corresponde aos filtros aplicados.
+              {% else %}
+                Os eventos do sistema aparecrao aqui conforme as acoes forem registradas.
+              {% endif %}
+            </p>
+          </article>
+        {% endfor %}
+      </section>
+
+      {% if auditoria.total_paginas > 1 %}
+        <nav class="portal-pagination" aria-label="Paginacao de eventos">
+          <div>
+            <span>
+              {{ auditoria.primeiro_item }}-{{ auditoria.ultimo_item }}
+              de {{ auditoria.total }}
+            </span>
+            <small>{{ auditoria.itens_por_pagina }} por pagina</small>
+          </div>
+
+          <div class="pagination-actions">
+            {% if auditoria.tem_pagina_anterior %}
+              <a
+                class="pagination-button"
+                href="?page={{ auditoria.pagina_anterior }}{% if auditoria.filtro_modulo %}&modulo={{ auditoria.filtro_modulo }}{% endif %}{% if auditoria.filtro_busca %}&busca={{ auditoria.filtro_busca }}{% endif %}"
+                aria-label="Pagina anterior"
+              >&lsaquo;</a>
+            {% else %}
+              <span class="pagination-button disabled" aria-hidden="true">&lsaquo;</span>
+            {% endif %}
+
+            {% for pagina in auditoria.paginas %}
+              {% if pagina == "..." %}
+                <span class="pagination-ellipsis">...</span>
+              {% elif pagina == auditoria.pagina_atual %}
+                <span class="pagination-button active" aria-current="page">{{ pagina }}</span>
+              {% else %}
+                <a
+                  class="pagination-button"
+                  href="?page={{ pagina }}{% if auditoria.filtro_modulo %}&modulo={{ auditoria.filtro_modulo }}{% endif %}{% if auditoria.filtro_busca %}&busca={{ auditoria.filtro_busca }}{% endif %}"
+                >{{ pagina }}</a>
+              {% endif %}
+            {% endfor %}
+
+            {% if auditoria.tem_proxima_pagina %}
+              <a
+                class="pagination-button"
+                href="?page={{ auditoria.proxima_pagina }}{% if auditoria.filtro_modulo %}&modulo={{ auditoria.filtro_modulo }}{% endif %}{% if auditoria.filtro_busca %}&busca={{ auditoria.filtro_busca }}{% endif %}"
+                aria-label="Proxima pagina"
+              >&rsaquo;</a>
+            {% else %}
+              <span class="pagination-button disabled" aria-hidden="true">&rsaquo;</span>
+            {% endif %}
+          </div>
+        </nav>
+      {% endif %}
+
+    </section>
+  </main>
+</body>
+</html>

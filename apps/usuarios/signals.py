@@ -1,5 +1,5 @@
 from django.contrib.auth.models import Group, Permission
-from django.db.models.signals import post_migrate
+from django.db.models.signals import post_migrate, post_save
 from django.dispatch import receiver
 
 
@@ -42,3 +42,29 @@ def create_default_groups(sender, **kwargs):
             if permission:
                 permissions.append(permission)
         group.permissions.set(permissions)
+
+
+@receiver(post_save, sender="usuarios.UserProfile")
+def sincronizar_papel_com_grupos(sender, instance, **kwargs):
+    """
+    M2: mantém o usuario Django no grupo correspondente ao papel_principal.
+    O usuario e removido de todos os grupos de papel e adicionado apenas ao novo.
+    """
+    user = instance.user
+    papel = instance.papel_principal
+    if not papel:
+        return
+
+    nomes_grupos_papel = set(ROLE_PERMISSIONS.keys())
+    grupos_papel = Group.objects.filter(name__in=nomes_grupos_papel)
+
+    # Remove de todos os grupos de papel existentes.
+    for grupo in grupos_papel:
+        user.groups.remove(grupo)
+
+    # Adiciona ao grupo do papel atual.
+    try:
+        grupo_destino = Group.objects.get(name=papel)
+        user.groups.add(grupo_destino)
+    except Group.DoesNotExist:
+        pass

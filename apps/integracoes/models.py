@@ -3,7 +3,8 @@ from pathlib import Path
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from apps.core.models import TimestampedModel, UserStampedModel
+from apps.core.fields import EncryptedCharField, EncryptedTextField
+from apps.core.models import SoftDeleteModel, TimestampedModel, UserStampedModel
 from apps.integracoes.services.google_drive import (
     GoogleDriveServiceError,
     extract_folder_id_from_url,
@@ -28,7 +29,7 @@ class FolderItemType(models.TextChoices):
     OUTRO = "outro", "Outro"
 
 
-class LocalStorageIntegration(UserStampedModel):
+class LocalStorageIntegration(SoftDeleteModel, UserStampedModel):
     nome = models.CharField(max_length=120, unique=True)
     status = models.CharField(
         max_length=20,
@@ -73,7 +74,7 @@ class LocalStorageIntegration(UserStampedModel):
         return self.nome
 
 
-class GoogleDriveIntegration(UserStampedModel):
+class GoogleDriveIntegration(SoftDeleteModel, UserStampedModel):
     nome = models.CharField(max_length=120, unique=True)
     status = models.CharField(
         max_length=20,
@@ -82,7 +83,8 @@ class GoogleDriveIntegration(UserStampedModel):
     )
     auth_mode = models.CharField(max_length=30, default="service_account")
     drive_folder_id = models.CharField(max_length=255, blank=True)
-    credentials_json = models.TextField()
+    # U1: criptografado em repouso — nunca armazenado em texto puro.
+    credentials_json = EncryptedTextField()
     service_account_email = models.EmailField()
     allowed_extensions = models.JSONField(default=list, blank=True)
     last_connection_at = models.DateTimeField(null=True, blank=True)
@@ -203,7 +205,13 @@ class GoogleDriveFolderSourceItem(TimestampedModel):
         return f"{self.nome} ({self.get_item_type_display()})"
 
 
-class OpenAIIntegration(UserStampedModel):
+class OpenAIIntegration(SoftDeleteModel, UserStampedModel):
+    """
+    Integracao com provedores de IA (OpenAI, Anthropic, Gemini).
+    Mantido como classe principal para compatibilidade com migrations historicas.
+    Use AIProviderIntegration (proxy formal abaixo) no codigo de producao.
+    """
+
     nome = models.CharField(max_length=120, unique=True)
     provider_type = models.CharField(
         max_length=40,
@@ -215,7 +223,8 @@ class OpenAIIntegration(UserStampedModel):
         choices=IntegrationStatus.choices,
         default=IntegrationStatus.INATIVA,
     )
-    api_key = models.CharField(max_length=255)
+    # U2: criptografado em repouso — nunca armazenado em texto puro.
+    api_key = EncryptedCharField()
     api_base_url = models.URLField(blank=True)
     organization_id = models.CharField(max_length=120, blank=True)
     project_id = models.CharField(max_length=120, blank=True)
@@ -264,5 +273,14 @@ class OpenAIIntegration(UserStampedModel):
         return f"{self.nome} ({self.get_provider_type_display()})"
 
 
-# Alias temporario para uso da direcao estrutural generica no codigo da sprint.
-AIProviderIntegration = OpenAIIntegration
+class AIProviderIntegration(OpenAIIntegration):
+    """
+    A4: proxy formal do modelo OpenAIIntegration.
+    Compartilha a mesma tabela; use este nome em todo codigo novo.
+    O nome OpenAIIntegration sobrevive apenas nas migrations historicas.
+    """
+
+    class Meta:
+        proxy = True
+        verbose_name = "Integracao de IA"
+        verbose_name_plural = "Integracoes de IA"

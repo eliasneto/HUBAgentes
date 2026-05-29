@@ -110,6 +110,9 @@
               </div>
               <div class="execution-field">
                 <label for="{{ form.api_key.id_for_label }}">{{ form.api_key.label }}{% if form.api_key.field.required %}<span class="field-required">*</span>{% endif %}</label>
+                {% if not form.api_key.field.required %}
+                  <span class="field-saved-badge">&#10003; Credencial cadastrada</span>
+                {% endif %}
                 {{ form.api_key }}
                 <small>{% if form.api_key.help_text %}{{ form.api_key.help_text }}{% else %}A chave nao sera exibida novamente na listagem.{% endif %}</small>
                 {% for error in form.api_key.errors %}<small class="field-error">{{ error }}</small>{% endfor %}

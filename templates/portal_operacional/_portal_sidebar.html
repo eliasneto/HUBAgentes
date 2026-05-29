@@ -25,7 +25,7 @@
       <div class="sidebar-submenu">
         <a class="tab-link submenu-link {% if active_nav == 'integracoes' %}active{% endif %}" href="{% url 'portal_integracoes' %}">Integracoes</a>
         <a class="tab-link submenu-link {% if active_nav == 'fontes_documentos' %}active{% endif %}" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
-        <a class="tab-link submenu-link {% if active_nav == 'auditoria' %}active{% endif %}" href="#auditoria">Historico e auditoria</a>
+        <a class="tab-link submenu-link {% if active_nav == 'auditoria' %}active{% endif %}" href="{% url 'portal_auditoria' %}">Historico e auditoria</a>
         <a class="tab-link submenu-link {% if active_nav == 'usuarios_acessos' %}active{% endif %}" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
       </div>
     </details>

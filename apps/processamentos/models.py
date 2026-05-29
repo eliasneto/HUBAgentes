@@ -10,7 +10,7 @@ from apps.agentes_ia.models import (
     AgentOutputAssemblyMode,
     AgentOutputPackagingMode,
 )
-from apps.core.models import TimestampedModel
+from apps.core.models import SoftDeleteModel, TimestampedModel
 from apps.integracoes.models import (
     AIProviderIntegration,
     GoogleDriveFolderSource,
@@ -86,7 +86,7 @@ class ExecutionScopeType(models.TextChoices):
     GRUPO = "grupo", "Grupo"
 
 
-class Processamento(TimestampedModel):
+class Processamento(SoftDeleteModel, TimestampedModel):
     codigo = models.CharField(max_length=40, unique=True)
     status = models.CharField(
         max_length=30,
@@ -295,6 +295,22 @@ class Processamento(TimestampedModel):
                 }
             )
 
+        # A1: valida snapshots quando o processamento ja saiu do estado inicial.
+        status_requer_snapshot = {
+            ProcessingStatus.EM_PROCESSAMENTO,
+            ProcessingStatus.CONCLUIDO_SUCESSO,
+            ProcessingStatus.CONCLUIDO_ERRO,
+        }
+        if self.status in status_requer_snapshot and self.agente_id:
+            if not self.prompt_snapshot:
+                raise ValidationError(
+                    {"prompt_snapshot": "O snapshot do prompt e obrigatorio apos inicio do processamento."}
+                )
+            if not self.modelo_snapshot:
+                raise ValidationError(
+                    {"modelo_snapshot": "O snapshot do modelo e obrigatorio apos inicio do processamento."}
+                )
+
     def save(self, *args, **kwargs):
         if (
             self.input_source_type == ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER
@@ -336,6 +352,20 @@ class Processamento(TimestampedModel):
         } and not self.finalizado_em:
             self.finalizado_em = timezone.now()
         super().save(*args, **kwargs)
+
+    def recalcular_totais(self):
+        """
+        A2: recalcula total_documentos e total_processados direto do banco,
+        evitando dessincronizacao em casos de rollback ou concorrencia.
+        Deve ser chamado dentro de uma transacao atomica.
+        """
+        from django.db.models import Count, Q
+        result = self.documentos.aggregate(
+            total=Count("id"),
+            processados=Count("id", filter=Q(status=DocumentStatus.PROCESSADO)),
+        )
+        self.total_documentos = result["total"]
+        self.total_processados = result["processados"]
 
     def __str__(self):
         return self.codigo
@@ -442,6 +472,12 @@ class ProcessamentoExecucaoIA(TimestampedModel):
         blank=True,
         related_name="execucoes_ia",
     )
+    # M1: documentos_entrada substitui documentos_referencia (JSON sem FK real).
+    documentos_entrada = models.ManyToManyField(
+        "processamentos.DocumentoEntrada",
+        blank=True,
+        related_name="execucoes_como_referencia",
+    )
     ai_provider_integration = models.ForeignKey(
         AIProviderIntegration,
         on_delete=models.SET_NULL,
@@ -471,7 +507,6 @@ class ProcessamentoExecucaoIA(TimestampedModel):
         choices=ExecutionScopeType.choices,
         default=ExecutionScopeType.INDIVIDUAL,
     )
-    documentos_referencia = models.JSONField(default=list, blank=True)
 
     class Meta:
         verbose_name = "Execucao de IA do processamento"
@@ -502,12 +537,21 @@ class DocumentoSaidaProcessamento(TimestampedModel):
         on_delete=models.CASCADE,
         related_name="documentos_saida",
     )
+    # A3: SET_NULL em vez de CASCADE — saida pode existir mesmo sem documento de entrada
+    # (execucoes em grupo nao tem documento singular), e deletar entrada nao deve
+    # apagar o arquivo de saida ja gerado.
     documento = models.ForeignKey(
         DocumentoEntrada,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="saidas",
+    )
+    # M1: documentos_entrada substitui documentos_referencia (JSON sem FK real).
+    documentos_entrada = models.ManyToManyField(
+        DocumentoEntrada,
+        blank=True,
+        related_name="saidas_como_referencia",
     )
     execucao_ia = models.ForeignKey(
         ProcessamentoExecucaoIA,
@@ -539,7 +583,6 @@ class DocumentoSaidaProcessamento(TimestampedModel):
         choices=ExecutionScopeType.choices,
         default=ExecutionScopeType.INDIVIDUAL,
     )
-    documentos_referencia = models.JSONField(default=list, blank=True)
 
     class Meta:
         verbose_name = "Saida de documento do processamento"

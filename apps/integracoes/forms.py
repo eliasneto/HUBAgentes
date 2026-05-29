@@ -32,6 +32,7 @@ class IntegrationPortalFormMixin:
                 continue
             field.required = False
             field.help_text = "Deixe em branco para manter a credencial atual."
+            field.widget.attrs["placeholder"] = "••••••••••••••••••••••••••••••••"
             self.initial[field_name] = ""
 
     def _apply_portal_widgets(self):

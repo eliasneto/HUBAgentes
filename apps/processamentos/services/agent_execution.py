@@ -519,7 +519,10 @@ def _execute_without_document(
         execution_started_at=execution_started_at,
         execution_finished_at=execution_finished_at,
     )
-    parsed_output = _parse_structured_output(execution_result.output_text)
+    parsed_output = _parse_structured_output(
+        execution_result.output_text,
+        requested_output_format=processamento.output_format,
+    )
     output_filename, output_bytes, output_format, render_payload = _render_output_file(
         parsed_output,
         processamento.output_format,
@@ -544,7 +547,6 @@ def _execute_without_document(
             usage_metadata=execution_result.usage_metadata or {},
             response_summary=execution_result.summary,
             scope_type=ExecutionScopeType.SEM_DOCUMENTO,
-            documentos_referencia=[],
         )
 
         processamento.arquivo_saida.save(
@@ -645,7 +647,10 @@ def _execute_document(
         execution_started_at=execution_started_at,
         execution_finished_at=execution_finished_at,
     )
-    parsed_output = _parse_structured_output(execution_result.output_text)
+    parsed_output = _parse_structured_output(
+        execution_result.output_text,
+        requested_output_format=processamento.output_format,
+    )
     output_filename, output_bytes, output_format, render_payload = _render_output_file(
         parsed_output,
         processamento.output_format,
@@ -670,8 +675,8 @@ def _execute_document(
             usage_metadata=execution_result.usage_metadata or {},
             response_summary=execution_result.summary,
             scope_type=ExecutionScopeType.INDIVIDUAL,
-            documentos_referencia=_build_document_references([documento]),
         )
+        execution_record.documentos_entrada.set([documento])
 
         output_record = DocumentoSaidaProcessamento(
             processamento=processamento,
@@ -680,10 +685,10 @@ def _execute_document(
             formato=output_format,
             status=OutputDocumentStatus.GERADO,
             scope_type=ExecutionScopeType.INDIVIDUAL,
-            documentos_referencia=_build_document_references([documento]),
         )
         output_record.arquivo.save(output_filename, ContentFile(output_bytes), save=False)
         output_record.save()
+        output_record.documentos_entrada.set([documento])
 
         documento.status = DocumentStatus.PROCESSADO
         documento.mensagem_erro = ""
@@ -755,7 +760,6 @@ def _execute_document_group(
 ):
     execution_started_at = timezone.now()
     tentativa_numero = _next_execution_attempt_number(processamento)
-    documentos_referencia = _build_document_references(documentos)
 
     with transaction.atomic():
         _registrar_atividade_processamento(
@@ -805,7 +809,10 @@ def _execute_document_group(
         execution_started_at=execution_started_at,
         execution_finished_at=execution_finished_at,
     )
-    parsed_output = _parse_structured_output(execution_result.output_text)
+    parsed_output = _parse_structured_output(
+        execution_result.output_text,
+        requested_output_format=processamento.output_format,
+    )
     output_filename, output_bytes, output_format, render_payload = _render_output_file(
         parsed_output,
         processamento.output_format,
@@ -830,8 +837,8 @@ def _execute_document_group(
             usage_metadata=execution_result.usage_metadata or {},
             response_summary=execution_result.summary,
             scope_type=ExecutionScopeType.GRUPO,
-            documentos_referencia=documentos_referencia,
         )
+        execution_record.documentos_entrada.set(documentos)
 
         output_record = DocumentoSaidaProcessamento(
             processamento=processamento,
@@ -840,10 +847,10 @@ def _execute_document_group(
             formato=output_format,
             status=OutputDocumentStatus.GERADO,
             scope_type=ExecutionScopeType.GRUPO,
-            documentos_referencia=documentos_referencia,
         )
         output_record.arquivo.save(output_filename, ContentFile(output_bytes), save=False)
         output_record.save()
+        output_record.documentos_entrada.set(documentos)
 
         processed_at = timezone.now()
         for documento in documentos:
@@ -926,7 +933,10 @@ def _aggregate_processing_telemetry(processamento):
     }
 
 
-def _parse_structured_output(output_text):
+_PLAIN_TEXT_FORMATS = {ProcessingOutputFormat.TXT, ProcessingOutputFormat.PDF}
+
+
+def _parse_structured_output(output_text, requested_output_format=None):
     if not output_text:
         raise ProcessamentoExecutionError(
             "A IA nao retornou conteudo util para compor a saida."
@@ -941,6 +951,8 @@ def _parse_structured_output(output_text):
     try:
         return json.loads(normalized_text)
     except json.JSONDecodeError as exc:
+        if requested_output_format in _PLAIN_TEXT_FORMATS:
+            return normalized_text
         raw_excerpt = _truncate_error_excerpt(normalized_text)
         raise ProcessamentoExecutionError(
             "A resposta da IA nao veio em JSON valido para este processamento.",
@@ -1119,10 +1131,10 @@ def _mark_document_error(
             total_tokens=processamento.total_tokens,
             error_message=message,
             scope_type=ExecutionScopeType.INDIVIDUAL,
-            documentos_referencia=_build_document_references([documento]),
         )
+        execution_record.documentos_entrada.set([documento])
 
-        DocumentoSaidaProcessamento.objects.create(
+        saida_erro = DocumentoSaidaProcessamento.objects.create(
             processamento=processamento,
             documento=documento,
             execucao_ia=execution_record,
@@ -1130,8 +1142,8 @@ def _mark_document_error(
             status=OutputDocumentStatus.ERRO,
             mensagem_erro=message,
             scope_type=ExecutionScopeType.INDIVIDUAL,
-            documentos_referencia=_build_document_references([documento]),
         )
+        saida_erro.documentos_entrada.set([documento])
 
 
 def _mark_document_group_error(
@@ -1148,8 +1160,6 @@ def _mark_document_group_error(
         int((execution_finished_at - execution_started_at).total_seconds() * 1000),
         0,
     )
-    documentos_referencia = _build_document_references(documentos)
-
     with transaction.atomic():
         for documento in documentos:
             documento.status = DocumentStatus.ERRO
@@ -1197,10 +1207,10 @@ def _mark_document_group_error(
             total_tokens=processamento.total_tokens,
             error_message=message,
             scope_type=ExecutionScopeType.GRUPO,
-            documentos_referencia=documentos_referencia,
         )
+        execution_record.documentos_entrada.set(documentos)
 
-        DocumentoSaidaProcessamento.objects.create(
+        saida_erro_grupo = DocumentoSaidaProcessamento.objects.create(
             processamento=processamento,
             documento=None,
             execucao_ia=execution_record,
@@ -1208,8 +1218,8 @@ def _mark_document_group_error(
             status=OutputDocumentStatus.ERRO,
             mensagem_erro=message,
             scope_type=ExecutionScopeType.GRUPO,
-            documentos_referencia=documentos_referencia,
         )
+        saida_erro_grupo.documentos_entrada.set(documentos)
 
 
 def _log_execution_event(

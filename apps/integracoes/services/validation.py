@@ -31,7 +31,10 @@ def validate_ai_provider_integration(integration) -> IntegrationValidationResult
         adapter = get_ai_provider_adapter(integration)
         validation_result = adapter.validate_connection()
     except AIProviderServiceError as exc:
-        return _mark_ai_provider_error(integration, str(exc))
+        error_str = str(exc)
+        if _eh_indisponibilidade_temporaria(error_str):
+            return _mark_ai_provider_unavailable(integration, error_str)
+        return _mark_ai_provider_error(integration, error_str)
     except Exception as exc:  # pragma: no cover
         return _mark_ai_provider_error(
             integration,
@@ -64,6 +67,40 @@ def validate_ai_provider_integration(integration) -> IntegrationValidationResult
     )
 
 
+def _eh_indisponibilidade_temporaria(error_message: str) -> bool:
+    normalized = error_message.lower()
+    return (
+        "503" in normalized
+        or "unavailable" in normalized
+        or "high demand" in normalized
+        or "try again later" in normalized
+        or "overloaded" in normalized
+        or "service unavailable" in normalized
+    )
+
+
+def _mark_ai_provider_unavailable(integration, error_message) -> IntegrationValidationResult:
+    """503 e indisponibilidade temporaria — nao altera o status da integracao."""
+    integration.last_validated_at = timezone.now()
+    integration.last_error = _truncate_error(error_message, MAX_LAST_ERROR_LENGTH)
+    integration.last_validation_summary = ""
+    integration.save(
+        update_fields=[
+            "last_validated_at",
+            "last_error",
+            "last_validation_summary",
+            "updated_at",
+        ]
+    )
+    return IntegrationValidationResult(
+        False,
+        (
+            f"{integration.nome}: provedor temporariamente indisponivel (503). "
+            "O status da integracao nao foi alterado. Tente validar novamente em alguns minutos."
+        ),
+    )
+
+
 def _mark_ai_provider_error(integration, error_message, user_message=None):
     integration.last_validated_at = timezone.now()
     integration.last_error = _truncate_error(error_message, MAX_LAST_ERROR_LENGTH)
@@ -87,6 +124,10 @@ def _mark_ai_provider_error(integration, error_message, user_message=None):
 
 def _build_ai_provider_user_message(error_message):
     normalized_error = error_message.lower()
+    if "503" in normalized_error or "unavailable" in normalized_error:
+        return (
+            "provedor temporariamente indisponivel. Aguarde alguns minutos e tente novamente."
+        )
     if "429" in normalized_error or "resource_exhausted" in normalized_error:
         return (
             "cota do provedor excedida. Verifique o plano, billing ou limites "
