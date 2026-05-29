@@ -112,21 +112,23 @@
                 <dd>{{ evento.tempo_relativo }}</dd>
               </div>
               {% if evento.tokens_total %}
-              <div>
-                <dt>Tokens total</dt>
-                <dd>{{ evento.tokens_total }}</dd>
-              </div>
-              <div>
-                <dt>Entrada</dt>
-                <dd>{{ evento.tokens_entrada|default:"—" }}</dd>
-              </div>
-              <div>
-                <dt>Processamento</dt>
-                <dd>{{ evento.tokens_processamento|default:"—" }}</dd>
-              </div>
-              <div>
-                <dt>Saida</dt>
-                <dd>{{ evento.tokens_saida|default:"—" }}</dd>
+              <div class="audit-tokens-row">
+                <div>
+                  <dt>Total</dt>
+                  <dd>{{ evento.tokens_total }}</dd>
+                </div>
+                <div>
+                  <dt>Entrada</dt>
+                  <dd>{{ evento.tokens_entrada|default:"—" }}</dd>
+                </div>
+                <div>
+                  <dt>Processo</dt>
+                  <dd>{{ evento.tokens_processamento|default:"—" }}</dd>
+                </div>
+                <div>
+                  <dt>Saída</dt>
+                  <dd>{{ evento.tokens_saida|default:"—" }}</dd>
+                </div>
               </div>
               {% endif %}
             </dl>

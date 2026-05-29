@@ -3247,6 +3247,22 @@ button.session-pill:hover,
   font-weight: 600;
 }
 
+.audit-tokens-row {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 216, 255, 0.1);
+  grid-column: 1 / -1;
+}
+
+.audit-tokens-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
 @media (max-width: 960px) {
   .audit-hero {
     grid-template-columns: 1fr;
