@@ -117,11 +117,35 @@ def _render_xlsx_bytes(parsed_output):
     return workbook.getvalue()
 
 
+def _estruturar_como_texto(data, nivel=0):
+    linhas = []
+    indent = "  " * nivel
+    if isinstance(data, dict):
+        for chave, valor in data.items():
+            rotulo = chave.replace("_", " ").upper() if nivel == 0 else chave.replace("_", " ").capitalize()
+            if isinstance(valor, (dict, list)):
+                linhas.append(f"{indent}{rotulo}:")
+                linhas.extend(_estruturar_como_texto(valor, nivel + 1).splitlines())
+            else:
+                linhas.append(f"{indent}{rotulo}: {valor}")
+    elif isinstance(data, list):
+        for item in data:
+            if isinstance(item, (dict, list)):
+                linhas.extend(_estruturar_como_texto(item, nivel + 1).splitlines())
+            else:
+                linhas.append(f"{indent}- {item}")
+    else:
+        linhas.append(f"{indent}{data}")
+    return "\n".join(linhas)
+
+
 def _render_pdf_bytes(parsed_output):
     if isinstance(parsed_output, str):
         text = parsed_output
+    elif isinstance(parsed_output, (dict, list)):
+        text = _estruturar_como_texto(parsed_output)
     else:
-        text = json.dumps(parsed_output, ensure_ascii=False, indent=2)
+        text = str(parsed_output)
     lines = [line[:120] for line in text.splitlines()] or [""]
     pages = list(_chunked(lines, 42))
 
