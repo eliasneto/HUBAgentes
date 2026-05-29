@@ -139,6 +139,26 @@ def _estruturar_como_texto(data, nivel=0):
     return "\n".join(linhas)
 
 
+def _wrap_line(line, max_chars=90):
+    if len(line) <= max_chars:
+        return [line]
+    stripped = line.lstrip()
+    indent = line[: len(line) - len(stripped)]
+    wrapped = []
+    current = indent
+    for word in stripped.split(" "):
+        if current == indent:
+            current += word
+        elif len(current) + 1 + len(word) <= max_chars:
+            current += " " + word
+        else:
+            wrapped.append(current)
+            current = indent + word
+    if current:
+        wrapped.append(current)
+    return wrapped or [line]
+
+
 def _render_pdf_bytes(parsed_output):
     if isinstance(parsed_output, str):
         text = parsed_output
@@ -146,7 +166,11 @@ def _render_pdf_bytes(parsed_output):
         text = _estruturar_como_texto(parsed_output)
     else:
         text = str(parsed_output)
-    lines = [line[:120] for line in text.splitlines()] or [""]
+    lines = []
+    for raw_line in text.splitlines():
+        lines.extend(_wrap_line(raw_line))
+    if not lines:
+        lines = [""]
     pages = list(_chunked(lines, 42))
 
     objects = []
