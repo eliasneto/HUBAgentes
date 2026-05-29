@@ -12,7 +12,7 @@
     <a class="tab-link {% if active_nav == 'painel' %}active{% endif %}" href="{% url 'portal_painel' %}">Painel inicial</a>
 
     <details class="sidebar-group" {% if active_nav == 'agentes' or active_nav == 'processamentos' or active_nav == 'gerenciar_agentes' %}open{% endif %}>
-      <summary class="tab-link group-trigger {% if active_nav == 'agentes' or active_nav == 'processamentos' or active_nav == 'gerenciar_agentes' %}active{% endif %}">Operacao</summary>
+      <summary class="tab-link group-trigger {% if active_nav == 'agentes' or active_nav == 'processamentos' or active_nav == 'gerenciar_agentes' %}active{% endif %}">Operação</summary>
       <div class="sidebar-submenu">
         <a class="tab-link submenu-link {% if active_nav == 'agentes' %}active{% endif %}" href="{% url 'portal_agentes_leitura' %}">Agentes</a>
         <a class="tab-link submenu-link {% if active_nav == 'processamentos' %}active{% endif %}" href="{% url 'portal_processamentos' %}">Processamentos</a>
@@ -23,23 +23,23 @@
     <details class="sidebar-group" {% if active_nav == 'integracoes' or active_nav == 'fontes_documentos' or active_nav == 'auditoria' or active_nav == 'usuarios_acessos' %}open{% endif %}>
       <summary class="tab-link group-trigger {% if active_nav == 'integracoes' or active_nav == 'fontes_documentos' or active_nav == 'auditoria' or active_nav == 'usuarios_acessos' %}active{% endif %}">Administrador</summary>
       <div class="sidebar-submenu">
-        <a class="tab-link submenu-link {% if active_nav == 'integracoes' %}active{% endif %}" href="{% url 'portal_integracoes' %}">Integracoes</a>
+        <a class="tab-link submenu-link {% if active_nav == 'integracoes' %}active{% endif %}" href="{% url 'portal_integracoes' %}">Integrações</a>
         <a class="tab-link submenu-link {% if active_nav == 'fontes_documentos' %}active{% endif %}" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
-        <a class="tab-link submenu-link {% if active_nav == 'auditoria' %}active{% endif %}" href="{% url 'portal_auditoria' %}">Historico e auditoria</a>
-        <a class="tab-link submenu-link {% if active_nav == 'usuarios_acessos' %}active{% endif %}" href="{% url 'portal_usuarios_acessos' %}">Usuarios e acessos</a>
+        <a class="tab-link submenu-link {% if active_nav == 'auditoria' %}active{% endif %}" href="{% url 'portal_auditoria' %}">Histórico e auditoria</a>
+        <a class="tab-link submenu-link {% if active_nav == 'usuarios_acessos' %}active{% endif %}" href="{% url 'portal_usuarios_acessos' %}">Usuários e acessos</a>
       </div>
     </details>
 
     <details class="sidebar-group" {% if active_nav == 'doc_painel' or active_nav == 'doc_agentes' or active_nav == 'doc_gerenciar_agentes' or active_nav == 'doc_integracoes' or active_nav == 'doc_processamentos' or active_nav == 'doc_fontes_documentos' or active_nav == 'doc_usuarios_acessos' %}open{% endif %}>
-      <summary class="tab-link group-trigger group-trigger-docs {% if active_nav == 'doc_painel' or active_nav == 'doc_agentes' or active_nav == 'doc_gerenciar_agentes' or active_nav == 'doc_integracoes' or active_nav == 'doc_processamentos' or active_nav == 'doc_fontes_documentos' or active_nav == 'doc_usuarios_acessos' %}active{% endif %}">Doc Sistema</summary>
+      <summary class="tab-link group-trigger group-trigger-docs {% if active_nav == 'doc_painel' or active_nav == 'doc_agentes' or active_nav == 'doc_gerenciar_agentes' or active_nav == 'doc_integracoes' or active_nav == 'doc_processamentos' or active_nav == 'doc_fontes_documentos' or active_nav == 'doc_usuarios_acessos' %}active{% endif %}">Documentação</summary>
       <div class="sidebar-submenu">
         <a class="tab-link submenu-link {% if active_nav == 'doc_painel' %}active{% endif %}" href="/doc-system/painel-inicial/">Painel inicial</a>
         <a class="tab-link submenu-link {% if active_nav == 'doc_agentes' %}active{% endif %}" href="/doc-system/agentes/">Agentes</a>
         <a class="tab-link submenu-link {% if active_nav == 'doc_processamentos' %}active{% endif %}" href="/doc-system/processamentos/">Processamentos</a>
         <a class="tab-link submenu-link {% if active_nav == 'doc_gerenciar_agentes' %}active{% endif %}" href="/doc-system/gerenciar-agentes/">Gerenciar agentes</a>
-        <a class="tab-link submenu-link {% if active_nav == 'doc_integracoes' %}active{% endif %}" href="/doc-system/integracoes/">Integracoes</a>
+        <a class="tab-link submenu-link {% if active_nav == 'doc_integracoes' %}active{% endif %}" href="/doc-system/integracoes/">Integrações</a>
         <a class="tab-link submenu-link {% if active_nav == 'doc_fontes_documentos' %}active{% endif %}" href="/doc-system/fontes-documentos/">Fontes de documentos</a>
-        <a class="tab-link submenu-link {% if active_nav == 'doc_usuarios_acessos' %}active{% endif %}" href="/doc-system/usuarios-e-acessos/">Usuarios e acessos</a>
+        <a class="tab-link submenu-link {% if active_nav == 'doc_usuarios_acessos' %}active{% endif %}" href="/doc-system/usuarios-e-acessos/">Usuários e acessos</a>
       </div>
     </details>
   </nav>

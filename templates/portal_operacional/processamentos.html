@@ -15,18 +15,18 @@
     <section class="portal-main" aria-label="Processamentos">
       <header class="portal-topbar">
         <div>
-          <p class="eyebrow">Esteira de execucao</p>
+          <p class="eyebrow">Execuções</p>
           <h1>Processamentos</h1>
         </div>
       </header>
 
       <section class="processing-hero">
         <div>
-          <p class="eyebrow">Monitor operacional</p>
-          <h2>Acompanhe lotes, documentos e consumo de IA em um unico painel.</h2>
+          <p class="eyebrow">Acompanhamento</p>
+          <h2>Veja o andamento de cada execução em tempo real.</h2>
           <p>
-            Esta tela acompanha as execucoes iniciadas pelos agentes e mostra
-            o andamento operacional de cada processamento.
+            Acompanhe o progresso, os erros e os resultados de cada tarefa
+            executada pelos seus agentes.
           </p>
         </div>
         <div class="processing-metrics" aria-label="Resumo dos processamentos">
@@ -40,7 +40,7 @@
           </article>
           <article>
             <strong data-summary-concluidos>{{ processamentos.concluidos }}</strong>
-            <span>Concluidos</span>
+            <span>Concluídos</span>
           </article>
           <article>
             <strong data-summary-com-erro>{{ processamentos.com_erro }}</strong>
@@ -87,7 +87,7 @@
                 <div class="processing-live-meta">
                   <small>
                     Etapa:
-                    <span data-stage-label>{{ processamento.etapa_atual|default:"Aguardando atualizacao" }}</span>
+                    <span data-stage-label>{{ processamento.etapa_atual|default:"Aguardando atualização" }}</span>
                   </small>
                   <small data-current-document-wrap {% if not processamento.documento_atual_nome %}hidden{% endif %}>
                     Documento atual:
@@ -100,13 +100,13 @@
               </div>
               {% if not processamento.tem_arquivo_saida %}
                 <div class="processing-output-access" data-output-unavailable>
-                  <small>Arquivo de saida ainda nao disponivel.</small>
+                  <small>Arquivo de saída ainda não disponível.</small>
                 </div>
               {% endif %}
               <details class="processing-error-panel" data-error-panel {% if not processamento.erro_operacional %}hidden{% endif %}>
                 <summary>Ver erro</summary>
                 <div>
-                  <span>Mensagem registrada pelo sistema ou pela IA</span>
+                  <span>Detalhes do erro</span>
                   <p data-error-message>{{ processamento.erro_operacional|linebreaksbr }}</p>
                 </div>
               </details>
@@ -121,26 +121,38 @@
                 <dd data-meta-documentos>{{ processamento.total_processados }} de {{ processamento.total_documentos }}</dd>
               </div>
               <div>
-                <dt>Tokens</dt>
-                <dd data-meta-tokens>{{ processamento.total_tokens|default:"Nao informado" }}</dd>
+                <dt>Tokens total</dt>
+                <dd data-meta-tokens>{{ processamento.total_tokens|default:"—" }}</dd>
               </div>
               <div>
-                <dt>Duracao</dt>
+                <dt>Entrada</dt>
+                <dd>{{ processamento.input_tokens|default:"—" }}</dd>
+              </div>
+              <div>
+                <dt>Processamento</dt>
+                <dd>{{ processamento.processing_tokens|default:"—" }}</dd>
+              </div>
+              <div>
+                <dt>Saída</dt>
+                <dd>{{ processamento.output_tokens|default:"—" }}</dd>
+              </div>
+              <div>
+                <dt>Duração</dt>
                 <dd data-meta-duracao>
                   {% if processamento.duracao_minutos %}
                     {{ processamento.duracao_minutos }} min
                   {% else %}
-                    Nao informada
+                    Não informada
                   {% endif %}
                 </dd>
               </div>
               <div>
-                <dt>Inicio</dt>
+                <dt>Início</dt>
                 <dd data-meta-inicio>
                   {% if processamento.iniciado_em %}
                     {{ processamento.iniciado_em|date:"d/m/Y H:i" }}
                   {% else %}
-                    Nao informado
+                    Não informado
                   {% endif %}
                 </dd>
               </div>
@@ -162,14 +174,14 @@
             <p class="eyebrow">Estado vazio</p>
             <h2>Nenhum processamento encontrado</h2>
             <p>
-              Execute um agente pelo portal para acompanhar a esteira por aqui.
+              Execute um agente para acompanhar os resultados aqui.
             </p>
           </article>
         {% endfor %}
       </section>
 
       {% if processamentos.total_paginas > 1 %}
-        <nav class="portal-pagination" aria-label="Paginacao de processamentos">
+        <nav class="portal-pagination" aria-label="Paginação de processamentos">
           <div>
             <span>
               {{ processamentos.primeiro_item }}-{{ processamentos.ultimo_item }}

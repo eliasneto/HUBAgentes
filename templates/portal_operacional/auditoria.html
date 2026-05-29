@@ -4,28 +4,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Historico e Auditoria - Portal</title>
+  <title>Histórico e Auditoria - Portal</title>
   <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260529-auditoria-1">
 </head>
 <body>
   <main class="portal-shell">
     {% include "portal_operacional/_portal_sidebar.html" with active_nav="auditoria" %}
 
-    <section class="portal-main" aria-label="Historico e Auditoria">
+    <section class="portal-main" aria-label="Histórico e Auditoria">
       <header class="portal-topbar">
         <div>
-          <p class="eyebrow">Rastreabilidade</p>
-          <h1>Historico e Auditoria</h1>
+          <p class="eyebrow">Histórico</p>
+          <h1>Histórico e Auditoria</h1>
         </div>
       </header>
 
       <section class="audit-hero">
         <div>
-          <p class="eyebrow">Trilha de eventos</p>
-          <h2>Consulte acoes, falhas e atividades registradas pelo sistema.</h2>
+          <p class="eyebrow">Registro de atividades</p>
+          <h2>Veja as ações e eventos registrados no sistema.</h2>
           <p>
-            Cada acao relevante — execucoes de agentes, alteracoes de configuracao,
-            atividades de usuarios — fica registrada aqui para consulta e rastreabilidade operacional.
+            Cada ação importante — execuções de agentes, alterações de configuração,
+            atividades de usuários — fica registrada aqui para você consultar quando precisar.
           </p>
         </div>
         <div class="audit-metrics" aria-label="Resumo dos eventos">
@@ -39,7 +39,7 @@
           </article>
           <article>
             <strong>{{ auditoria.modulos_count }}</strong>
-            <span>Modulos ativos</span>
+            <span>Módulos ativos</span>
           </article>
         </div>
       </section>
@@ -47,9 +47,9 @@
       <section class="audit-filters" aria-label="Filtros">
         <form method="get" action="" class="audit-filter-form">
           <div class="execution-field">
-            <label for="filtro-modulo">Modulo</label>
+            <label for="filtro-modulo">Módulo</label>
             <select id="filtro-modulo" name="modulo">
-              <option value="">Todos os modulos</option>
+              <option value="">Todos os módulos</option>
               {% for modulo in auditoria.modulos_disponiveis %}
                 <option value="{{ modulo }}" {% if auditoria.filtro_modulo == modulo %}selected{% endif %}>
                   {{ modulo }}
@@ -111,6 +111,24 @@
                 <dt>Tempo</dt>
                 <dd>{{ evento.tempo_relativo }}</dd>
               </div>
+              {% if evento.tokens_total %}
+              <div>
+                <dt>Tokens total</dt>
+                <dd>{{ evento.tokens_total }}</dd>
+              </div>
+              <div>
+                <dt>Entrada</dt>
+                <dd>{{ evento.tokens_entrada|default:"—" }}</dd>
+              </div>
+              <div>
+                <dt>Processamento</dt>
+                <dd>{{ evento.tokens_processamento|default:"—" }}</dd>
+              </div>
+              <div>
+                <dt>Saida</dt>
+                <dd>{{ evento.tokens_saida|default:"—" }}</dd>
+              </div>
+              {% endif %}
             </dl>
           </article>
         {% empty %}
@@ -122,7 +140,7 @@
               {% if auditoria.filtro_modulo or auditoria.filtro_busca %}
                 Nenhum evento corresponde aos filtros aplicados.
               {% else %}
-                Os eventos do sistema aparecrao aqui conforme as acoes forem registradas.
+                Os eventos do sistema aparecerão aqui conforme as ações forem registradas.
               {% endif %}
             </p>
           </article>
@@ -130,7 +148,7 @@
       </section>
 
       {% if auditoria.total_paginas > 1 %}
-        <nav class="portal-pagination" aria-label="Paginacao de eventos">
+        <nav class="portal-pagination" aria-label="Paginação de eventos">
           <div>
             <span>
               {{ auditoria.primeiro_item }}-{{ auditoria.ultimo_item }}

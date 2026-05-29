@@ -32,6 +32,9 @@ class ProcessamentoResumo:
     total_documentos: int
     total_processados: int
     total_tokens: int | None
+    input_tokens: int | None
+    processing_tokens: int | None
+    output_tokens: int | None
     percentual: int
     duracao_minutos: float | None
     iniciado_em: datetime | None
@@ -185,6 +188,9 @@ def listar_processamentos_para_portal(
             total_documentos=processamento.total_documentos,
             total_processados=processamento.total_processados,
             total_tokens=processamento.total_tokens,
+            input_tokens=processamento.input_tokens,
+            processing_tokens=processamento.processing_tokens,
+            output_tokens=processamento.output_tokens,
             percentual=_calcular_percentual(processamento),
             duracao_minutos=_duracao_minutos(processamento.duracao_processamento_ms),
             iniciado_em=processamento.iniciado_em,

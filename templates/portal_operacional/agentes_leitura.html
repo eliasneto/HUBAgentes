@@ -40,7 +40,7 @@
     <section class="portal-main" aria-label="{% if modo_gerenciamento_agentes %}Gerenciar agentes{% else %}Agentes{% endif %}">
       <header class="portal-topbar">
         <div>
-          <p class="eyebrow">{% if modo_gerenciamento_agentes %}Construtor operacional{% else %}Central operacional{% endif %}</p>
+          <p class="eyebrow">{% if modo_gerenciamento_agentes %}Editor de agentes{% else %}Agentes disponíveis{% endif %}</p>
           <h1>{% if modo_gerenciamento_agentes %}Gerenciar agentes{% else %}Agentes{% endif %}</h1>
         </div>
       </header>
@@ -57,17 +57,17 @@
         <div>
           {% if modo_gerenciamento_agentes %}
             <p class="eyebrow">Todos os agentes</p>
-            <h2>Crie, revise e edite agentes antes de liberar a execucao.</h2>
+            <h2>Crie, ajuste e ative agentes.</h2>
             <p>
-              Esta area mostra agentes de usuario e agentes tecnicos. Use a edicao
-              para ajustar identidade, entrada, saida, IA e prompt sem acessar o Admin.
+              Veja todos os agentes cadastrados e edite qualquer configuração
+              sem precisar acessar a área técnica.
             </p>
           {% else %}
-            <p class="eyebrow">Biblioteca de agentes</p>
-            <h2>Execute agentes visiveis ao usuario e mantenha agentes tecnicos fora do painel.</h2>
+            <p class="eyebrow">Pronto para usar</p>
+            <h2>Execute os agentes disponíveis para você.</h2>
             <p>
-              Esta area mostra apenas agentes de usuario liberados para o portal.
-              A criacao e edicao ficam na aba Gerenciar agentes.
+              Apenas agentes ativos aparecem aqui.
+              Para criar ou editar, acesse Gerenciar agentes.
             </p>
           {% endif %}
         </div>

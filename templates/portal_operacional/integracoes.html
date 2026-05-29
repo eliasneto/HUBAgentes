@@ -4,21 +4,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Integracoes - Portal</title>
+  <title>Integrações - Portal</title>
   <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-integracao-edit-1">
 </head>
 <body>
   <main class="portal-shell">
     {% include "portal_operacional/_portal_sidebar.html" with active_nav="integracoes" %}
 
-    <section class="portal-main" aria-label="Integracoes">
+    <section class="portal-main" aria-label="Integrações">
       <header class="portal-topbar">
         <div>
-          <p class="eyebrow">Conexoes do sistema</p>
-          <h1>Integracoes</h1>
+          <p class="eyebrow">Configurações</p>
+          <h1>Integrações</h1>
         </div>
         {% if pode_validar_integracoes %}
-          <a class="toolbar-action primary" href="{% url 'portal_integracao_criar' %}">Nova conexao</a>
+          <a class="toolbar-action primary" href="{% url 'portal_integracao_criar' %}">Nova integração</a>
         {% endif %}
       </header>
 
@@ -32,14 +32,14 @@
 
       <section class="integrations-hero">
         <div>
-          <p class="eyebrow">Mapa de conexoes</p>
-          <h2>Confira os provedores que sustentam a leitura automatizada.</h2>
+          <p class="eyebrow">Integrações cadastradas</p>
+          <h2>Veja os serviços conectados ao sistema.</h2>
           <p>
-            Esta tela exibe apenas metadados operacionais. Dados sensiveis e
-            credenciais tecnicas permanecem ocultos no Portal.
+            As credenciais e informações sensíveis ficam protegidas e não
+            são exibidas nesta tela.
           </p>
         </div>
-        <div class="sources-metrics integrations-metrics" aria-label="Resumo das integracoes">
+        <div class="sources-metrics integrations-metrics" aria-label="Resumo das integrações">
           <article>
             <strong>{{ integracoes.total_integracoes }}</strong>
             <span>Total</span>

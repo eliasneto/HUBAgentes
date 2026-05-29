@@ -22,11 +22,11 @@
 
       <section class="sources-hero">
         <div>
-          <p class="eyebrow">Mapa de entrada</p>
-          <h2>Controle de onde os PDFs chegam antes da leitura pela IA.</h2>
+          <p class="eyebrow">Fontes cadastradas</p>
+          <h2>Veja de onde os documentos são lidos.</h2>
           <p>
-            Esta tela lista as fontes ja cadastradas para operacao e ajuda a
-            conferir de onde os documentos serao lidos.
+            Lista dos locais já configurados de onde os documentos
+            serão carregados para os agentes.
           </p>
         </div>
         <div class="sources-metrics" aria-label="Resumo das fontes">
@@ -48,7 +48,7 @@
       <section class="sources-section" aria-labelledby="google-drive-title">
         <div class="section-title-row">
           <div class="section-heading">
-            <p class="eyebrow">Nuvem</p>
+            <p class="eyebrow">Google Drive</p>
             <h2 id="google-drive-title">Pastas Google Drive</h2>
           </div>
           <div class="section-actions">
@@ -80,7 +80,7 @@
                     {% if fonte.ultima_validacao %}
                       {{ fonte.ultima_validacao|date:"d/m/Y H:i" }}
                     {% else %}
-                      Nao informada
+                      Não informada
                     {% endif %}
                   </dd>
                 </div>
@@ -96,7 +96,7 @@
               <span class="empty-icon" aria-hidden="true">GD</span>
               <p class="eyebrow">Sem Google Drive</p>
               <h2>Nenhuma pasta do Google Drive cadastrada</h2>
-              <p>Nenhuma origem de Google Drive esta disponivel para o portal.</p>
+              <p>Nenhuma pasta do Google Drive foi cadastrada ainda.</p>
             </article>
           {% endfor %}
         </div>
@@ -105,7 +105,7 @@
       <section class="sources-section" aria-labelledby="local-storage-title">
         <div class="section-title-row">
           <div class="section-heading">
-            <p class="eyebrow">Ambiente local</p>
+            <p class="eyebrow">Pasta local</p>
             <h2 id="local-storage-title">Pastas locais</h2>
           </div>
           <div class="section-actions">
@@ -124,12 +124,12 @@
               <p>{{ fonte.base_path }}</p>
               <dl class="agent-meta">
                 <div>
-                  <dt>Extensoes</dt>
-                  <dd>{{ fonte.extensoes|default:"Nao informadas" }}</dd>
+                  <dt>Extensões</dt>
+                  <dd>{{ fonte.extensoes|default:"Não informadas" }}</dd>
                 </div>
                 <div>
                   <dt>Leitura recursiva</dt>
-                  <dd>{% if fonte.leitura_recursiva %}Sim{% else %}Nao{% endif %}</dd>
+                  <dd>{% if fonte.leitura_recursiva %}Sim{% else %}Não{% endif %}</dd>
                 </div>
                 <div>
                   <dt>Ultima validacao</dt>
@@ -137,7 +137,7 @@
                     {% if fonte.ultima_validacao %}
                       {{ fonte.ultima_validacao|date:"d/m/Y H:i" }}
                     {% else %}
-                      Nao informada
+                      Não informada
                     {% endif %}
                   </dd>
                 </div>

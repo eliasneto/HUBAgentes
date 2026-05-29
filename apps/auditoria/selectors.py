@@ -20,6 +20,10 @@ class EventoAuditoriaResumo:
     criado_em: datetime
     criado_em_formatado: str
     tempo_relativo: str
+    tokens_total: int | None
+    tokens_entrada: int | None
+    tokens_processamento: int | None
+    tokens_saida: int | None
 
 
 @dataclass(frozen=True)
@@ -106,6 +110,10 @@ def listar_eventos_para_portal(
                 "%d/%m/%Y %H:%M"
             ),
             tempo_relativo=_tempo_relativo(e.created_at),
+            tokens_total=e.payload.get("total_tokens") if e.payload else None,
+            tokens_entrada=e.payload.get("input_tokens") if e.payload else None,
+            tokens_processamento=e.payload.get("processing_tokens") if e.payload else None,
+            tokens_saida=e.payload.get("output_tokens") if e.payload else None,
         )
         for e in page_obj.object_list
     ]

@@ -4,34 +4,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Usuarios e acessos - Portal</title>
+  <title>Usuários e acessos - Portal</title>
   <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-usuarios-acessos-1">
 </head>
 <body>
   <main class="portal-shell">
     {% include "portal_operacional/_portal_sidebar.html" with active_nav="usuarios_acessos" %}
 
-    <section class="portal-main" aria-label="Usuarios e acessos">
+    <section class="portal-main" aria-label="Usuários e acessos">
       <header class="portal-topbar">
         <div>
           <p class="eyebrow">Controle de acesso</p>
-          <h1>Usuarios e acessos</h1>
+          <h1>Usuários e acessos</h1>
         </div>
       </header>
 
       <section class="access-hero">
         <div>
-          <p class="eyebrow">Mapa de permissoes</p>
-          <h2>Veja quem acessa o portal e quais grupos estao em uso.</h2>
+          <p class="eyebrow">Quem tem acesso</p>
+          <h2>Veja quem pode usar o portal e os grupos configurados.</h2>
           <p>
-            Esta tela e uma visao operacional segura. Senhas, tokens e dados
-            sensiveis nao sao exibidos aqui.
+            As informações sensíveis não são exibidas nesta tela.
           </p>
         </div>
-        <div class="access-metrics" aria-label="Resumo de usuarios">
+        <div class="access-metrics" aria-label="Resumo de usuários">
           <article>
             <strong>{{ usuarios_acessos.total_usuarios }}</strong>
-            <span>Usuarios</span>
+            <span>Usuários</span>
           </article>
           <article>
             <strong>{{ usuarios_acessos.total_ativos }}</strong>
@@ -48,15 +47,15 @@
         </div>
       </section>
 
-      <section class="access-section" aria-label="Lista de usuarios">
+      <section class="access-section" aria-label="Lista de usuários">
         <div class="section-title-row">
           <div>
-            <p class="eyebrow">Usuarios</p>
+            <p class="eyebrow">Usuários</p>
             <h2>Contas cadastradas</h2>
           </div>
           <div class="section-actions">
             <span>{{ usuarios_acessos.total_usuarios }} registro(s)</span>
-            <a class="toolbar-action primary" href="{% url 'portal_usuario_criar' %}">Novo usuario</a>
+            <a class="toolbar-action primary" href="{% url 'portal_usuario_criar' %}">Novo usuário</a>
           </div>
         </div>
 
@@ -85,26 +84,26 @@
                   <dd>{{ usuario.grupos }}</dd>
                 </div>
                 <div>
-                  <dt>Ultimo acesso</dt>
+                  <dt>Último acesso</dt>
                   <dd>
                     {% if usuario.ultimo_acesso %}
                       {{ usuario.ultimo_acesso|date:"d/m/Y H:i" }}
                     {% else %}
-                      Nao informado
+                      Não informado
                     {% endif %}
                   </dd>
                 </div>
               </dl>
               <div class="access-card-actions">
-                <a class="secondary-action" href="{{ usuario.editar_url }}">Editar usuario</a>
+                <a class="secondary-action" href="{{ usuario.editar_url }}">Editar usuário</a>
               </div>
             </article>
           {% empty %}
             <article class="empty-agents">
               <span class="empty-icon" aria-hidden="true">US</span>
               <p class="eyebrow">Estado vazio</p>
-              <h2>Nenhum usuario encontrado</h2>
-              <p>Use a opcao Novo usuario para liberar acessos ao portal.</p>
+              <h2>Nenhum usuário encontrado</h2>
+              <p>Use a opção Novo usuário para liberar acessos ao portal.</p>
             </article>
           {% endfor %}
         </div>
