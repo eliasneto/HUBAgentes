@@ -49,7 +49,17 @@ services:
       retries: 3
       start_period: 30s
 
+  ollama:
+    image: ollama/ollama
+    container_name: HUB_Agentes_ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
 volumes:
   mysql_data:
   media_data:
   staticfiles_data:
+  ollama_data:
