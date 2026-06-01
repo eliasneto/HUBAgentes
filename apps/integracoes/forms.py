@@ -41,6 +41,12 @@ class IntegrationPortalFormMixin:
             field.widget.attrs["class"] = f"{css_class} portal-input".strip()
             if field_name not in {"api_key", "credentials_json"}:
                 field.widget.attrs.setdefault("autocomplete", "off")
+        # Erro e definido pelo sistema, nao pelo usuario
+        if "status" in self.fields:
+            self.fields["status"].choices = [
+                (IntegrationStatus.ATIVA, "Ativa"),
+                (IntegrationStatus.INATIVA, "Inativa"),
+            ]
 
     def save(self, commit=True):
         instance = super().save(commit=False)
