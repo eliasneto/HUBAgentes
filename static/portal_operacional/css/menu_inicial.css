@@ -1209,6 +1209,16 @@ button.session-pill:hover,
   margin: 0;
 }
 
+.integration-actions .danger-action {
+  border-color: rgba(255, 91, 110, 0.5);
+  color: #ff6b82;
+}
+
+.integration-actions .danger-action:hover {
+  background: rgba(255, 91, 110, 0.12);
+  border-color: rgba(255, 91, 110, 0.8);
+}
+
 .integration-actions .secondary-action {
   min-height: 36px;
   padding: 0 14px;

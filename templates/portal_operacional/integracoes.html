@@ -110,6 +110,10 @@
                     {% csrf_token %}
                     <button class="secondary-action" type="submit">Validar conexao</button>
                   </form>
+                  <form method="post" action="{% url 'portal_integracao_excluir' 'ia' integracao.id %}" onsubmit="return confirm('Excluir a integracao \'{{ integracao.nome }}\'? Esta acao nao pode ser desfeita.')">
+                    {% csrf_token %}
+                    <button class="secondary-action danger-action" type="submit">Excluir</button>
+                  </form>
                 </div>
               {% endif %}
             </article>
@@ -162,6 +166,10 @@
                   <form method="post" action="{{ integracao.validar_url }}">
                     {% csrf_token %}
                     <button class="secondary-action" type="submit">Validar conexao</button>
+                  </form>
+                  <form method="post" action="{% url 'portal_integracao_excluir' 'google-drive' integracao.id %}" onsubmit="return confirm('Excluir a integracao \'{{ integracao.nome }}\'? Esta acao nao pode ser desfeita.')">
+                    {% csrf_token %}
+                    <button class="secondary-action danger-action" type="submit">Excluir</button>
                   </form>
                 </div>
               {% endif %}
@@ -221,6 +229,10 @@
                   <form method="post" action="{{ integracao.validar_url }}">
                     {% csrf_token %}
                     <button class="secondary-action" type="submit">Validar conexao</button>
+                  </form>
+                  <form method="post" action="{% url 'portal_integracao_excluir' 'storage-local' integracao.id %}" onsubmit="return confirm('Excluir a integracao \'{{ integracao.nome }}\'? Esta acao nao pode ser desfeita.')">
+                    {% csrf_token %}
+                    <button class="secondary-action danger-action" type="submit">Excluir</button>
                   </form>
                 </div>
               {% endif %}

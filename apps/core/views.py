@@ -538,6 +538,26 @@ class IntegracaoValidarView(PortalAdministradorRequiredMixin, View):
         return redirect("portal_integracoes")
 
 
+class IntegracaoDeleteView(PortalAdministradorRequiredMixin, View):
+    login_url = reverse_lazy("portal_login")
+
+    model_classes = {
+        "ia": AIProviderIntegration,
+        "google-drive": GoogleDriveIntegration,
+        "storage-local": LocalStorageIntegration,
+    }
+
+    def post(self, request, tipo, integracao_id):
+        model_class = self.model_classes.get(tipo)
+        if model_class is None:
+            raise Http404("Tipo de integracao nao suportado.")
+        integration = get_object_or_404(model_class, pk=integracao_id)
+        nome = integration.nome
+        integration.delete()
+        messages.success(request, f"Integracao '{nome}' excluida com sucesso.")
+        return redirect("portal_integracoes")
+
+
 class ProcessamentosView(LoginRequiredMixin, TemplateView):
     template_name = "portal_operacional/processamentos.html"
     login_url = reverse_lazy("portal_login")
