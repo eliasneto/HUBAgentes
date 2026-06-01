@@ -25,4 +25,4 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 8010
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8010", "--workers", "3", "--timeout", "180"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8010", "--workers", "3", "--timeout", "600", "--graceful-timeout", "60"]

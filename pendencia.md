@@ -23,14 +23,11 @@ O campo `pasta_grupo` já é usado ativamente em `agent_execution.py` e `documen
 
 **Arquivo:** `apps/processamentos/services/operational_execution.py`
 
-Todo o processamento (download do Drive, chamada à API de IA, renderização da saída) acontece dentro do ciclo de request/response. O Gunicorn está configurado com 3 workers e timeout de 180s.
+Todo o processamento acontece dentro do ciclo de request/response. Com 3 workers, 3 usuários simultâneos travam o servidor.
 
-Consequências em produção:
-- Com 3 usuários processando simultaneamente, o servidor trava completamente.
-- Se a IA demorar mais de 180s, o worker é morto e o processamento fica preso em `EM_PROCESSAMENTO`.
+~~Curto prazo resolvido em 01/06/2026~~: timeout do Gunicorn aumentado de 180s para **600s** (10 min) + `graceful-timeout` de 60s. Workers não morrem mais em processamentos longos.
 
-**Ação de curto prazo:** aumentar o `--timeout` no Gunicorn e orientar usuários sobre o limite de documentos por lote.  
-**Ação definitiva:** implementar execução assíncrona com Celery + Redis (ou ao menos `threading.Thread`).
+**Ação definitiva pendente:** implementar execução assíncrona com Celery + Redis para eliminar o bloqueio de workers por completo.
 
 ---
 
