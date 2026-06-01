@@ -4,14 +4,20 @@ from pathlib import Path
 from django.core.files.base import ContentFile
 from django.db import transaction
 
+from apps.agentes_ia.models import AgentDocumentExecutionMode
 from apps.integracoes.services.google_drive import (
     GoogleDriveServiceError,
+    GOOGLE_DRIVE_FOLDER_MIME,
+    list_folder_contents_from_folder_source,
+    list_pdf_files_from_drive_folder_id,
     list_pdf_files_from_folder_source,
 )
 from apps.integracoes.services.local_storage import (
     LocalStorageServiceError,
     get_local_file_payload,
     list_pdf_files_from_relative_folder,
+    list_pdf_files_from_subfolder,
+    list_subfolders_from_relative_folder,
     read_local_file_bytes,
 )
 from apps.processamentos.models import (
@@ -26,11 +32,19 @@ class DocumentSourcePreparationError(Exception):
 
 
 def prepare_documentos(processamento):
+    is_lote_por_pasta = (
+        processamento.document_execution_mode_snapshot
+        == AgentDocumentExecutionMode.LOTE_POR_PASTA
+    )
     if processamento.input_source_type == ProcessingInputSourceType.NONE:
         return {"created": 0, "updated": 0, "total": 0}
     if processamento.input_source_type == ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER:
+        if is_lote_por_pasta:
+            return _prepare_google_drive_documents_por_pasta(processamento)
         return _prepare_google_drive_documents(processamento)
     if processamento.input_source_type == ProcessingInputSourceType.LOCAL_FOLDER:
+        if is_lote_por_pasta:
+            return _prepare_local_folder_documents_por_pasta(processamento)
         return _prepare_local_folder_documents(processamento)
     if processamento.input_source_type == ProcessingInputSourceType.LOCAL_FILE:
         return _prepare_local_file_document(processamento)
@@ -145,6 +159,117 @@ def _prepare_local_folder_documents(processamento):
         else:
             _update_documento_if_needed(documento, defaults)
             updated += 1
+    return {"created": created, "updated": updated, "total": processamento.documentos.count()}
+
+
+def _prepare_local_folder_documents_por_pasta(processamento):
+    if not processamento.local_storage_integration_id:
+        raise DocumentSourcePreparationError(
+            "Selecione a integracao local autorizada antes de materializar os documentos."
+        )
+    try:
+        subpastas = list_subfolders_from_relative_folder(
+            processamento.local_storage_integration,
+            processamento.local_relative_input_path,
+        )
+    except LocalStorageServiceError as exc:
+        raise DocumentSourcePreparationError(str(exc)) from exc
+
+    if not subpastas:
+        raise DocumentSourcePreparationError(
+            "Nenhuma subpasta encontrada na pasta informada para o modo Lote por pasta."
+        )
+
+    created = 0
+    updated = 0
+    for subpasta in subpastas:
+        try:
+            files = list_pdf_files_from_subfolder(
+                processamento.local_storage_integration,
+                processamento.local_relative_input_path,
+                subpasta,
+            )
+        except LocalStorageServiceError as exc:
+            raise DocumentSourcePreparationError(str(exc)) from exc
+
+        for local_file in files:
+            documento = _find_existing_documento(
+                processamento,
+                source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+                source_reference=local_file["relative_path"],
+            )
+            defaults = {
+                "nome_arquivo": local_file["name"],
+                "drive_file_id": "",
+                "drive_path": local_file["absolute_path"],
+                "source_type": ProcessingInputSourceType.LOCAL_FOLDER,
+                "source_reference": local_file["relative_path"],
+                "mime_type": local_file["mime_type"],
+                "checksum": local_file["checksum"],
+                "pasta_grupo": subpasta.name,
+            }
+            if documento is None:
+                DocumentoEntrada.objects.create(processamento=processamento, **defaults)
+                created += 1
+            else:
+                _update_documento_if_needed(documento, defaults)
+                updated += 1
+
+    return {"created": created, "updated": updated, "total": processamento.documentos.count()}
+
+
+def _prepare_google_drive_documents_por_pasta(processamento):
+    if not processamento.folder_source_id:
+        raise DocumentSourcePreparationError(
+            "Selecione a pasta do Google Drive antes de materializar os documentos."
+        )
+    try:
+        items = list_folder_contents_from_folder_source(processamento.folder_source)
+    except GoogleDriveServiceError as exc:
+        raise DocumentSourcePreparationError(str(exc)) from exc
+
+    subpastas = [item for item in items if item["item_type"] == "pasta"]
+    if not subpastas:
+        raise DocumentSourcePreparationError(
+            "Nenhuma subpasta encontrada na pasta do Google Drive para o modo Lote por pasta."
+        )
+
+    created = 0
+    updated = 0
+    drive_integration = processamento.folder_source.google_drive_integration
+
+    for subpasta in subpastas:
+        try:
+            files = list_pdf_files_from_drive_folder_id(
+                drive_integration,
+                subpasta["drive_item_id"],
+            )
+        except GoogleDriveServiceError as exc:
+            raise DocumentSourcePreparationError(str(exc)) from exc
+
+        for drive_file in files:
+            documento = _find_existing_documento(
+                processamento,
+                source_type=ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER,
+                source_reference=drive_file["id"],
+            )
+            defaults = {
+                "nome_arquivo": drive_file["name"],
+                "drive_file_id": drive_file["id"],
+                "drive_path": drive_file.get("webViewLink", ""),
+                "source_type": ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER,
+                "source_reference": drive_file["id"],
+                "mime_type": drive_file.get("mimeType", "application/pdf"),
+                "checksum": drive_file.get("md5Checksum", ""),
+                "pasta_grupo": subpasta["nome"],
+            }
+            if documento is None:
+                DocumentoEntrada.objects.create(processamento=processamento, **defaults)
+                created += 1
+            else:
+                _update_documento_if_needed(documento, defaults)
+                updated += 1
+
     return {"created": created, "updated": updated, "total": processamento.documentos.count()}
 
 

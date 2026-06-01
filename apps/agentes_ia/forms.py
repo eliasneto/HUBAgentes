@@ -8,14 +8,10 @@ from apps.agentes_ia.models import (
     AgentDefaultOutputFormat,
     AgentInputPolicy,
     AgentDocumentExecutionMode,
-    AgentOperationalCategory,
     AgentOutputAssemblyMode,
     AgentOutputDestination,
     AgentOutputPackagingMode,
     AgentStatus,
-    AgentType,
-    AgentTriggerMode,
-    AgentVisibility,
 )
 from apps.agentes_ia.services import (
     atualizar_agente_portal,
@@ -32,22 +28,6 @@ from apps.integracoes.models import (
 
 class AgentePortalCreateForm(forms.Form):
     nome = forms.CharField(label="Nome do agente", max_length=120)
-    tipo = forms.ChoiceField(label="Tipo", choices=AgentType.choices)
-    categoria_operacional = forms.ChoiceField(
-        label="Categoria operacional",
-        choices=AgentOperationalCategory.choices,
-        initial=AgentOperationalCategory.LEITURA_DOCUMENTO,
-    )
-    visibilidade = forms.ChoiceField(
-        label="Visibilidade",
-        choices=AgentVisibility.choices,
-        initial=AgentVisibility.USUARIO,
-    )
-    modo_acionamento = forms.ChoiceField(
-        label="Modo de acionamento",
-        choices=AgentTriggerMode.choices,
-        initial=AgentTriggerMode.PORTAL,
-    )
     status = forms.ChoiceField(
         label="Status",
         choices=(
@@ -56,7 +36,6 @@ class AgentePortalCreateForm(forms.Form):
         ),
         initial=AgentStatus.INATIVO,
     )
-    objetivo = forms.CharField(label="Objetivo", widget=forms.Textarea(attrs={"rows": 3}))
     prompt_base = forms.CharField(
         label="Prompt base",
         widget=forms.Textarea(attrs={"rows": 8}),
@@ -165,12 +144,7 @@ class AgentePortalCreateForm(forms.Form):
 
         initial_data = {
             "nome": self.instance.nome,
-            "tipo": self.instance.tipo,
-            "categoria_operacional": self.instance.categoria_operacional,
-            "visibilidade": self.instance.visibilidade,
-            "modo_acionamento": self.instance.modo_acionamento,
             "status": self.instance.status,
-            "objetivo": self.instance.objetivo,
             "prompt_base": self.instance.prompt_base,
             "ai_provider_integration": self.instance.ai_provider_integration,
             "modelo_preferencial": self.instance.modelo_preferencial,
@@ -287,12 +261,7 @@ class AgentePortalCreateForm(forms.Form):
         service_kwargs = {
             "actor": self.actor,
             "nome": self.cleaned_data["nome"],
-            "tipo": self.cleaned_data["tipo"],
-            "categoria_operacional": self.cleaned_data["categoria_operacional"],
-            "visibilidade": self.cleaned_data["visibilidade"],
-            "modo_acionamento": self.cleaned_data["modo_acionamento"],
             "status": self.cleaned_data["status"],
-            "objetivo": self.cleaned_data["objetivo"],
             "prompt_base": self.cleaned_data["prompt_base"],
             "ai_provider_integration": self.cleaned_data["ai_provider_integration"],
             "modelo_preferencial": self.cleaned_data["modelo_preferencial"],

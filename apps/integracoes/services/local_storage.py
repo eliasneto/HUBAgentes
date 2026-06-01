@@ -72,6 +72,28 @@ def get_local_file_payload(local_storage_integration, relative_path):
     )
 
 
+def list_subfolders_from_relative_folder(local_storage_integration, relative_path):
+    target_folder = resolve_local_relative_path(local_storage_integration, relative_path)
+    if not target_folder.exists():
+        raise LocalStorageServiceError("A pasta local informada nao existe.")
+    if not target_folder.is_dir():
+        raise LocalStorageServiceError("O caminho informado precisa apontar para uma pasta.")
+    return sorted(
+        [entry for entry in target_folder.iterdir() if entry.is_dir()],
+        key=lambda p: p.name.lower(),
+    )
+
+
+def list_pdf_files_from_subfolder(local_storage_integration, relative_path, subfolder_path):
+    base_path = validate_local_storage_integration(local_storage_integration)
+    raw_files = subfolder_path.glob("*.pdf")
+    result = []
+    for file_path in sorted({f.resolve() for f in raw_files}, key=lambda p: p.name.lower()):
+        if file_path.is_file():
+            result.append(_build_local_file_payload(file_path, base_path, local_storage_integration))
+    return result
+
+
 def read_local_file_bytes(local_storage_integration, relative_path):
     target_file = resolve_local_relative_path(local_storage_integration, relative_path)
     if not target_file.exists() or not target_file.is_file():

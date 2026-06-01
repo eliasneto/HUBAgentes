@@ -21,6 +21,8 @@ from apps.processamentos.services.agent_execution import (
 )
 from apps.processamentos.services.document_sources import DocumentSourcePreparationError
 from apps.processamentos.services.error_handling import normalizar_erro_processamento
+from apps.processamentos.services.output_packaging import OutputPackagingError
+from apps.processamentos.services.output_renderers import OutputRendererError
 
 
 class OperationalExecutionError(Exception):
@@ -64,32 +66,49 @@ def criar_e_iniciar_processamento_para_agente(*, agente, actor, cleaned_data):
         LocalStorageServiceError,
         DocumentSourcePreparationError,
         ProcessamentoExecutionError,
+        OutputRendererError,
+        OutputPackagingError,
     ) as exc:
         mensagem_operacional, mensagem_tecnica = normalizar_erro_processamento(exc)
-        processamento.refresh_from_db()
-        processamento.status = ProcessingStatus.CONCLUIDO_ERRO
-        processamento.mensagem_erro = mensagem_operacional
-        processamento.mensagem_erro_tecnico = mensagem_tecnica
-        processamento.finalizado_em = timezone.now()
-        processamento.etapa_atual = "Falha ao iniciar processamento"
-        processamento.documento_atual_nome = ""
-        processamento.ultima_atividade_em = timezone.now()
-        processamento.save(
-            update_fields=[
-                "status",
-                "mensagem_erro",
-                "mensagem_erro_tecnico",
-                "finalizado_em",
-                "etapa_atual",
-                "documento_atual_nome",
-                "ultima_atividade_em",
-                "updated_at",
-            ]
-        )
+        _finalizar_processamento_com_erro(processamento, mensagem_operacional, mensagem_tecnica)
         raise OperationalExecutionError(mensagem_operacional) from exc
+    except Exception as exc:
+        # Fallback para exceções não mapeadas (DatabaseError, MemoryError, etc.)
+        # Garante que o processamento nunca fica preso em EM_PROCESSAMENTO.
+        _finalizar_processamento_com_erro(
+            processamento,
+            "Ocorreu um erro inesperado durante a execucao do agente.",
+            str(exc),
+        )
+        raise OperationalExecutionError(
+            "Ocorreu um erro inesperado durante a execucao do agente."
+        ) from exc
 
     processamento.refresh_from_db()
     return processamento
+
+
+def _finalizar_processamento_com_erro(processamento, mensagem_operacional, mensagem_tecnica=""):
+    processamento.refresh_from_db()
+    processamento.status = ProcessingStatus.CONCLUIDO_ERRO
+    processamento.mensagem_erro = mensagem_operacional
+    processamento.mensagem_erro_tecnico = mensagem_tecnica
+    processamento.finalizado_em = timezone.now()
+    processamento.etapa_atual = "Falha ao iniciar processamento"
+    processamento.documento_atual_nome = ""
+    processamento.ultima_atividade_em = timezone.now()
+    processamento.save(
+        update_fields=[
+            "status",
+            "mensagem_erro",
+            "mensagem_erro_tecnico",
+            "finalizado_em",
+            "etapa_atual",
+            "documento_atual_nome",
+            "ultima_atividade_em",
+            "updated_at",
+        ]
+    )
 
 
 def _criar_processamento(*, agente, actor, cleaned_data):

@@ -49,17 +49,31 @@ services:
       retries: 3
       start_period: 30s
 
-  ollama:
-    image: ollama/ollama
-    container_name: HUB_Agentes_ollama
+  worker:
+    build: .
+    container_name: HUB_Agentes_worker
     restart: unless-stopped
-    ports:
-      - "11434:11434"
+    env_file:
+      - .env
+    environment:
+      DATABASE_ENGINE: mysql
+      DATABASE_NAME: ${DATABASE_NAME:-hub_agentes}
+      DATABASE_USER: ${DATABASE_USER:-hub_agentes}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-hub_agentes_password}
+      DATABASE_HOST: db
+      DATABASE_PORT: 3306
+    depends_on:
+      web:
+        condition: service_healthy
     volumes:
-      - ollama_data:/root/.ollama
+      - media_data:/app/media
+    command: >
+      sh -c "while true; do
+        python manage.py reconciliar_processamentos_orfaos;
+        sleep 300;
+      done"
 
 volumes:
   mysql_data:
   media_data:
   staticfiles_data:
-  ollama_data:

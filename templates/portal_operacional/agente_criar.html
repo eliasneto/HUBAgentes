@@ -7,6 +7,29 @@
   <title>{% if modo_edicao %}Editar agente{% else %}Criar agente{% endif %} - Portal</title>
   <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-agent-builder-scroll-1">
   <style>
+    .combination-hint {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(0, 216, 255, 0.06);
+      border: 1px solid rgba(51, 244, 255, 0.28);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .combination-hint[hidden] { display: none; }
+    .combination-hint strong {
+      font-size: 0.875rem;
+      color: #33f4ff;
+    }
+    .combination-hint span {
+      color: #d7f8ff;
+    }
+    .combination-hint em {
+      color: var(--muted, #6b8aad);
+      font-style: normal;
+    }
     .toggle-line input[type="checkbox"] {
       position: absolute !important;
       width: 1px !important;
@@ -27,7 +50,7 @@
       white-space: nowrap !important;
     }
   </style>
-  <script src="{% static 'portal_operacional/js/agente_criar.js' %}?v=20260524-parametros-1" defer></script>
+  <script src="{% static 'portal_operacional/js/agente_criar.js' %}?v=20260530-combination-hint-1" defer></script>
 </head>
 <body class="agent-builder-page">
   <main class="portal-shell">
@@ -87,35 +110,10 @@
           </div>
 
           <div class="execution-grid">
-            <div class="execution-field">
+            <div class="execution-field builder-wide">
               <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
               {{ form.nome }}
               {% for error in form.nome.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
-            </div>
-
-            <div class="execution-field">
-              <label for="{{ form.tipo.id_for_label }}">{{ form.tipo.label }}</label>
-              {{ form.tipo }}
-              {% for error in form.tipo.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
-            </div>
-
-            <div class="execution-field">
-              <label for="{{ form.categoria_operacional.id_for_label }}">{{ form.categoria_operacional.label }}</label>
-              {{ form.categoria_operacional }}
-              {% for error in form.categoria_operacional.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
-            </div>
-
-            <div class="execution-field">
-              <label for="{{ form.visibilidade.id_for_label }}">{{ form.visibilidade.label }}</label>
-              {{ form.visibilidade }}
-              <small>Agente tecnico nao aparece na lista operacional comum.</small>
-              {% for error in form.visibilidade.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
-            </div>
-
-            <div class="execution-field">
-              <label for="{{ form.modo_acionamento.id_for_label }}">{{ form.modo_acionamento.label }}</label>
-              {{ form.modo_acionamento }}
-              {% for error in form.modo_acionamento.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
 
             <div class="execution-field">
@@ -130,12 +128,6 @@
               {{ form.modelo_preferencial }}
               {% for error in form.modelo_preferencial.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
-          </div>
-
-          <div class="execution-field builder-wide">
-            <label for="{{ form.objetivo.id_for_label }}">{{ form.objetivo.label }}</label>
-            {{ form.objetivo }}
-            {% for error in form.objetivo.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
           </div>
         </section>
 
@@ -225,6 +217,12 @@
               <small>Para 2 ou mais saidas, o ZIP preserva cada arquivo no formato configurado acima.</small>
               {% for error in form.output_packaging_mode.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
+          </div>
+
+          <div class="combination-hint" data-combination-hint data-builder-doc-config hidden>
+            <strong data-combination-hint-title></strong>
+            <span data-combination-hint-desc></span>
+            <em data-combination-hint-obs></em>
           </div>
 
           <div class="execution-field builder-wide">

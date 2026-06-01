@@ -50,8 +50,107 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   initPromptParameters(form);
+  initCombinationHint(form);
   updateSourceBlocks();
 });
+
+var COMBINATION_HINTS = {
+  "individual|uma_por_entrada|zip_se_multiplos": {
+    titulo: "Um arquivo de entrada, um arquivo de saida",
+    descricao: "Cada arquivo e processado separadamente pela IA e gera uma saida propria. Quando mais de um arquivo for enviado, as saidas sao compactadas em ZIP automaticamente.",
+    obs: "",
+  },
+  "individual|uma_por_entrada|sempre_zip": {
+    titulo: "Um arquivo de entrada, um arquivo de saida (sempre ZIP)",
+    descricao: "Cada arquivo e processado separadamente pela IA e gera uma saida propria. As saidas sao sempre entregues dentro de um ZIP, mesmo quando ha apenas um arquivo.",
+    obs: "",
+  },
+  "grupo_unico|uma_saida_final|arquivo_unico": {
+    titulo: "Varios arquivos de entrada, uma saida consolidada",
+    descricao: "Todos os arquivos sao enviados juntos para a IA em uma unica chamada. A IA recebe tudo de uma vez e gera um unico arquivo de saida.",
+    obs: "A juncao das informacoes e responsabilidade do prompt de IA.",
+  },
+  "grupo_unico|uma_saida_final|sempre_zip": {
+    titulo: "Varios arquivos de entrada, uma saida consolidada em ZIP",
+    descricao: "Todos os arquivos sao enviados juntos para a IA em uma unica chamada. A IA recebe tudo de uma vez e gera um unico arquivo de saida entregue dentro de um ZIP.",
+    obs: "A juncao das informacoes e responsabilidade do prompt de IA.",
+  },
+  "lote_por_pasta|uma_por_entrada|zip_se_multiplos": {
+    titulo: "Lote por pasta, uma saida por arquivo",
+    descricao: "Os arquivos sao processados pasta por pasta. Cada arquivo gera uma saida separada. Quando ha mais de um arquivo na pasta, as saidas sao compactadas em ZIP.",
+    obs: "",
+  },
+  "lote_por_pasta|uma_por_entrada|sempre_zip": {
+    titulo: "Lote por pasta, uma saida por arquivo (sempre ZIP)",
+    descricao: "Os arquivos sao processados pasta por pasta. Cada arquivo gera uma saida separada, sempre entregue dentro de um ZIP.",
+    obs: "",
+  },
+  "lote_por_pasta|uma_saida_final|arquivo_unico": {
+    titulo: "Lote por pasta, uma saida consolidada por lote",
+    descricao: "Os arquivos sao processados pasta por pasta. Todos os arquivos de cada pasta sao enviados juntos para a IA em uma unica chamada, que gera uma saida unica por lote.",
+    obs: "A juncao das informacoes e responsabilidade do prompt de IA.",
+  },
+  "lote_por_pasta|uma_saida_final|sempre_zip": {
+    titulo: "Lote por pasta, uma saida consolidada por lote em ZIP",
+    descricao: "Os arquivos sao processados pasta por pasta. Todos os arquivos de cada pasta sao enviados juntos para a IA, que gera uma saida unica por lote entregue em ZIP.",
+    obs: "A juncao das informacoes e responsabilidade do prompt de IA.",
+  },
+  "lote_por_pasta|uma_por_grupo|arquivo_unico": {
+    titulo: "Lote por pasta, uma saida por grupo (arquivo unico)",
+    descricao: "Os arquivos de cada pasta sao enviados juntos para a IA em uma unica chamada, que gera uma saida consolidada por grupo. Cada grupo gera seu proprio arquivo de saida.",
+    obs: "A juncao das informacoes dentro do grupo e responsabilidade do prompt de IA.",
+  },
+  "lote_por_pasta|uma_por_grupo|zip_se_multiplos": {
+    titulo: "Lote por pasta, uma saida por grupo",
+    descricao: "Os arquivos de cada pasta sao enviados juntos para a IA em uma unica chamada, que gera uma saida consolidada por grupo. Quando ha mais de um grupo, as saidas sao compactadas em ZIP.",
+    obs: "A juncao das informacoes dentro do grupo e responsabilidade do prompt de IA.",
+  },
+  "lote_por_pasta|uma_por_grupo|sempre_zip": {
+    titulo: "Lote por pasta, uma saida por grupo (sempre ZIP)",
+    descricao: "Os arquivos de cada pasta sao enviados juntos para a IA em uma unica chamada, que gera uma saida consolidada por grupo. As saidas sao sempre entregues dentro de um ZIP, mesmo com apenas um grupo.",
+    obs: "A juncao das informacoes dentro do grupo e responsabilidade do prompt de IA.",
+  },
+};
+
+function initCombinationHint(form) {
+  var hintBox = form.querySelector("[data-combination-hint]");
+  if (!hintBox) {
+    return;
+  }
+
+  var execSelect = form.querySelector('[name="document_execution_mode"]');
+  var assemblySelect = form.querySelector('[name="output_assembly_mode"]');
+  var packagingSelect = form.querySelector('[name="output_packaging_mode"]');
+
+  if (!execSelect || !assemblySelect || !packagingSelect) {
+    return;
+  }
+
+  var titleEl = hintBox.querySelector("[data-combination-hint-title]");
+  var descEl = hintBox.querySelector("[data-combination-hint-desc]");
+  var obsEl = hintBox.querySelector("[data-combination-hint-obs]");
+
+  function updateHint() {
+    var key = execSelect.value + "|" + assemblySelect.value + "|" + packagingSelect.value;
+    var hint = COMBINATION_HINTS[key];
+
+    if (!hint) {
+      hintBox.hidden = true;
+      return;
+    }
+
+    titleEl.textContent = hint.titulo;
+    descEl.textContent = hint.descricao;
+    obsEl.textContent = hint.obs ? "Observacao: " + hint.obs : "";
+    obsEl.hidden = !hint.obs;
+    hintBox.hidden = false;
+  }
+
+  execSelect.addEventListener("change", updateHint);
+  assemblySelect.addEventListener("change", updateHint);
+  packagingSelect.addEventListener("change", updateHint);
+  updateHint();
+}
 
 function initPromptParameters(form) {
   const panel = form.querySelector("[data-prompt-parameters]");

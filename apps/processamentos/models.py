@@ -394,6 +394,7 @@ class DocumentoEntrada(TimestampedModel):
         default=ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER,
     )
     source_reference = models.CharField(max_length=500, blank=True)
+    pasta_grupo = models.CharField(max_length=500, blank=True, default="")
     uploaded_file = models.FileField(
         upload_to=documento_entrada_upload_path,
         null=True,

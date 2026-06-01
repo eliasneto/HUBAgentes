@@ -163,7 +163,7 @@ class AgenteIA(SoftDeleteModel, UserStampedModel):
         choices=AgentTriggerMode.choices,
         default=AgentTriggerMode.PORTAL,
     )
-    objetivo = models.TextField()
+    objetivo = models.TextField(blank=True)
     status = models.CharField(
         max_length=20,
         choices=AgentStatus.choices,

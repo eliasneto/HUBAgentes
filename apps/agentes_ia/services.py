@@ -9,9 +9,11 @@ from apps.agentes_ia.models import (
     AgenteIA,
     AgentDefaultInputSourceType,
     AgentInputPolicy,
+    AgentOperationalCategory,
     AgentOutputPolicy,
     AgentStatus,
     AgentTriggerMode,
+    AgentType,
     AgentVisibility,
 )
 from apps.integracoes.models import IntegrationStatus
@@ -269,12 +271,7 @@ def criar_agente_portal(
     *,
     actor,
     nome,
-    tipo,
-    categoria_operacional,
-    visibilidade,
-    modo_acionamento,
     status,
-    objetivo,
     prompt_base,
     ai_provider_integration,
     modelo_preferencial,
@@ -294,16 +291,16 @@ def criar_agente_portal(
         agente = AgenteIA(
             nome=nome,
             slug=_gerar_slug_disponivel(nome),
-            tipo=tipo,
-            categoria_operacional=categoria_operacional,
-            visibilidade=visibilidade,
-            modo_acionamento=modo_acionamento,
-            objetivo=objetivo,
+            tipo=AgentType.GENERICO,
+            categoria_operacional=AgentOperationalCategory.LEITURA_DOCUMENTO,
+            visibilidade=AgentVisibility.USUARIO,
+            modo_acionamento=AgentTriggerMode.PORTAL,
+            objetivo="",
             status=status,
             prompt_base=prompt_base,
             modelo_preferencial=modelo_preferencial,
             ai_provider_integration=ai_provider_integration,
-            permite_execucao_manual=modo_acionamento == AgentTriggerMode.PORTAL,
+            permite_execucao_manual=True,
             permite_clonagem=True,
             created_by=actor,
             updated_by=actor,
@@ -355,12 +352,7 @@ def atualizar_agente_portal(
     agente,
     actor,
     nome,
-    tipo,
-    categoria_operacional,
-    visibilidade,
-    modo_acionamento,
     status,
-    objetivo,
     prompt_base,
     ai_provider_integration,
     modelo_preferencial,
@@ -378,18 +370,10 @@ def atualizar_agente_portal(
 ):
     with transaction.atomic():
         agente.nome = nome
-        agente.tipo = tipo
-        agente.categoria_operacional = categoria_operacional
-        agente.visibilidade = visibilidade
-        agente.modo_acionamento = modo_acionamento
         agente.status = status
-        agente.objetivo = objetivo
         agente.prompt_base = prompt_base
         agente.modelo_preferencial = modelo_preferencial
         agente.ai_provider_integration = ai_provider_integration
-        agente.permite_execucao_manual = (
-            modo_acionamento == AgentTriggerMode.PORTAL
-        )
         agente.updated_by = actor
         agente.full_clean()
         agente.save()

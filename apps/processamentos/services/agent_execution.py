@@ -140,6 +140,15 @@ def execute_processing(processamento, actor):
             execution_params=execution_params,
             actor=actor,
         )
+    elif _usa_execucao_por_pasta(processamento):
+        batch_result = _execute_documents_by_folder(
+            processamento=processamento,
+            documentos=documentos,
+            integration=integration,
+            model_name=model_name,
+            execution_params=execution_params,
+            actor=actor,
+        )
     else:
         batch_result = _execute_documents_as_group(
             processamento=processamento,
@@ -272,6 +281,15 @@ def _usa_execucao_individual(processamento):
         == AgentDocumentExecutionMode.INDIVIDUAL
         or processamento.output_assembly_mode_snapshot
         == AgentOutputAssemblyMode.UMA_POR_ENTRADA
+    )
+
+
+def _usa_execucao_por_pasta(processamento):
+    return (
+        processamento.document_execution_mode_snapshot
+        == AgentDocumentExecutionMode.LOTE_POR_PASTA
+        and processamento.output_assembly_mode_snapshot
+        == AgentOutputAssemblyMode.UMA_SAIDA_FINAL
     )
 
 
@@ -453,6 +471,92 @@ def _execute_documents_as_group(
         "total_errors": 0,
         "last_error_message": "",
         "last_technical_error_message": "",
+    }
+
+
+def _execute_documents_by_folder(
+    *,
+    processamento,
+    documentos,
+    integration,
+    model_name,
+    execution_params,
+    actor,
+):
+    from itertools import groupby
+
+    output_records = []
+    total_success = 0
+    total_errors = 0
+    last_error_message = ""
+    last_technical_error_message = ""
+
+    documentos_por_pasta = {}
+    for documento in documentos:
+        chave = documento.pasta_grupo or ""
+        documentos_por_pasta.setdefault(chave, []).append(documento)
+
+    if not documentos_por_pasta:
+        return {
+            "output_records": [],
+            "total_success": 0,
+            "total_errors": 0,
+            "last_error_message": "",
+            "last_technical_error_message": "",
+        }
+
+    for pasta_nome, grupo in sorted(documentos_por_pasta.items()):
+        execution_started_at = timezone.now()
+        try:
+            group_result = _execute_document_group(
+                processamento=processamento,
+                documentos=grupo,
+                integration=integration,
+                model_name=model_name,
+                execution_params=execution_params,
+                actor=actor,
+            )
+        except (
+            GoogleDriveServiceError,
+            LocalStorageServiceError,
+            DocumentSourcePreparationError,
+            AIProviderServiceError,
+            OutputRendererError,
+            ProcessamentoExecutionError,
+            OutputPackagingError,
+        ) as exc:
+            mensagem_operacional, mensagem_tecnica = normalizar_erro_processamento(exc)
+            total_errors += len(grupo)
+            last_error_message = mensagem_operacional
+            if mensagem_tecnica:
+                last_technical_error_message = mensagem_tecnica
+            _mark_document_group_error(
+                processamento=processamento,
+                documentos=grupo,
+                message=mensagem_operacional,
+                integration=integration,
+                model_name=model_name,
+                execution_started_at=execution_started_at,
+            )
+            _log_group_execution_error(
+                actor=actor,
+                processamento=processamento,
+                documentos=grupo,
+                integration=integration,
+                model_name=model_name,
+                error_message=str(exc),
+            )
+            continue
+
+        total_success += len(grupo)
+        output_records.append(group_result["output_record"])
+
+    return {
+        "output_records": output_records,
+        "total_success": total_success,
+        "total_errors": total_errors,
+        "last_error_message": last_error_message,
+        "last_technical_error_message": last_technical_error_message,
     }
 
 

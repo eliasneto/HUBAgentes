@@ -170,6 +170,26 @@ def list_folder_contents_from_folder_source(folder_source) -> list[dict[str, Any
     )
 
 
+def list_pdf_files_from_drive_folder_id(google_drive_integration, folder_id: str) -> list[dict]:
+    service = build_drive_service(google_drive_integration)
+    query = f"'{folder_id}' in parents and trashed = false and mimeType = '{PDF_MIME}'"
+    try:
+        response = (
+            service.files()
+            .list(
+                q=query,
+                fields="files(id,name,mimeType,parents,webViewLink,md5Checksum)",
+                pageSize=1000,
+            )
+            .execute()
+        )
+    except Exception as exc:  # pragma: no cover
+        raise GoogleDriveServiceError(
+            f"Falha ao listar PDFs da subpasta no Google Drive: {exc}"
+        ) from exc
+    return response.get("files", [])
+
+
 def download_drive_file_bytes(google_drive_integration, drive_file_id: str) -> bytes:
     if not drive_file_id:
         raise GoogleDriveServiceError("Informe o identificador do arquivo do Google Drive.")
