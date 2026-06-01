@@ -26,12 +26,17 @@ class AIProviderExecutionResult:
 
 class BaseAIProviderAdapter:
     default_timeout_seconds = 120
+    # Timeout de validacao e menor que o de execucao para nao ultrapassar
+    # o timeout do proxy reverso (OpenResty/nginx tipicamente 60s).
+    validation_timeout_seconds = 25
 
     def __init__(self, integration):
         self.integration = integration
 
     def validate_connection(self):
-        response_payload, request_url = self._perform_request(self.build_payload())
+        response_payload, request_url = self._perform_request(
+            self.build_payload(), timeout=self.validation_timeout_seconds
+        )
         return AIProviderValidationResult(
             summary=self.extract_summary(response_payload),
             response_payload=response_payload,
@@ -87,7 +92,7 @@ class BaseAIProviderAdapter:
     def extract_summary(self, response_payload):
         raise NotImplementedError
 
-    def _perform_request(self, payload):
+    def _perform_request(self, payload, timeout=None):
         if not self.integration.default_model:
             raise AIProviderServiceError(
                 "Informe o modelo padrao antes de validar a integracao de IA."
@@ -104,6 +109,7 @@ class BaseAIProviderAdapter:
             http_error_prefix="Falha HTTP {code} ao validar o provedor: {body}",
             connection_error_prefix="Falha de conexao ao validar o provedor: {reason}",
             invalid_json_message="O provedor retornou uma resposta invalida para a validacao.",
+            timeout=timeout,
         )
 
     def _post_json_request(
@@ -114,6 +120,7 @@ class BaseAIProviderAdapter:
         http_error_prefix,
         connection_error_prefix,
         invalid_json_message,
+        timeout=None,
     ):
         raw_payload = json.dumps(payload).encode("utf-8")
         http_request = request.Request(
@@ -122,10 +129,11 @@ class BaseAIProviderAdapter:
             headers=self.build_headers(),
             method="POST",
         )
+        effective_timeout = timeout or self.integration.timeout_seconds or self.default_timeout_seconds
         try:
             with request.urlopen(
                 http_request,
-                timeout=self.integration.timeout_seconds or self.default_timeout_seconds,
+                timeout=effective_timeout,
             ) as response:
                 raw_body = response.read().decode("utf-8")
         except error.HTTPError as exc:
