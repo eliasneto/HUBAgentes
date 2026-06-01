@@ -45,4 +45,21 @@ python manage.py migrate --noinput
 
 python manage.py collectstatic --noinput
 
+# Cria superusuario padrao se nao existir nenhum admin
+python - <<'PY'
+import os, django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+django.setup()
+from django.contrib.auth.models import User
+if not User.objects.filter(is_superuser=True).exists():
+    User.objects.create_superuser(
+        username=os.environ.get("DJANGO_ADMIN_USER", "eliasneto"),
+        password=os.environ.get("DJANGO_ADMIN_PASSWORD", "eliasneto"),
+        email="",
+    )
+    print("Superusuario criado:", os.environ.get("DJANGO_ADMIN_USER", "eliasneto"))
+else:
+    print("Superusuario ja existe, nenhum criado.")
+PY
+
 exec "$@"
