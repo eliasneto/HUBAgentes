@@ -5,6 +5,21 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.2.0] — 2026-06-01
+
+### Adicionado
+- **Django system check `core.W001`** — avisa no startup do servidor quando `FIELD_ENCRYPTION_KEY` não está configurada, antes que o problema cause erro em runtime.
+- **`makemigrations` automático no entrypoint** — o container roda `makemigrations` antes do `migrate` a cada inicialização, detectando e criando migrations de model que o desenvolvedor esqueceu de gerar.
+
+### Corrigido
+- **500 ao criar/editar integração sem `FIELD_ENCRYPTION_KEY`** — `EncryptedFieldMixin.get_prep_value` causava `ValueError` não tratada quando a chave não estava configurada. Agora loga erro e salva sem criptografia em vez de derrubar o servidor.
+- **Migration pendente `agenteia.objetivo`** — campo `objetivo` de `AgenteIA` alterado para `blank=True` sem migration correspondente; migration `0009_alter_agenteia_objetivo` gerada.
+
+### Documentado
+- `docker compose restart` não recarrega o `.env` — usar sempre `docker compose up -d --force-recreate <serviço>` ao alterar variáveis de ambiente.
+
+---
+
 ## [1.1.0] — 2026-06-01
 
 ### Adicionado

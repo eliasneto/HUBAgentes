@@ -38,9 +38,9 @@ Consequências em produção:
 
 **Arquivo:** `apps/core/fields.py`
 
-Se a chave de criptografia do `.env` de produção não for a mesma usada para cifrar os dados existentes no banco, o sistema retorna o valor cifrado ilegível sem erro visível — apenas um `logger.warning`. As credenciais do Google Drive e as chaves de API dos provedores de IA param de funcionar silenciosamente.
+~~Corrigido em 01/06/2026~~: o `get_prep_value` agora tem fallback adequado — se a chave não estiver configurada, loga erro e salva sem criptografia em vez de causar 500. Um Django system check (`core.W001`) avisa no startup quando a chave está ausente.
 
-**Ação:** testar explicitamente no ambiente de produção que a `FIELD_ENCRYPTION_KEY` decifra os registros já cadastrados antes do go-live. Nunca rotacionar a chave sem migrar os dados antes.
+**Ação residual:** testar explicitamente no ambiente de produção que a `FIELD_ENCRYPTION_KEY` decifra os registros já cadastrados. Nunca rotacionar a chave sem migrar os dados antes.
 
 ---
 
@@ -81,6 +81,21 @@ SELECT id, nome FROM agentes_ia_agenteia
 WHERE id NOT IN (SELECT agente_id FROM agentes_ia_agenteconfiguracaooperacional)
 AND deleted_at IS NULL;
 ```
+
+---
+
+### 8. `docker compose restart` não recarrega variáveis do `.env`
+
+**Contexto:** descoberto em produção em 01/06/2026.
+
+`docker compose restart <serviço>` reinicia o container mas mantém o ambiente da criação original — alterações no `.env` não são lidas.
+
+**Sempre usar ao mudar o `.env`:**
+```bash
+docker compose up -d --force-recreate web
+```
+
+Isso recria o container lendo o `.env` atualizado.
 
 ---
 

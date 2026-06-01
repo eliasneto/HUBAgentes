@@ -37,7 +37,12 @@ else:
 PY
 fi
 
+# Cria migrations para mudancas de model ainda nao mapeadas
+python manage.py makemigrations --no-input
+
+# Aplica todas as migrations pendentes
 python manage.py migrate --noinput
+
 python manage.py collectstatic --noinput
 
 exec "$@"
