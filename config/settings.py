@@ -171,3 +171,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Chave de criptografia para campos sensiveis em repouso (EncryptedTextField/EncryptedCharField).
 # Gere com: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 FIELD_ENCRYPTION_KEY = config("FIELD_ENCRYPTION_KEY", default="")
+
+# Sessao: logout por inatividade de 2 horas
+# SESSION_SAVE_EVERY_REQUEST reinicia o contador a cada requisicao — inatividade, nao tempo absoluto.
+SESSION_COOKIE_AGE = 60 * 60 * 2  # 2 horas em segundos
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False

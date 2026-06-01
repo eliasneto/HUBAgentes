@@ -1,5 +1,18 @@
 {% load static %}
-<aside class="portal-sidebar" aria-label="Menu principal">
+
+<!-- Botão hamburguer (mobile) -->
+<button class="sidebar-toggle" data-sidebar-toggle aria-label="Abrir menu" aria-expanded="false">
+  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <rect x="2" y="4" width="16" height="2" rx="1" fill="currentColor"/>
+    <rect x="2" y="9" width="16" height="2" rx="1" fill="currentColor"/>
+    <rect x="2" y="14" width="16" height="2" rx="1" fill="currentColor"/>
+  </svg>
+</button>
+
+<!-- Backdrop (mobile) -->
+<div class="sidebar-backdrop" data-sidebar-backdrop aria-hidden="true"></div>
+
+<aside class="portal-sidebar" aria-label="Menu principal" data-sidebar>
   <div class="brand-block">
     <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
     <div>
@@ -46,3 +59,42 @@
 
   {% include "portal_operacional/_sidebar_footer.html" %}
 </aside>
+
+<script>
+(function () {
+  var toggle   = document.querySelector('[data-sidebar-toggle]');
+  var sidebar  = document.querySelector('[data-sidebar]');
+  var backdrop = document.querySelector('[data-sidebar-backdrop]');
+  if (!toggle || !sidebar || !backdrop) return;
+
+  function openSidebar() {
+    sidebar.classList.add('sidebar-open');
+    backdrop.classList.add('active');
+    toggle.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('sidebar-open');
+    backdrop.classList.remove('active');
+    toggle.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+  }
+
+  toggle.addEventListener('click', function () {
+    sidebar.classList.contains('sidebar-open') ? closeSidebar() : openSidebar();
+  });
+
+  backdrop.addEventListener('click', closeSidebar);
+
+  /* Fecha ao clicar em qualquer link do menu (navegação mobile) */
+  sidebar.querySelectorAll('a').forEach(function (link) {
+    link.addEventListener('click', closeSidebar);
+  });
+
+  /* Fecha com Escape */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeSidebar();
+  });
+}());
+</script>

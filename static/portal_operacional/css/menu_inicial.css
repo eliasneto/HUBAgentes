@@ -2804,23 +2804,89 @@ button.session-pill:hover,
   font-family: Consolas, "Courier New", monospace;
 }
 
+/* ── Hamburguer e backdrop (visíveis só no mobile) ── */
+.sidebar-toggle {
+  display: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+
 @media (max-width: 1080px) {
   body {
     overflow: auto;
   }
 
+  /* Botão hamburguer */
+  .sidebar-toggle {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 101;
+    width: 42px;
+    height: 42px;
+    border: 1px solid rgba(0, 216, 255, 0.34);
+    border-radius: 12px;
+    background: rgba(2, 14, 40, 0.92);
+    color: var(--neon-2);
+    cursor: pointer;
+    box-shadow: 0 0 14px rgba(0, 216, 255, 0.18);
+    transition: background 0.15s ease;
+  }
+
+  .sidebar-toggle:hover {
+    background: rgba(0, 216, 255, 0.12);
+  }
+
+  .sidebar-toggle svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Backdrop */
+  .sidebar-backdrop.active {
+    display: block;
+  }
+
+  /* Portal sem coluna de sidebar */
   .portal-shell {
     min-height: 100vh;
     height: auto;
     grid-template-columns: 1fr;
   }
 
+  /* Sidebar vira drawer fixo fora da tela */
   .portal-sidebar {
-    position: sticky;
+    position: fixed;
     top: 0;
-    z-index: 2;
+    left: 0;
+    bottom: 0;
+    width: 292px;
+    z-index: 99;
     gap: 16px;
     padding: 18px;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+  }
+
+  .portal-sidebar.sidebar-open {
+    transform: translateX(0);
+    box-shadow: 6px 0 40px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Compensa o hamburguer no conteúdo */
+  .portal-main {
+    padding-top: 72px;
   }
 
   .portal-tabs {

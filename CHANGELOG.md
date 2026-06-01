@@ -5,6 +5,23 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.1.0] — 2026-06-01
+
+### Adicionado
+- **Responsividade mobile** — sidebar vira drawer lateral em telas até 1080px: botão hamburguer fixo no topo, slide com animação, backdrop escuro ao abrir, fecha ao tocar fora ou pressionar Esc, e fecha automaticamente ao navegar para outro link.
+- **Timeout de sessão por inatividade** — usuário é deslogado automaticamente após 2 horas sem nenhuma ação no sistema (`SESSION_COOKIE_AGE = 7200`, `SESSION_SAVE_EVERY_REQUEST = True`).
+- **Hints de combinação para modo "Uma saída por grupo"** — adicionadas as 3 combinações de empacotamento (`arquivo_unico`, `zip_se_multiplos`, `sempre_zip`) ao painel de hints contextuais do formulário de criação de agentes.
+
+### Corrigido
+- **Campos fantasmas no formulário de criação de agentes** — removidos blocos de campos (`tipo`, `categoria_operacional`, `visibilidade`, `modo_acionamento`, `objetivo`) que não existiam no formulário e causavam desalinhamento visual no grid da seção Identidade.
+- **Hint de combinação com fundo branco** — caixa de hint de saída ajustada para o tema escuro do portal (fundo translúcido, borda neon, textos em ciano e muted).
+- **Tokens de auditoria exibidos verticalmente** — bloco de tokens (`Total`, `Entrada`, `Processo`, `Saída`) movido da coluna lateral para uma faixa horizontal na base do card de auditoria, exibido como chips lado a lado.
+
+### Removido
+- **Container Ollama removido do Docker Compose** — serviço `ollama` e volume `ollama_data` removidos do `docker-compose.yml` pois a IA local não será utilizada nesta etapa.
+
+---
+
 ## [1.0.0] — 2026-05-31
 
 Primeira versão de produção do **HUB Agentes** — plataforma para configuração, execução e auditoria de agentes de IA sobre documentos.
