@@ -111,27 +111,28 @@
                 <dt>Tempo</dt>
                 <dd>{{ evento.tempo_relativo }}</dd>
               </div>
-              {% if evento.tokens_total %}
-              <div class="audit-tokens-row">
-                <div>
-                  <dt>Total</dt>
-                  <dd>{{ evento.tokens_total }}</dd>
-                </div>
-                <div>
-                  <dt>Entrada</dt>
-                  <dd>{{ evento.tokens_entrada|default:"—" }}</dd>
-                </div>
-                <div>
-                  <dt>Processo</dt>
-                  <dd>{{ evento.tokens_processamento|default:"—" }}</dd>
-                </div>
-                <div>
-                  <dt>Saída</dt>
-                  <dd>{{ evento.tokens_saida|default:"—" }}</dd>
-                </div>
-              </div>
-              {% endif %}
             </dl>
+
+            {% if evento.tokens_total %}
+            <div class="audit-tokens-strip">
+              <span class="audit-token-chip audit-token-total">
+                <span>Total</span>
+                <strong>{{ evento.tokens_total }}</strong>
+              </span>
+              <span class="audit-token-chip">
+                <span>Entrada</span>
+                <strong>{{ evento.tokens_entrada|default:"—" }}</strong>
+              </span>
+              <span class="audit-token-chip">
+                <span>Processo</span>
+                <strong>{{ evento.tokens_processamento|default:"—" }}</strong>
+              </span>
+              <span class="audit-token-chip">
+                <span>Saída</span>
+                <strong>{{ evento.tokens_saida|default:"—" }}</strong>
+              </span>
+            </div>
+            {% endif %}
           </article>
         {% empty %}
           <article class="empty-agents">
