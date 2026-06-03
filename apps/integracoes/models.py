@@ -64,10 +64,17 @@ class LocalStorageIntegration(SoftDeleteModel, UserStampedModel):
             )
         self.allowed_extensions = normalized_extensions
 
+        import os
+        raw = self.base_path.strip().replace("\\", "/")
+        local_win = os.environ.get("LOCAL_STORAGE_PATH", "").replace("\\", "/").rstrip("/")
+        if local_win and raw.upper().startswith(local_win.upper()):
+            remainder = raw[len(local_win):].lstrip("/")
+            self.base_path = "/app/entradas/" + remainder if remainder else "/app/entradas"
+
         base_path = Path(self.base_path).expanduser()
         if not base_path.is_absolute():
             raise ValidationError(
-                {"base_path": "Informe um caminho absoluto para a raiz autorizada."}
+                {"base_path": "Informe um caminho absoluto para a raiz autorizada. Use /app/entradas/ ou C:\\HubAgentes\\."}
             )
 
     def __str__(self):

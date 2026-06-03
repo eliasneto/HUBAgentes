@@ -24,6 +24,7 @@ class EventoAuditoriaResumo:
     tokens_entrada: int | None
     tokens_processamento: int | None
     tokens_saida: int | None
+    custo_brl: str | None
 
 
 @dataclass(frozen=True)
@@ -114,6 +115,7 @@ def listar_eventos_para_portal(
             tokens_entrada=e.payload.get("input_tokens") if e.payload else None,
             tokens_processamento=e.payload.get("processing_tokens") if e.payload else None,
             tokens_saida=e.payload.get("output_tokens") if e.payload else None,
+            custo_brl=e.payload.get("custo_brl") if e.payload else None,
         )
         for e in page_obj.object_list
     ]

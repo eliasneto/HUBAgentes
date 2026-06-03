@@ -144,6 +144,12 @@ class LocalStorageIntegrationPortalForm(IntegrationPortalFormMixin, forms.ModelF
             "base_path": "Caminho local autorizado",
             "recursive_scan": "Ler subpastas automaticamente",
         }
+        help_texts = {
+            "base_path": (
+                "Use o caminho Windows (ex: C:\\HubAgentes\\contratos) "
+                "ou diretamente o caminho do servidor (ex: /app/entradas/contratos)."
+            ),
+        }
 
 
 class GoogleDriveFolderSourcePortalForm(IntegrationPortalFormMixin, forms.ModelForm):

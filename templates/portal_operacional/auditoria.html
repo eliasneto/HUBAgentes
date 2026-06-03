@@ -131,6 +131,12 @@
                 <span>Saída</span>
                 <strong>{{ evento.tokens_saida|default:"—" }}</strong>
               </span>
+              {% if evento.custo_brl %}
+              <span class="audit-token-chip audit-token-custo">
+                <span>Custo</span>
+                <strong>R$ {{ evento.custo_brl|floatformat:4 }}</strong>
+              </span>
+              {% endif %}
             </div>
             {% endif %}
           </article>

@@ -33,13 +33,14 @@
       </div>
     </details>
 
-    <details class="sidebar-group" {% if active_nav == 'integracoes' or active_nav == 'fontes_documentos' or active_nav == 'auditoria' or active_nav == 'usuarios_acessos' %}open{% endif %}>
-      <summary class="tab-link group-trigger {% if active_nav == 'integracoes' or active_nav == 'fontes_documentos' or active_nav == 'auditoria' or active_nav == 'usuarios_acessos' %}active{% endif %}">Administrador</summary>
+    <details class="sidebar-group" {% if active_nav == 'integracoes' or active_nav == 'fontes_documentos' or active_nav == 'auditoria' or active_nav == 'usuarios_acessos' or active_nav == 'configuracao_custos' %}open{% endif %}>
+      <summary class="tab-link group-trigger {% if active_nav == 'integracoes' or active_nav == 'fontes_documentos' or active_nav == 'auditoria' or active_nav == 'usuarios_acessos' or active_nav == 'configuracao_custos' %}active{% endif %}">Administrador</summary>
       <div class="sidebar-submenu">
         <a class="tab-link submenu-link {% if active_nav == 'integracoes' %}active{% endif %}" href="{% url 'portal_integracoes' %}">Integrações</a>
         <a class="tab-link submenu-link {% if active_nav == 'fontes_documentos' %}active{% endif %}" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>
         <a class="tab-link submenu-link {% if active_nav == 'auditoria' %}active{% endif %}" href="{% url 'portal_auditoria' %}">Histórico e auditoria</a>
         <a class="tab-link submenu-link {% if active_nav == 'usuarios_acessos' %}active{% endif %}" href="{% url 'portal_usuarios_acessos' %}">Usuários e acessos</a>
+        <a class="tab-link submenu-link {% if active_nav == 'configuracao_custos' %}active{% endif %}" href="{% url 'portal_configuracao_custos' %}">Configuração de Custos</a>
       </div>
     </details>
 

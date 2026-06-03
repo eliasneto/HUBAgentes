@@ -1,0 +1,162 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuracao de Custos - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260603-custos-2">
+  <style>
+    .custo-cotacao-stats {
+      display: flex;
+      gap: 16px;
+      margin: 0;
+    }
+    .custo-cotacao-stats > div {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: rgba(0,216,255,.06);
+      border: 1px solid rgba(51,244,255,.18);
+      border-radius: 10px;
+      padding: 14px 20px;
+      min-width: 140px;
+    }
+    .custo-cotacao-stats dt {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted, #7ca5b8);
+    }
+    .custo-cotacao-stats dd {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--neon-1, #00d8ff);
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="configuracao_custos" %}
+
+    <section class="portal-main" aria-label="Configuracao de Custos">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Administrador</p>
+          <h1>Configuracao de Custos</h1>
+        </div>
+        <a class="toolbar-action primary" href="{% url 'portal_precificacao_criar' %}">Nova precificacao</a>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if 'success' in message.tags %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <!-- Cotacao do Dolar -->
+      <section class="integrations-hero">
+        <div>
+          <p class="eyebrow">Moeda</p>
+          <h2>Cotacao do dolar</h2>
+          <p>
+            Informe a cotacao atual do dolar para converter os custos de USD para BRL.
+            Atualize sempre que houver variacao significativa.
+          </p>
+        </div>
+        {% if configuracao %}
+          <dl class="custo-cotacao-stats" aria-label="Cotacao atual">
+            <div>
+              <dt>Cotacao atual</dt>
+              <dd>R$ {{ configuracao.cotacao_dolar|floatformat:2 }}</dd>
+            </div>
+            <div>
+              <dt>Ultima atualizacao</dt>
+              <dd>{{ configuracao.updated_at|date:"d/m/Y" }}</dd>
+            </div>
+          </dl>
+        {% endif %}
+      </section>
+
+      <section class="sources-section">
+        <div class="section-heading">
+          <p class="eyebrow">Cotacao</p>
+          <h2>Atualizar cotacao do dolar</h2>
+        </div>
+        <form method="post" action="{% url 'portal_cotacao_salvar' %}" class="agent-builder-form" autocomplete="off">
+          {% csrf_token %}
+          <div class="form-row">
+            <div class="execution-field">
+              <label for="id_cotacao_dolar">Valor do dolar (R$)</label>
+              {{ form_cotacao.cotacao_dolar }}
+              {% if form_cotacao.cotacao_dolar.errors %}
+                {% for erro in form_cotacao.cotacao_dolar.errors %}
+                  <span class="field-error">{{ erro }}</span>
+                {% endfor %}
+              {% endif %}
+              <small class="field-hint">Ex: 5.7800 — use ponto como separador decimal.</small>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="start-button">Salvar cotacao</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Precificacao por Modelo -->
+      <section class="sources-section" aria-labelledby="modelos-title">
+        <div class="section-heading">
+          <p class="eyebrow">Modelos de IA</p>
+          <h2 id="modelos-title">Precificacao por modelo</h2>
+        </div>
+
+        {% if precificacoes %}
+          <div class="integrations-grid">
+            {% for p in precificacoes %}
+              <article class="integration-card ai-integration">
+                <div class="source-card-header">
+                  <span class="agent-status {% if p.ativo %}active{% else %}inactive{% endif %}">
+                    {% if p.ativo %}Ativo{% else %}Inativo{% endif %}
+                  </span>
+                  <span class="agent-type">IA</span>
+                </div>
+                <strong>{{ p.nome_modelo }}</strong>
+                <dl class="agent-meta">
+                  <div>
+                    <dt>Input (por 1M tokens)</dt>
+                    <dd>U$ {{ p.preco_input_por_milhao }}</dd>
+                  </div>
+                  <div>
+                    <dt>Output (por 1M tokens)</dt>
+                    <dd>U$ {{ p.preco_output_por_milhao }}</dd>
+                  </div>
+                </dl>
+                <div class="integration-actions">
+                  <a class="secondary-action" href="{% url 'portal_precificacao_editar' p.pk %}">Editar</a>
+                  <form method="post" action="{% url 'portal_precificacao_excluir' p.pk %}" onsubmit="return confirm('Excluir a precificacao de {{ p.nome_modelo }}? Esta acao nao pode ser desfeita.')">
+                    {% csrf_token %}
+                    <button type="submit" class="secondary-action danger-action">Excluir</button>
+                  </form>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <article class="empty-agents">
+            <span class="empty-icon" aria-hidden="true">R$</span>
+            <p class="eyebrow">Estado vazio</p>
+            <h2>Nenhuma precificacao cadastrada</h2>
+            <p>Adicione o preco por 1 milhao de tokens para cada modelo de IA que voce utiliza.</p>
+            <a class="start-button" href="{% url 'portal_precificacao_criar' %}">Nova precificacao</a>
+          </article>
+        {% endif %}
+      </section>
+
+    </section>
+  </main>
+</body>
+</html>

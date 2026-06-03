@@ -36,6 +36,7 @@ from apps.processamentos.services.document_sources import (
     load_document_bytes,
     prepare_documentos,
 )
+from apps.custos.selectors import calcular_custo_processamento
 from apps.processamentos.services.error_handling import normalizar_erro_processamento
 from apps.processamentos.services.output_packaging import (
     OutputPackagingError,
@@ -177,6 +178,8 @@ def execute_processing(processamento, actor):
         processamento.processing_tokens = telemetry["processing_tokens"]
         processamento.output_tokens = telemetry["output_tokens"]
         processamento.total_tokens = telemetry["total_tokens"]
+        processamento.custo_usd = telemetry.get("custo_usd")
+        processamento.custo_brl = telemetry.get("custo_brl")
         processamento.finalizado_em = finished_at
         if batch_result["total_errors"]:
             processamento.status = ProcessingStatus.CONCLUIDO_ERRO
@@ -633,6 +636,13 @@ def _execute_without_document(
         f"{processamento.codigo}_resultado.{processamento.output_format}",
     )
 
+    custo_usd_exec, custo_brl_exec = calcular_custo_processamento(
+        nome_modelo=model_name,
+        input_tokens=telemetry["input_tokens"],
+        output_tokens=telemetry["output_tokens"],
+        processing_tokens=telemetry["processing_tokens"],
+    )
+
     with transaction.atomic():
         execution_record = ProcessamentoExecucaoIA.objects.create(
             processamento=processamento,
@@ -648,6 +658,8 @@ def _execute_without_document(
             processing_tokens=telemetry["processing_tokens"],
             output_tokens=telemetry["output_tokens"],
             total_tokens=telemetry["total_tokens"],
+            custo_usd=custo_usd_exec,
+            custo_brl=custo_brl_exec,
             usage_metadata=execution_result.usage_metadata or {},
             response_summary=execution_result.summary,
             scope_type=ExecutionScopeType.SEM_DOCUMENTO,
@@ -667,6 +679,8 @@ def _execute_without_document(
         processamento.processing_tokens = telemetry["processing_tokens"]
         processamento.output_tokens = telemetry["output_tokens"]
         processamento.total_tokens = telemetry["total_tokens"]
+        processamento.custo_usd = custo_usd_exec
+        processamento.custo_brl = custo_brl_exec
         processamento.total_processados = 0
         processamento.status = ProcessingStatus.CONCLUIDO_SUCESSO
         processamento.mensagem_erro = ""
@@ -761,6 +775,13 @@ def _execute_document(
         _build_output_basename(processamento, documento, processamento.output_format),
     )
 
+    custo_usd_exec, custo_brl_exec = calcular_custo_processamento(
+        nome_modelo=model_name,
+        input_tokens=telemetry["input_tokens"],
+        output_tokens=telemetry["output_tokens"],
+        processing_tokens=telemetry["processing_tokens"],
+    )
+
     with transaction.atomic():
         execution_record = ProcessamentoExecucaoIA.objects.create(
             processamento=processamento,
@@ -776,6 +797,8 @@ def _execute_document(
             processing_tokens=telemetry["processing_tokens"],
             output_tokens=telemetry["output_tokens"],
             total_tokens=telemetry["total_tokens"],
+            custo_usd=custo_usd_exec,
+            custo_brl=custo_brl_exec,
             usage_metadata=execution_result.usage_metadata or {},
             response_summary=execution_result.summary,
             scope_type=ExecutionScopeType.INDIVIDUAL,
@@ -808,6 +831,8 @@ def _execute_document(
         processamento.processing_tokens = telemetry["processing_tokens"]
         processamento.output_tokens = telemetry["output_tokens"]
         processamento.total_tokens = telemetry["total_tokens"]
+        processamento.custo_usd = custo_usd_exec
+        processamento.custo_brl = custo_brl_exec
         processamento.total_processados = processamento.documentos.filter(
             status=DocumentStatus.PROCESSADO
         ).count()
@@ -825,6 +850,8 @@ def _execute_document(
                 "processing_tokens",
                 "output_tokens",
                 "total_tokens",
+                "custo_usd",
+                "custo_brl",
                 "total_processados",
                 "etapa_atual",
                 "documento_atual_nome",
@@ -923,6 +950,13 @@ def _execute_document_group(
         f"{processamento.codigo}_grupo.{processamento.output_format}",
     )
 
+    custo_usd_exec, custo_brl_exec = calcular_custo_processamento(
+        nome_modelo=model_name,
+        input_tokens=telemetry["input_tokens"],
+        output_tokens=telemetry["output_tokens"],
+        processing_tokens=telemetry["processing_tokens"],
+    )
+
     with transaction.atomic():
         execution_record = ProcessamentoExecucaoIA.objects.create(
             processamento=processamento,
@@ -938,6 +972,8 @@ def _execute_document_group(
             processing_tokens=telemetry["processing_tokens"],
             output_tokens=telemetry["output_tokens"],
             total_tokens=telemetry["total_tokens"],
+            custo_usd=custo_usd_exec,
+            custo_brl=custo_brl_exec,
             usage_metadata=execution_result.usage_metadata or {},
             response_summary=execution_result.summary,
             scope_type=ExecutionScopeType.GRUPO,
@@ -1020,7 +1056,17 @@ def _select_documentos(processamento):
 
 
 def _aggregate_processing_telemetry(processamento):
+    from decimal import Decimal
     execution_records = list(processamento.execucoes_ia.all())
+
+    custo_usd = None
+    custo_brl = None
+    for execucao in execution_records:
+        if execucao.custo_usd is not None:
+            custo_usd = (custo_usd or Decimal("0")) + execucao.custo_usd
+        if execucao.custo_brl is not None:
+            custo_brl = (custo_brl or Decimal("0")) + execucao.custo_brl
+
     return {
         "input_tokens": _sum_nullable_token_values(
             execucao.input_tokens for execucao in execution_records
@@ -1034,6 +1080,8 @@ def _aggregate_processing_telemetry(processamento):
         "total_tokens": _sum_nullable_token_values(
             execucao.total_tokens for execucao in execution_records
         ),
+        "custo_usd": custo_usd,
+        "custo_brl": custo_brl,
     }
 
 
@@ -1369,6 +1417,8 @@ def _log_execution_event(
                 "processing_tokens": telemetry["processing_tokens"],
                 "output_tokens": telemetry["output_tokens"],
                 "total_tokens": telemetry["total_tokens"],
+                "custo_usd": execution_record.custo_usd,
+                "custo_brl": execution_record.custo_brl,
                 "output_format": output_record.formato,
                 "output_keys": (
                     list(render_payload.keys()) if isinstance(render_payload, dict) else []
@@ -1436,6 +1486,8 @@ def _log_group_execution_event(
                 "processing_tokens": telemetry["processing_tokens"],
                 "output_tokens": telemetry["output_tokens"],
                 "total_tokens": telemetry["total_tokens"],
+                "custo_usd": execution_record.custo_usd,
+                "custo_brl": execution_record.custo_brl,
                 "output_format": output_record.formato,
                 "output_keys": (
                     list(render_payload.keys()) if isinstance(render_payload, dict) else []
@@ -1499,6 +1551,8 @@ def _log_execution_without_document_event(
                 "processing_tokens": telemetry["processing_tokens"],
                 "output_tokens": telemetry["output_tokens"],
                 "total_tokens": telemetry["total_tokens"],
+                "custo_usd": execution_record.custo_usd,
+                "custo_brl": execution_record.custo_brl,
                 "output_format": processamento.arquivo_saida_formato,
                 "output_keys": (
                     list(render_payload.keys()) if isinstance(render_payload, dict) else []

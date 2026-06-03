@@ -1,0 +1,118 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ titulo }} - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260603-custos-2">
+</head>
+<body>
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="configuracao_custos" %}
+
+    <section class="portal-main" aria-label="{{ titulo }}">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Configuracao de Custos</p>
+          <h1>{{ titulo }}</h1>
+        </div>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if message.tags == 'success' %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Precificacao de modelo</p>
+          <h2>{{ titulo }}</h2>
+          <p>
+            Selecione a integracao de IA ja cadastrada — o modelo e preenchido automaticamente
+            a partir do modelo padrao configurado na integracao. Informe os precos em dolares
+            por 1 milhao de tokens.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>R$</span>
+          <small>custo</small>
+        </div>
+      </section>
+
+      <form class="agent-builder-form" method="post" autocomplete="off">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="form-alert">
+            {% for erro in form.non_field_errors %}{{ erro }}{% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="form-row">
+          <div class="execution-field">
+            <label for="{{ form.nome_modelo.id_for_label }}">Integracao / Modelo</label>
+            {{ form.nome_modelo }}
+            {% if form.nome_modelo.errors %}
+              {% for erro in form.nome_modelo.errors %}
+                <span class="field-error">{{ erro }}</span>
+              {% endfor %}
+            {% endif %}
+            <small class="field-hint">Selecione a integracao cadastrada. O nome do modelo e usado para calcular o custo de cada processamento.</small>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="execution-field">
+            <label for="{{ form.preco_input_por_milhao.id_for_label }}">Preco de entrada — por 1M tokens (U$)</label>
+            {{ form.preco_input_por_milhao }}
+            {% if form.preco_input_por_milhao.errors %}
+              {% for erro in form.preco_input_por_milhao.errors %}
+                <span class="field-error">{{ erro }}</span>
+              {% endfor %}
+            {% endif %}
+            <small class="field-hint">Ex: 0.075000 para U$ 0,075 por 1M tokens</small>
+          </div>
+          <div class="execution-field">
+            <label for="{{ form.preco_output_por_milhao.id_for_label }}">Preco de saida — por 1M tokens (U$)</label>
+            {{ form.preco_output_por_milhao }}
+            {% if form.preco_output_por_milhao.errors %}
+              {% for erro in form.preco_output_por_milhao.errors %}
+                <span class="field-error">{{ erro }}</span>
+              {% endfor %}
+            {% endif %}
+            <small class="field-hint">Ex: 0.300000 para U$ 0,30 por 1M tokens</small>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="execution-field">
+            <label class="toggle-line" for="{{ form.ativo.id_for_label }}">
+              {{ form.ativo }}
+              <span class="toggle-switch" aria-hidden="true"></span>
+              <span>
+                <strong>Ativo</strong>
+                <small>Apenas precificacoes ativas sao usadas no calculo de custo.</small>
+              </span>
+            </label>
+            {% if form.ativo.errors %}
+              {% for erro in form.ativo.errors %}
+                <span class="field-error">{{ erro }}</span>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="start-button">Salvar</button>
+          <a class="secondary-action" href="{{ cancelar_url }}">Cancelar</a>
+        </div>
+      </form>
+
+    </section>
+  </main>
+</body>
+</html>

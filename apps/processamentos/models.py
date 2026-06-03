@@ -191,6 +191,8 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     processing_tokens = models.PositiveIntegerField(null=True, blank=True)
     output_tokens = models.PositiveIntegerField(null=True, blank=True)
     total_tokens = models.PositiveIntegerField(null=True, blank=True)
+    custo_usd = models.DecimalField(max_digits=14, decimal_places=6, null=True, blank=True)
+    custo_brl = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
 
     class Meta:
         verbose_name = "Processamento"
@@ -500,6 +502,8 @@ class ProcessamentoExecucaoIA(TimestampedModel):
     processing_tokens = models.PositiveIntegerField(null=True, blank=True)
     output_tokens = models.PositiveIntegerField(null=True, blank=True)
     total_tokens = models.PositiveIntegerField(null=True, blank=True)
+    custo_usd = models.DecimalField(max_digits=14, decimal_places=6, null=True, blank=True)
+    custo_brl = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
     usage_metadata = models.JSONField(default=dict, blank=True)
     response_summary = models.TextField(blank=True)
     error_message = models.TextField(blank=True)

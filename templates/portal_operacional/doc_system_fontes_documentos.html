@@ -144,22 +144,61 @@ URL da pasta: https://drive.google.com/drive/folders/xxxxxxxxxxxx</code></pre>
           </div>
           <div class="doc-table-row">
             <div><strong>Caminho local autorizado</strong></div>
-            <div>Caminho absoluto do servidor</div>
-            <div>Exemplo: <code>/app/media/entradas</code> ou <code>C:\licitacao</code>.</div>
+            <div>Caminho absoluto dentro do servidor (container)</div>
+            <div>Sempre use o caminho no formato Linux, iniciando com <code>/app/entradas/</code>.</div>
           </div>
           <div class="doc-table-row">
             <div><strong>Ler subpastas automaticamente</strong></div>
             <div>Marcado ou desmarcado</div>
-            <div>Ative quando os arquivos puderem estar organizados em subpastas abaixo da raiz.</div>
+            <div>Ative quando os PDFs puderem estar organizados em subpastas abaixo da raiz informada.</div>
           </div>
         </div>
 
         <div class="doc-code-panel">
-          <strong>Exemplo de fonte local</strong>
-          <pre><code>Nome: Pasta de entrada do servidor
+          <strong>Exemplos de fonte local</strong>
+          <pre><code>Nome: Contratos
 Status: ativa
-Caminho local autorizado: /app/media/entradas
+Caminho local autorizado: /app/entradas/contratos
+Ler subpastas automaticamente: Nao
+
+Nome: Relatorios Financeiros
+Status: ativa
+Caminho local autorizado: /app/entradas/relatorios/financeiros
 Ler subpastas automaticamente: Sim</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Pasta local — como funciona o mapeamento</p>
+          <h2>De onde vem a pasta <code>/app/entradas</code></h2>
+        </div>
+
+        <p style="margin-bottom: 16px; color: var(--muted);">
+          O sistema roda dentro de um container Docker. Para que os documentos do Windows
+          fiquem acessiveis, a pasta <strong>C:\HubAgentes</strong> do computador e mapeada
+          automaticamente para <strong>/app/entradas</strong> dentro do container.
+        </p>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Windows</span>
+            <p>Crie e organize suas pastas em <code>C:\HubAgentes\</code>. Coloque os PDFs nelas normalmente pelo Windows Explorer.</p>
+            <small>Exemplo: <code>C:\HubAgentes\contratos\</code></small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Sistema</span>
+            <p>No cadastro de pasta local, use o caminho correspondente no container, substituindo <code>C:\HubAgentes</code> por <code>/app/entradas</code>.</p>
+            <small>Exemplo: <code>/app/entradas/contratos</code></small>
+          </article>
+        </div>
+
+        <div class="doc-code-panel" style="margin-top: 16px;">
+          <strong>Tabela de correspondencia de caminhos</strong>
+          <pre><code>C:\HubAgentes\                      →  /app/entradas/
+C:\HubAgentes\contratos\            →  /app/entradas/contratos
+C:\HubAgentes\relatorios\           →  /app/entradas/relatorios
+C:\HubAgentes\clientes\empresa-xyz\ →  /app/entradas/clientes/empresa-xyz</code></pre>
         </div>
       </section>
 
@@ -201,7 +240,8 @@ Ler subpastas automaticamente: Sim</code></pre>
         <ul class="doc-note-list">
           <li>Uma fonte documental depende de uma conexao valida e ativa quando o tipo usa Google Drive.</li>
           <li>Para Google Drive, a pasta deve estar compartilhada com a conta tecnica correta.</li>
-          <li>Para pasta local, o caminho informado precisa existir no servidor e ser absoluto.</li>
+          <li>Para pasta local, o caminho informado deve sempre comecar com <code>/app/entradas/</code> — nunca use caminhos Windows como <code>C:\...</code>, pois o sistema roda em Linux (container Docker).</li>
+          <li>A pasta <code>C:\HubAgentes</code> no Windows corresponde a <code>/app/entradas</code> no container. Crie suas subpastas dentro de <code>C:\HubAgentes</code> e referencie-as com o prefixo <code>/app/entradas/</code> no cadastro.</li>
           <li>Ativar leitura recursiva amplia o alcance da busca para subpastas, entao use com intencao.</li>
           <li>Revise o tipo da fonte com cuidado, porque isso muda a forma como o sistema localiza os documentos.</li>
           <li>As fontes de documentos sao a base da entrada operacional; se a origem estiver errada, o agente pode processar arquivos incorretos ou nao encontrar nenhum documento.</li>

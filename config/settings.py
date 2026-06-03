@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'apps.processamentos',
     'apps.auditoria',
     'apps.doc_system',
+    'apps.custos',
 ]
 
 MIDDLEWARE = [

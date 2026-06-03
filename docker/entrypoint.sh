@@ -53,11 +53,11 @@ django.setup()
 from django.contrib.auth.models import User
 if not User.objects.filter(is_superuser=True).exists():
     User.objects.create_superuser(
-        username=os.environ.get("DJANGO_ADMIN_USER", "eliasneto"),
-        password=os.environ.get("DJANGO_ADMIN_PASSWORD", "eliasneto"),
+        username=os.environ.get("DJANGO_ADMIN_USER", "admin"),
+        password=os.environ.get("DJANGO_ADMIN_PASSWORD", "admin"),
         email="",
     )
-    print("Superusuario criado:", os.environ.get("DJANGO_ADMIN_USER", "eliasneto"))
+    print("Superusuario criado:", os.environ.get("DJANGO_ADMIN_USER", "admin"))
 else:
     print("Superusuario ja existe, nenhum criado.")
 PY
