@@ -13,18 +13,11 @@ from apps.integracoes.models import (
 
 
 def _caminho_para_exibicao(base_path: str) -> str:
-    import os
     if not base_path.startswith("/app/entradas"):
         return base_path
-    local_storage = os.environ.get("LOCAL_STORAGE_PATH", "").replace("\\", "/").rstrip("/")
     remainder = base_path[len("/app/entradas"):].lstrip("/")
-    if not local_storage:
-        return base_path
-    is_windows = local_storage.upper().startswith("C:/") or local_storage.upper().startswith("C:\\")
-    if is_windows:
-        win_base = local_storage.replace("/", "\\").rstrip("\\")
-        return win_base + ("\\" + remainder.replace("/", "\\") if remainder else "")
-    return local_storage + ("/" + remainder if remainder else "")
+    win_path = "C:\\HubAgentes"
+    return win_path + "\\" + remainder.replace("/", "\\") if remainder else win_path
 
 
 @dataclass(frozen=True)
@@ -230,7 +223,7 @@ def listar_integracoes_para_portal() -> IntegracoesPortalResumo:
                 id=integracao.pk,
                 nome=integracao.nome,
                 status=integracao.get_status_display(),
-                base_path=integracao.base_path,
+                base_path=_caminho_para_exibicao(integracao.base_path),
                 extensoes=", ".join(integracao.allowed_extensions or []),
                 leitura_recursiva=integracao.recursive_scan,
                 ultima_validacao=integracao.last_validated_at,
