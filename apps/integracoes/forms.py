@@ -147,9 +147,19 @@ class LocalStorageIntegrationPortalForm(IntegrationPortalFormMixin, forms.ModelF
         help_texts = {
             "base_path": (
                 "Use o caminho Windows (ex: C:\\HubAgentes\\contratos) "
-                "ou diretamente o caminho do servidor (ex: /app/entradas/contratos)."
+                "ou o caminho do servidor (ex: /app/entradas/contratos)."
             ),
         }
+
+    def clean_base_path(self):
+        import os
+        value = self.cleaned_data.get("base_path", "").strip()
+        raw = value.replace("\\", "/")
+        local_win = os.environ.get("LOCAL_STORAGE_PATH", "").replace("\\", "/").rstrip("/")
+        if local_win and raw.upper().startswith(local_win.upper()):
+            remainder = raw[len(local_win):].lstrip("/")
+            return "/app/entradas/" + remainder if remainder else "/app/entradas"
+        return value
 
 
 class GoogleDriveFolderSourcePortalForm(IntegrationPortalFormMixin, forms.ModelForm):
