@@ -34,4 +34,8 @@ urlpatterns = [
         "usuarios-e-acessos/",
         include("apps.doc_system.usuarios_acessos.urls"),
     ),
+    path(
+        "configuracao-custos/",
+        include("apps.doc_system.configuracao_custos.urls"),
+    ),
 ]

@@ -135,16 +135,26 @@
             </div>
 
             <div class="execution-grid">
-              <div class="execution-field">
+              <div class="execution-field builder-wide">
                 <label for="{{ form.base_path.id_for_label }}">{{ form.base_path.label }}{% if form.base_path.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.base_path }}
-                <small>Informe um caminho absoluto, por exemplo: C:\licitacao.</small>
+                <small>Windows: C:\HubAgentes\contratos &nbsp;|&nbsp; Servidor: /app/entradas/contratos</small>
                 {% for error in form.base_path.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
-              <label class="user-checkline integration-checkline">
-                {{ form.recursive_scan }}
-                <span>{{ form.recursive_scan.label }}</span>
-              </label>
+            </div>
+
+            <div class="execution-grid">
+              <div class="execution-field builder-wide">
+                <label class="toggle-line" for="{{ form.recursive_scan.id_for_label }}">
+                  {{ form.recursive_scan }}
+                  <span class="toggle-switch" aria-hidden="true"></span>
+                  <span>
+                    <strong>Ler subpastas automaticamente</strong>
+                    <small>Ative quando os PDFs estiverem organizados em subpastas dentro da pasta raiz.</small>
+                  </span>
+                </label>
+                {% for error in form.recursive_scan.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              </div>
             </div>
 
             <aside class="integration-field-guide" aria-label="Modelo de preenchimento para fonte local">
@@ -156,7 +166,7 @@
               <dl>
                 <div>
                   <dt>Caminho local autorizado</dt>
-                  <dd>Use um caminho existente no servidor, por exemplo: <code>/app/media/entradas</code>.</dd>
+                  <dd>Use o caminho Windows (ex: <code>C:\HubAgentes\contratos</code>) ou o caminho do servidor (ex: <code>/app/entradas/contratos</code>).</dd>
                 </div>
                 <div>
                   <dt>Ler subpastas automaticamente</dt>

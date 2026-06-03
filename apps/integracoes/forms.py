@@ -146,8 +146,8 @@ class LocalStorageIntegrationPortalForm(IntegrationPortalFormMixin, forms.ModelF
         }
         help_texts = {
             "base_path": (
-                "Use o caminho Windows (ex: C:\\HubAgentes\\contratos) "
-                "ou o caminho do servidor (ex: /app/entradas/contratos)."
+                "Windows: C:\\HubAgentes\\contratos  |  "
+                "Servidor/container: /app/entradas/contratos"
             ),
         }
 
@@ -155,10 +155,16 @@ class LocalStorageIntegrationPortalForm(IntegrationPortalFormMixin, forms.ModelF
         import os
         value = self.cleaned_data.get("base_path", "").strip()
         raw = value.replace("\\", "/")
-        local_win = os.environ.get("LOCAL_STORAGE_PATH", "").replace("\\", "/").rstrip("/")
-        if local_win and raw.upper().startswith(local_win.upper()):
-            remainder = raw[len(local_win):].lstrip("/")
+        local_storage = os.environ.get("LOCAL_STORAGE_PATH", "").replace("\\", "/").rstrip("/")
+        if local_storage and raw.upper().startswith(local_storage.upper()):
+            # Traduz caminho do host (Windows ou Linux) para caminho interno do container
+            remainder = raw[len(local_storage):].lstrip("/")
             return "/app/entradas/" + remainder if remainder else "/app/entradas"
+        # Aceita caminho Windows C:\HubAgentes\ mesmo sem LOCAL_STORAGE_PATH compativel
+        for win_prefix in ("c:/hubagentes", "c:\\hubagentes"):
+            if raw.lower().startswith(win_prefix):
+                remainder = raw[len(win_prefix):].replace("\\", "/").lstrip("/")
+                return "/app/entradas/" + remainder if remainder else "/app/entradas"
         return value
 
 

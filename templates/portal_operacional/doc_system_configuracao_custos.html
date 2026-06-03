@@ -1,0 +1,192 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Configuracao de Custos</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260603-doc-custos-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_configuracao_custos" %}
+
+    <section class="portal-main" aria-label="Documentacao de Configuracao de Custos">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Configuracao de Custos</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia operacional</p>
+          <h2>Como configurar precos e acompanhar o custo de cada processamento de IA.</h2>
+          <p>
+            Esta tela documenta o modulo de Configuracao de Custos. Ela explica como cadastrar
+            os precos por modelo de IA, configurar a cotacao do dolar e como o sistema calcula
+            e exibe o custo em reais de cada processamento.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>R$</span>
+          <small>custos</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo a passo</p>
+          <h2>Como ativar o calculo de custos</h2>
+        </div>
+        <ol class="doc-step-list">
+          <li>Acesse <strong>Administrador &gt; Configuracao de Custos</strong>.</li>
+          <li>Informe a <strong>cotacao atual do dolar</strong> em reais (ex: 5.78).</li>
+          <li>Clique em <strong>Nova precificacao</strong> e selecione o modelo de IA ja cadastrado em Integracoes.</li>
+          <li>Informe o <strong>preco de entrada</strong> e o <strong>preco de saida</strong> em dolares por 1 milhao de tokens.</li>
+          <li>Salve a precificacao e marque como <strong>Ativa</strong>.</li>
+          <li>A partir do proximo processamento, o custo sera calculado e exibido no <strong>Historico e Auditoria</strong>.</li>
+        </ol>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Cotacao do dolar</p>
+          <h2>Como configurar a taxa de cambio</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Observacoes</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Valor do dolar (R$)</strong></div>
+            <div>Numero decimal com ponto</div>
+            <div>Ex: <code>5.7800</code>. Atualize manualmente sempre que houver variacao significativa.</div>
+          </div>
+        </div>
+
+        <div class="doc-code-panel">
+          <strong>Exemplo</strong>
+          <pre><code>Cotacao atual: R$ 5,78
+Ultima atualizacao: 03/06/2026</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Precificacao por modelo</p>
+          <h2>Campos do cadastro de preco</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que aceita</div>
+            <div>Observacoes</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Integracao / Modelo</strong></div>
+            <div>Selecao das integracoes de IA cadastradas</div>
+            <div>O sistema lista automaticamente as integracoes ativas com modelo configurado.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Preco de entrada</strong></div>
+            <div>Valor em dolares por 1 milhao de tokens</div>
+            <div>Ex: <code>0.100000</code> para U$ 0,10 por 1M tokens de entrada (prompt).</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Preco de saida</strong></div>
+            <div>Valor em dolares por 1 milhao de tokens</div>
+            <div>Ex: <code>0.400000</code> para U$ 0,40 por 1M tokens de saida. Inclui tokens de raciocinio (thinking).</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Ativo</strong></div>
+            <div>Toggle ligado ou desligado</div>
+            <div>Apenas precificacoes ativas sao usadas no calculo. Desative para suspender sem excluir.</div>
+          </div>
+        </div>
+
+        <div class="doc-code-panel">
+          <strong>Exemplo de precificacao — Gemini 2.0 Flash</strong>
+          <pre><code>Integracao / Modelo: Minha Integracao Gemini — gemini-2.0-flash
+Preco de entrada: 0.100000  (U$ 0,10 por 1M tokens)
+Preco de saida:  0.400000  (U$ 0,40 por 1M tokens)
+Ativo: Sim</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Formula de calculo</p>
+          <h2>Como o custo e calculado por processamento</h2>
+        </div>
+
+        <div class="doc-code-panel">
+          <strong>Formula aplicada automaticamente</strong>
+          <pre><code>tokens_saida_total = tokens_saida + tokens_processamento (raciocinio)
+
+custo_usd = (tokens_entrada x preco_entrada + tokens_saida_total x preco_saida) / 1.000.000
+
+custo_brl = custo_usd x cotacao_dolar</code></pre>
+        </div>
+
+        <div class="doc-guide-grid" style="margin-top:16px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Tokens de raciocinio</span>
+            <p>Os tokens de processamento (raciocinio/thinking do Gemini) sao cobrados pelo provedor na mesma taxa dos tokens de saida. Por isso sao somados antes do calculo.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Sem precificacao</span>
+            <p>Se o modelo nao tiver precificacao cadastrada ou a cotacao do dolar nao estiver configurada, o custo nao e calculado e o campo fica vazio no historico.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Onde o custo aparece</p>
+          <h2>Como visualizar os custos dos processamentos</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Historico e Auditoria</span>
+            <p>Cada evento de execucao exibe um chip <strong>Custo R$</strong> ao lado dos chips de tokens (Total, Entrada, Processo, Saida).</p>
+            <small>Valor com 4 casas decimais. Ex: R$ 0,0179</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Referencia de custo</span>
+            <p>Para estimar o custo mensal: multiplique o custo medio por documento pelo volume esperado de processamentos.</p>
+            <small>Ex: R$ 0,02 x 1.000 documentos = R$ 20,00/mes</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Observacoes importantes</p>
+          <h2>Pontos de atencao antes de usar</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>O nome do modelo na precificacao deve corresponder exatamente ao modelo usado nas integracoes (ex: <code>gemini-2.0-flash</code>). O sistema busca a precificacao pelo nome do modelo salvo no processamento.</li>
+          <li>A cotacao do dolar e configurada manualmente — atualize-a periodicamente para refletir a variacao cambial.</li>
+          <li>Precificacoes inativas nao sao usadas no calculo, mesmo que o modelo seja o mesmo.</li>
+          <li>Processamentos anteriores ao cadastro da precificacao nao tem o custo recalculado — o calculo ocorre no momento da execucao.</li>
+          <li>O modulo de custos e exclusivo para administradores e nao e visivel para usuarios operacionais.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_configuracao_custos' %}">Abrir Configuracao de Custos</a>
+        <a class="start-button" href="/doc-system/configuracao-custos/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

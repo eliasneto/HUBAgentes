@@ -22,6 +22,7 @@ from django.urls import include, path
 from apps.auditoria.views import AuditoriaView
 from apps.core.views import (
     AgenteExecucaoView,
+    LocalStorageSubpastasView,
     AgentePortalCreateView,
     AgentePortalLegacyCreateRedirectView,
     AgentePortalUpdateView,
@@ -53,6 +54,7 @@ urlpatterns = [
     path('agentes-de-leitura/', AgentesLeituraView.as_view(), name='portal_agentes_leitura'),
     path('agentes/', AgentesGerenciamentoView.as_view(), name='portal_agentes_gerenciar'),
     path('agentes/novo/', AgentePortalCreateView.as_view(), name='portal_agente_criar'),
+    path('agentes/api/subpastas-local/<int:integration_id>/', LocalStorageSubpastasView.as_view(), name='portal_subpastas_local'),
     path('agentes/<slug:slug>/editar/', AgentePortalUpdateView.as_view(), name='portal_agente_editar'),
     path('agentes-de-leitura/novo/', AgentePortalLegacyCreateRedirectView.as_view(), name='portal_agente_criar_legacy'),
     path('agentes-de-leitura/<slug:slug>/executar/', AgenteExecucaoView.as_view(), name='portal_agente_executar'),

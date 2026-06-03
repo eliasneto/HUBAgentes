@@ -214,22 +214,38 @@ Credenciais JSON: { ...conteudo completo do arquivo... }</code></pre>
           </div>
           <div class="doc-table-row">
             <div><strong>Caminho local autorizado</strong></div>
-            <div>Caminho absoluto do servidor</div>
-            <div>Exemplo: <code>/app/media/entradas</code> ou <code>C:\licitacao</code>.</div>
+            <div>Caminho Windows ou caminho do servidor</div>
+            <div>Windows: <code>C:\HubAgentes\contratos</code> &nbsp;|&nbsp; Servidor: <code>/app/entradas/contratos</code></div>
           </div>
           <div class="doc-table-row">
             <div><strong>Ler subpastas automaticamente</strong></div>
             <div>Marcado ou desmarcado</div>
-            <div>Ative quando os arquivos puderem estar em pastas filhas.</div>
+            <div>Ative quando os PDFs puderem estar organizados em subpastas dentro da pasta raiz.</div>
           </div>
         </div>
 
         <div class="doc-code-panel">
-          <strong>Exemplo de conexao de pasta local</strong>
-          <pre><code>Nome: Pasta de entrada do servidor
+          <strong>Exemplos de conexao de pasta local</strong>
+          <pre><code>Nome: Contratos
 Status: ativa
-Caminho local autorizado: /app/media/entradas
+Caminho local autorizado: C:\HubAgentes\contratos
+Ler subpastas automaticamente: Nao
+
+Nome: Todos os documentos
+Status: ativa
+Caminho local autorizado: C:\HubAgentes
 Ler subpastas automaticamente: Sim</code></pre>
+        </div>
+
+        <div class="doc-guide-grid" style="margin-top:16px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Windows</span>
+            <p>Digite o caminho no formato Windows normalmente: <code>C:\HubAgentes\contratos</code>. O sistema converte automaticamente para o formato interno do servidor.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Mapeamento</span>
+            <p>A pasta <code>C:\HubAgentes</code> corresponde a <code>/app/entradas</code> dentro do container. Qualquer subpasta criada no Windows fica acessivel com o prefixo <code>/app/entradas/</code>.</p>
+          </article>
         </div>
       </section>
 
@@ -243,7 +259,8 @@ Ler subpastas automaticamente: Sim</code></pre>
           <li>O botao <strong>Validar conexao</strong> deve ser usado sempre depois de criar ou editar uma conexao.</li>
           <li>Em edicao, campos secretos como <strong>Chave de API</strong> e <strong>Credenciais JSON</strong> podem ficar em branco para preservar o valor atual.</li>
           <li>Para Google Drive, a pasta precisa estar compartilhada com o e-mail da <code>service account</code>.</li>
-          <li>Para pasta local, o caminho precisa existir no servidor e ser absoluto.</li>
+          <li>Para pasta local, o caminho informado precisa existir no servidor. Use <code>C:\HubAgentes\...</code> (Windows) ou <code>/app/entradas/...</code> (servidor direto).</li>
+          <li>Com <strong>Ler subpastas</strong> ativo, o sistema usa <code>rglob</code> para varrer toda a arvore de subpastas — ideal para grandes volumes organizados por pasta.</li>
           <li>No escopo atual, a conexao de pasta local permanece orientada a <code>PDF</code>.</li>
           <li>Uma conexao inativa ou com erro pode impedir uso por agentes ou fontes documentais vinculadas.</li>
           <li>A listagem do portal exibe apenas metadados operacionais; credenciais sensiveis continuam ocultas.</li>

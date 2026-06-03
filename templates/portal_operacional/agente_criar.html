@@ -166,8 +166,14 @@
 
             <div class="execution-field builder-wide" data-builder-source="local_folder local_file">
               <label for="{{ form.default_local_relative_input_path.id_for_label }}">{{ form.default_local_relative_input_path.label }}</label>
+
+              <select id="subpastas-select" class="portal-input" style="display:none">
+                <option value="">— Raiz da pasta (sem subpasta) —</option>
+              </select>
+              <small id="subpastas-hint" style="display:none"></small>
+
               {{ form.default_local_relative_input_path }}
-              <small>Use o caminho relativo dentro da pasta autorizada.</small>
+              <small id="caminho-relativo-hint">Use o caminho relativo dentro da pasta autorizada, ou deixe em branco para a raiz.</small>
               {% for error in form.default_local_relative_input_path.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
 
@@ -265,5 +271,82 @@
       </form>
     </section>
   </main>
+
+<script>
+(function () {
+  var integracaoSelect = document.getElementById('{{ form.default_local_storage_integration.id_for_label }}');
+  var subpastasSelect  = document.getElementById('subpastas-select');
+  var subpastasHint    = document.getElementById('subpastas-hint');
+  var caminhoInput     = document.getElementById('{{ form.default_local_relative_input_path.id_for_label }}');
+  var caminhoHint      = document.getElementById('caminho-relativo-hint');
+
+  if (!integracaoSelect || !subpastasSelect || !caminhoInput) return;
+
+  function carregarSubpastas(integrationId) {
+    if (!integrationId) {
+      subpastasSelect.style.display = 'none';
+      subpastasHint.style.display   = 'none';
+      caminhoInput.style.display    = '';
+      caminhoHint.style.display     = '';
+      return;
+    }
+
+    subpastasHint.textContent  = 'Carregando subpastas...';
+    subpastasHint.style.display = '';
+
+    fetch('/agentes/api/subpastas-local/' + integrationId + '/')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        subpastasSelect.innerHTML = '<option value="">— Raiz da pasta (sem subpasta) —</option>';
+
+        if (data.erro) {
+          subpastasHint.textContent = 'Nao foi possivel listar subpastas: ' + data.erro;
+          subpastasSelect.style.display = 'none';
+          caminhoInput.style.display    = '';
+          caminhoHint.style.display     = '';
+          return;
+        }
+
+        if (data.subpastas && data.subpastas.length > 0) {
+          data.subpastas.forEach(function (nome) {
+            var opt = document.createElement('option');
+            opt.value       = nome;
+            opt.textContent = nome;
+            if (caminhoInput.value === nome) opt.selected = true;
+            subpastasSelect.appendChild(opt);
+          });
+          subpastasHint.textContent = data.subpastas.length + ' subpasta(s) encontrada(s) em ' + data.base_path;
+        } else {
+          subpastasHint.textContent = 'Nenhuma subpasta encontrada — a raiz sera usada.';
+        }
+
+        // Sincroniza select -> input oculto
+        if (!caminhoInput.value) subpastasSelect.value = '';
+        subpastasSelect.style.display = '';
+        caminhoInput.style.display    = 'none';
+        caminhoHint.style.display     = 'none';
+      })
+      .catch(function () {
+        subpastasHint.textContent = 'Erro ao buscar subpastas.';
+        subpastasSelect.style.display = 'none';
+        caminhoInput.style.display    = '';
+      });
+  }
+
+  subpastasSelect.addEventListener('change', function () {
+    caminhoInput.value = subpastasSelect.value;
+  });
+
+  integracaoSelect.addEventListener('change', function () {
+    caminhoInput.value = '';
+    carregarSubpastas(this.value);
+  });
+
+  // Carrega ao abrir em modo edicao se ja tiver valor
+  if (integracaoSelect.value) {
+    carregarSubpastas(integracaoSelect.value);
+  }
+}());
+</script>
 </body>
 </html>

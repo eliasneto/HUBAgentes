@@ -629,6 +629,28 @@ class UsuarioPortalUpdateView(UsuarioPortalFormMixin, FormView):
         return context
 
 
+class LocalStorageSubpastasView(LoginRequiredMixin, View):
+    login_url = reverse_lazy("portal_login")
+
+    def get(self, request, integration_id):
+        from apps.integracoes.models import LocalStorageIntegration
+        from apps.integracoes.services.local_storage import (
+            list_subfolders_from_relative_folder,
+            LocalStorageServiceError,
+        )
+        try:
+            integration = LocalStorageIntegration.objects.get(pk=integration_id)
+            subpastas = list_subfolders_from_relative_folder(integration, "")
+            return JsonResponse({
+                "subpastas": [p.name for p in subpastas],
+                "base_path": integration.base_path,
+            })
+        except LocalStorageIntegration.DoesNotExist:
+            return JsonResponse({"subpastas": [], "erro": "Integracao nao encontrada"})
+        except LocalStorageServiceError as exc:
+            return JsonResponse({"subpastas": [], "erro": str(exc)})
+
+
 class ProcessamentoStatusView(LoginRequiredMixin, View):
     login_url = reverse_lazy("portal_login")
 
