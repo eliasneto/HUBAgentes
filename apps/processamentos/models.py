@@ -258,14 +258,7 @@ class Processamento(SoftDeleteModel, TimestampedModel):
                         )
                     }
                 )
-            if not self.local_relative_input_path:
-                raise ValidationError(
-                    {
-                        "local_relative_input_path": (
-                            "Informe o caminho relativo da pasta ou do arquivo local."
-                        )
-                    }
-                )
+            # Caminho relativo vazio = raiz da pasta autorizada (comportamento válido)
             if self.local_storage_integration.status != IntegrationStatus.ATIVA:
                 raise ValidationError(
                     {
@@ -275,11 +268,14 @@ class Processamento(SoftDeleteModel, TimestampedModel):
                         }
                     )
         elif self.input_source_type == ProcessingInputSourceType.UPLOAD_AT_EXECUTION:
-            if self.arquivo_execucao_upload and not self.arquivo_execucao_upload.name.lower().endswith(".pdf"):
+            _ext_suportadas = {"pdf", "txt", "csv", "png", "jpg", "jpeg", "xlsx"}
+            if self.arquivo_execucao_upload:
+                ext = self.arquivo_execucao_upload.name.lower().rsplit(".", 1)[-1]
+            if self.arquivo_execucao_upload and ext not in _ext_suportadas:
                 raise ValidationError(
                     {
                         "arquivo_execucao_upload": (
-                            "No modo de upload em execucao, informe um arquivo PDF."
+                            f"Extensao nao suportada. Use: {', '.join(sorted(_ext_suportadas))}"
                         )
                     }
                 )
@@ -337,9 +333,10 @@ class Processamento(SoftDeleteModel, TimestampedModel):
         if not self.prompt_snapshot and self.agente_id:
             self.prompt_snapshot = self.agente.prompt_base
         if not self.modelo_snapshot and self.agente_id:
+            integracao = self.agente.ai_provider_integration
             self.modelo_snapshot = (
                 self.agente.modelo_preferencial
-                or self.agente.ai_provider_integration.default_model
+                or (integracao.default_model if integracao else "")
             )
         if self.status == ProcessingStatus.CONCLUIDO_SUCESSO:
             if self.arquivo_saida and not self.arquivo_saida_nome:
@@ -422,11 +419,19 @@ class DocumentoEntrada(TimestampedModel):
             models.Index(fields=["processamento", "source_type"]),
         ]
 
+    EXTENSOES_SUPORTADAS = {"pdf", "txt", "csv", "png", "jpg", "jpeg", "xlsx"}
+
     def clean(self):
         super().clean()
-        if not self.nome_arquivo.lower().endswith(".pdf"):
+        ext = self.nome_arquivo.lower().rsplit(".", 1)[-1] if "." in self.nome_arquivo else ""
+        if ext not in self.EXTENSOES_SUPORTADAS:
             raise ValidationError(
-                {"nome_arquivo": "No MVP, somente arquivos PDF sao aceitos como entrada."}
+                {
+                    "nome_arquivo": (
+                        f"Extensao '.{ext}' nao suportada. "
+                        f"Use: {', '.join(sorted(self.EXTENSOES_SUPORTADAS))}"
+                    )
+                }
             )
         if (
             self.source_type == ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER

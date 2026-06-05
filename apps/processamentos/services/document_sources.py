@@ -14,6 +14,7 @@ from apps.integracoes.services.google_drive import (
 )
 from apps.integracoes.services.local_storage import (
     LocalStorageServiceError,
+    MIME_TYPE_MAP,
     get_local_file_payload,
     list_pdf_files_from_relative_folder,
     list_pdf_files_from_subfolder,
@@ -70,10 +71,18 @@ def load_document_bytes(processamento, documento):
             raise DocumentSourcePreparationError(
                 "A integracao local nao esta configurada para este processamento."
             )
-        return read_local_file_bytes(
-            processamento.local_storage_integration,
-            documento.source_reference,
-        )
+        try:
+            return read_local_file_bytes(
+                processamento.local_storage_integration,
+                documento.source_reference,
+            )
+        except LocalStorageServiceError as exc:
+            nome_pasta = processamento.local_storage_integration.nome
+            raise DocumentSourcePreparationError(
+                f"Esse agente esta configurado para acessar a pasta local '{nome_pasta}'. "
+                f"Nao foi possivel ler o arquivo — verifique se a maquina que hospeda essa "
+                f"pasta esta ligada e acessivel na rede. Detalhe: {exc}"
+            ) from exc
     if documento.source_type == ProcessingInputSourceType.UPLOAD_AT_EXECUTION:
         if not documento.uploaded_file:
             raise DocumentSourcePreparationError(
@@ -134,7 +143,12 @@ def _prepare_local_folder_documents(processamento):
             processamento.local_relative_input_path,
         )
     except LocalStorageServiceError as exc:
-        raise DocumentSourcePreparationError(str(exc)) from exc
+        nome_pasta = processamento.local_storage_integration.nome
+        raise DocumentSourcePreparationError(
+            f"Esse agente esta configurado para acessar a pasta local '{nome_pasta}'. "
+            f"Nao foi possivel acessar o caminho configurado — verifique se a maquina que "
+            f"hospeda essa pasta esta ligada e acessivel na rede. Detalhe: {exc}"
+        ) from exc
 
     created = 0
     updated = 0
@@ -173,7 +187,12 @@ def _prepare_local_folder_documents_por_pasta(processamento):
             processamento.local_relative_input_path,
         )
     except LocalStorageServiceError as exc:
-        raise DocumentSourcePreparationError(str(exc)) from exc
+        nome_pasta = processamento.local_storage_integration.nome
+        raise DocumentSourcePreparationError(
+            f"Esse agente esta configurado para acessar a pasta local '{nome_pasta}'. "
+            f"Nao foi possivel acessar o caminho configurado — verifique se a maquina que "
+            f"hospeda essa pasta esta ligada e acessivel na rede. Detalhe: {exc}"
+        ) from exc
 
     if not subpastas:
         raise DocumentSourcePreparationError(
@@ -335,6 +354,8 @@ def _prepare_upload_document(processamento):
         pending_only=True,
     )
     if documento is None:
+        ext = Path(upload_name).suffix.lower().lstrip(".")
+        mime = MIME_TYPE_MAP.get(ext, "application/octet-stream")
         documento = DocumentoEntrada(
             processamento=processamento,
             nome_arquivo=upload_name,
@@ -342,7 +363,7 @@ def _prepare_upload_document(processamento):
             drive_path="upload interno",
             source_type=ProcessingInputSourceType.UPLOAD_AT_EXECUTION,
             source_reference=source_reference,
-            mime_type="application/pdf",
+            mime_type=mime,
             checksum=checksum,
         )
         documento.uploaded_file.save(upload_name, ContentFile(upload_bytes), save=False)
@@ -350,8 +371,9 @@ def _prepare_upload_document(processamento):
         created = 1
         updated = 0
     else:
+        ext = Path(upload_name).suffix.lower().lstrip(".")
         documento.nome_arquivo = upload_name
-        documento.mime_type = "application/pdf"
+        documento.mime_type = MIME_TYPE_MAP.get(ext, "application/octet-stream")
         documento.checksum = checksum
         documento.drive_path = "upload interno"
         documento.uploaded_file.save(upload_name, ContentFile(upload_bytes), save=False)

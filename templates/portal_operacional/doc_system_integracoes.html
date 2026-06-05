@@ -267,6 +267,51 @@ Ler subpastas automaticamente: Sim</code></pre>
         </ul>
       </section>
 
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Extensoes suportadas</p>
+          <h2>Formatos de entrada e saida aceitos pelo sistema</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Entrada — todos os provedores</span>
+            <p><strong>PDF</strong> — documentos, contratos, editais, relatorios.<br>
+               <strong>TXT</strong> — arquivos de texto puro.<br>
+               <strong>CSV</strong> — dados tabulares separados por virgula.<br>
+               <strong>PNG / JPG / JPEG</strong> — imagens (requer provedor com suporte visual, ex: Gemini).<br>
+               <strong>XLSX</strong> — planilhas Excel (requer provedor com suporte a binario).</p>
+            <small>Configure as extensoes aceitas no cadastro de cada Integracao de pasta local.</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Entrada — por provedor</span>
+            <p><strong>Gemini</strong> — PDF, TXT, CSV, PNG, JPG, XLSX<br>
+               <strong>OpenAI</strong> — PDF, TXT, CSV, PNG, JPG<br>
+               <strong>Groq</strong> — somente TXT e CSV (texto puro, sem binarios)<br>
+               <strong>Anthropic</strong> — PDF, TXT, CSV, PNG, JPG</p>
+            <small>Groq nao suporta arquivos binarios (PDF, imagens, Excel). Use Gemini para esses formatos.</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Saida — todos os provedores</span>
+            <p><strong>JSON</strong> — estrutura de dados bruta retornada pela IA.<br>
+               <strong>Excel (.xlsx)</strong> — planilha com dados tabulados.<br>
+               <strong>CSV</strong> — valores separados por virgula.<br>
+               <strong>PDF</strong> — documento formatado gerado pelo sistema.<br>
+               <strong>TXT</strong> — texto simples.<br>
+               <strong>Definido pela IA</strong> — a IA informa o formato via campo <code>formato_saida</code>.</p>
+            <small>O formato de saida e configurado no agente e gerado pelo sistema — independe do provedor de IA.</small>
+          </article>
+        </div>
+
+        <div class="doc-code-panel" style="margin-top:16px">
+          <strong>Resumo por provedor</strong>
+          <pre><code>Gemini   → entrada: PDF, TXT, CSV, PNG, JPG, XLSX | saida: qualquer
+OpenAI   → entrada: PDF, TXT, CSV, PNG, JPG       | saida: qualquer
+Anthropic→ entrada: PDF, TXT, CSV, PNG, JPG       | saida: qualquer
+Groq     → entrada: TXT, CSV apenas               | saida: qualquer</code></pre>
+        </div>
+      </section>
+
       <div class="execution-actions builder-actions">
         <a class="secondary-action" href="{% url 'portal_integracoes' %}">Abrir integracoes</a>
         <a class="start-button" href="/doc-system/integracoes/">Recarregar esta documentacao</a>

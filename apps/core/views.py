@@ -73,10 +73,22 @@ class PortalAdministradorRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
         raise PermissionDenied("Apenas administradores podem gerenciar agentes.")
 
 
+_TEMPLATE_MAP = {
+    "principal": "portal_operacional/login.html",
+    "v2": "portal_operacional/login_v2.html",
+    "v3": "portal_operacional/login_v3.html",
+}
+
+
 class PortalLoginView(LoginView):
-    template_name = "portal_operacional/login.html"
     redirect_authenticated_user = True
     next_page = reverse_lazy("portal_painel")
+
+    @property
+    def template_name(self):
+        from apps.core.models import ConfiguracaoTelaLogin
+        config = ConfiguracaoTelaLogin.obter()
+        return _TEMPLATE_MAP.get(config.tela_ativa, "portal_operacional/login.html")
 
     def form_invalid(self, form):
         messages.error(self.request, "Usuario ou senha invalidos.")
@@ -91,9 +103,88 @@ class PortalLogoutView(LogoutView):
     next_page = reverse_lazy("portal_login")
 
 
+def _obter_dados_dashboard():
+    from django.db.models import Count, Sum, Q
+    from apps.processamentos.models import Processamento, ProcessingStatus, DocumentStatus
+
+    concluidos = {
+        ProcessingStatus.CONCLUIDO_SUCESSO,
+        ProcessingStatus.CONCLUIDO_ERRO,
+    }
+
+    # 1. Processamentos por agente
+    proc_por_agente = (
+        Processamento.objects
+        .filter(agente__isnull=False)
+        .values("agente__nome")
+        .annotate(total=Count("id"))
+        .order_by("-total")[:10]
+    )
+
+    # 2. Tokens totais por integração de IA
+    tokens_por_integracao = (
+        Processamento.objects
+        .filter(ai_provider_integration_snapshot__isnull=False, total_tokens__isnull=False)
+        .values("ai_provider_integration_snapshot__nome")
+        .annotate(total=Sum("total_tokens"))
+        .order_by("-total")[:10]
+    )
+
+    # 3. Custo em BRL por integração de IA
+    custo_por_integracao = (
+        Processamento.objects
+        .filter(ai_provider_integration_snapshot__isnull=False, custo_brl__isnull=False)
+        .values("ai_provider_integration_snapshot__nome")
+        .annotate(total=Sum("custo_brl"))
+        .order_by("-total")[:10]
+    )
+
+    # 4. Documentos processados por agente
+    docs_por_agente = (
+        Processamento.objects
+        .filter(agente__isnull=False)
+        .values("agente__nome")
+        .annotate(total=Sum("total_processados"))
+        .order_by("-total")[:10]
+    )
+
+    return {
+        "proc_por_agente": list(proc_por_agente),
+        "tokens_por_integracao": list(tokens_por_integracao),
+        "custo_por_integracao": list(custo_por_integracao),
+        "docs_por_agente": list(docs_por_agente),
+    }
+
+
 class PortalPainelView(LoginRequiredMixin, TemplateView):
     template_name = "portal_operacional/menu_inicial.html"
     login_url = reverse_lazy("portal_login")
+
+    def get_context_data(self, **kwargs):
+        from apps.core.models import ConfiguracaoGeral
+        context = super().get_context_data(**kwargs)
+        config = ConfiguracaoGeral.obter()
+        visibilidade = config.visibilidade_dashboard
+        user = self.request.user
+
+        pode_ver = False
+        if visibilidade == "operacional":
+            pode_ver = True
+        elif visibilidade == "analista":
+            pode_ver = (
+                user.is_superuser
+                or user.groups.filter(name__in=["administrador", "analista"]).exists()
+            )
+        else:  # administrador
+            pode_ver = (
+                user.is_superuser
+                or user.groups.filter(name="administrador").exists()
+            )
+
+        context["exibir_dashboard"] = pode_ver
+        if pode_ver:
+            context["dashboard"] = _obter_dados_dashboard()
+        return context
 
 
 class AgentesLeituraView(LoginRequiredMixin, TemplateView):
@@ -215,7 +306,8 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
             request.FILES,
             agente=self.agente,
         )
-        if form.runtime_fields_schema.get("show_file_upload"):
+        show_upload = form.runtime_fields_schema.get("show_file_upload")
+        if show_upload:
             if not form.is_valid():
                 messages.error(self.request, self._first_form_error(form))
                 return redirect("portal_agentes_leitura")
@@ -688,11 +780,28 @@ class ProcessamentoStatusView(LoginRequiredMixin, View):
         )
 
 
+class ProcessamentoVerificarSaidaView(LoginRequiredMixin, View):
+    """Verifica se o arquivo de saída ainda existe antes do download."""
+    login_url = reverse_lazy("portal_login")
+
+    def get(self, request, codigo):
+        user = request.user
+        is_admin = user.is_superuser or user.groups.filter(name="administrador").exists()
+        filtro = {} if is_admin else {"iniciado_por": user}
+        processamento = get_object_or_404(Processamento, codigo=codigo, **filtro)
+        if processamento.arquivo_saida:
+            return JsonResponse({"disponivel": True})
+        return JsonResponse({"disponivel": False}, status=410)
+
+
 class ProcessamentoSaidaDownloadView(LoginRequiredMixin, View):
     login_url = reverse_lazy("portal_login")
 
     def get(self, request, codigo):
-        processamento = get_object_or_404(Processamento, codigo=codigo)
+        user = request.user
+        is_admin = user.is_superuser or user.groups.filter(name="administrador").exists()
+        filtro = {} if is_admin else {"iniciado_por": user}
+        processamento = get_object_or_404(Processamento, codigo=codigo, **filtro)
         if not processamento.arquivo_saida:
             raise Http404("Este processamento ainda nao possui arquivo de saida.")
 
@@ -707,3 +816,88 @@ class ProcessamentoSaidaDownloadView(LoginRequiredMixin, View):
         source_name = processamento.arquivo_saida_nome or processamento.arquivo_saida.name
         extension = Path(source_name).suffix or ""
         return f"saida_{processamento.codigo}{extension}"
+
+
+def _proxima_data_limpeza(dia: int):
+    from datetime import date
+    import calendar
+    hoje = date.today()
+    # Tenta no mês atual
+    ultimo_dia = calendar.monthrange(hoje.year, hoje.month)[1]
+    dia_mes = min(dia, ultimo_dia)
+    candidato = date(hoje.year, hoje.month, dia_mes)
+    if candidato <= hoje:
+        # Já passou — próximo mês
+        if hoje.month == 12:
+            ano, mes = hoje.year + 1, 1
+        else:
+            ano, mes = hoje.year, hoje.month + 1
+        ultimo_dia = calendar.monthrange(ano, mes)[1]
+        candidato = date(ano, mes, min(dia, ultimo_dia))
+    return candidato
+
+
+class ConfiguracaoGeralView(PortalAdministradorRequiredMixin, TemplateView):
+    template_name = "portal_operacional/configuracao_geral.html"
+
+    def get_context_data(self, **kwargs):
+        from apps.core.models import ConfiguracaoGeral, VisibilidadeDashboard
+        context = super().get_context_data(**kwargs)
+        config = ConfiguracaoGeral.obter()
+        context["config"] = config
+        context["opcoes"] = VisibilidadeDashboard.choices
+        if config.limpeza_automatica_ativa:
+            context["proxima_limpeza"] = _proxima_data_limpeza(config.dia_execucao_limpeza)
+        return context
+
+
+class SalvarConfiguracaoGeralView(PortalAdministradorRequiredMixin, View):
+    def post(self, request):
+        from apps.core.models import ConfiguracaoGeral, VisibilidadeDashboard
+        valor = request.POST.get("visibilidade_dashboard", "administrador")
+        if valor not in dict(VisibilidadeDashboard.choices):
+            valor = "administrador"
+        try:
+            dias = max(1, min(365, int(request.POST.get("dias_retencao_arquivos", 30))))
+        except (ValueError, TypeError):
+            dias = 30
+        config = ConfiguracaoGeral.obter()
+        config.visibilidade_dashboard = valor
+        config.limpeza_automatica_ativa = "limpeza_automatica_ativa" in request.POST
+        config.atualizado_por = request.user
+        config.save()
+        messages.success(request, "Configurações gerais salvas com sucesso.")
+        return redirect("portal_configuracao_geral")
+
+
+class ConfiguracaoTelaLoginView(PortalAdministradorRequiredMixin, TemplateView):
+    template_name = "portal_operacional/configuracao_tela_login.html"
+
+    def get_context_data(self, **kwargs):
+        from apps.core.models import ConfiguracaoTelaLogin, TelaLoginOpcao
+        context = super().get_context_data(**kwargs)
+        config = ConfiguracaoTelaLogin.obter()
+        context["tela_ativa"] = config.tela_ativa
+        context["tela_ativa_label"] = dict(TelaLoginOpcao.choices).get(config.tela_ativa, config.tela_ativa)
+        return context
+
+
+class AtivarTelaLoginView(PortalAdministradorRequiredMixin, View):
+    def post(self, request):
+        from apps.core.models import ConfiguracaoTelaLogin, TelaLoginOpcao
+        tela = request.POST.get("tela", "principal")
+        if tela not in dict(TelaLoginOpcao.choices):
+            tela = "principal"
+        config = ConfiguracaoTelaLogin.obter()
+        config.tela_ativa = tela
+        config.atualizado_por = request.user
+        config.save()
+        messages.success(request, f"Tela de login alterada com sucesso.")
+        return redirect("portal_tela_login")
+
+
+class LoginPreviewView(PortalAdministradorRequiredMixin, View):
+    def get(self, request, tela):
+        template = _TEMPLATE_MAP.get(tela, "portal_operacional/login.html")
+        from django.template.response import TemplateResponse
+        return TemplateResponse(request, template, {})

@@ -224,11 +224,7 @@ def obter_bloqueio_execucao_padrao(agente):
                 "Agente sem pasta local padrao configurada. "
                 "Atualize a configuracao operacional antes de executar."
             )
-        if not configuracao.default_local_relative_input_path:
-            return (
-                "Agente sem caminho local padrao configurado. "
-                "Atualize a configuracao operacional antes de executar."
-            )
+        # Caminho relativo vazio = raiz da pasta autorizada (válido)
         if (
             configuracao.default_local_storage_integration.status
             != IntegrationStatus.ATIVA

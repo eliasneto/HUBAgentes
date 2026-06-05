@@ -49,7 +49,7 @@
       {% if messages %}
         <section class="builder-messages" aria-label="Mensagens do sistema">
           {% for message in messages %}
-            <div class="form-alert">{{ message }}</div>
+            <div class="form-alert {% if message.tags == 'success' %}form-alert-success{% endif %}">{{ message }}</div>
           {% endfor %}
         </section>
       {% endif %}

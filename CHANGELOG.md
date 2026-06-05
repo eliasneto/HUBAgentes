@@ -5,6 +5,124 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.3.0] — 2026-06-04
+
+### Adicionado
+
+#### Painel Inicial — Dashboards
+- **4 dashboards no painel inicial:** Processamentos por agente, Tokens por integração, Custo (R$) por integração e Documentos processados por agente — barras proporcionais com cores distintas por categoria.
+- **Controle de visibilidade do dashboard** em Configurações Gerais: administrador, analista ou todos os perfis.
+
+#### Limpeza Automática de Arquivos
+- **Limpeza mensal automática de arquivos de saída:** configurável por dia do mês (padrão: dia 30). A cada execução deleta arquivos gerados há mais de 30 dias, mantendo os registros dos processamentos.
+- **Toggle liga/desliga** na tela de Configurações Gerais. Próxima data de execução exibida em tempo real.
+- **Configuração avançada** (dia de execução, dias de retenção) exclusiva do Django Admin.
+- **Comando `limpar_arquivos_saida`** com suporte a `--dry-run`, `--force` e `--check-day` para testes e execução manual.
+
+#### Suporte a Múltiplos Formatos de Arquivo
+- **Entrada multi-formato liberada:** além de PDF, o sistema agora aceita TXT, CSV, PNG, JPG, JPEG e XLSX como arquivos de entrada — em pastas locais e no upload na execução.
+- **Detecção automática de MIME type** por extensão de arquivo.
+- **Limite de 50 MB** no upload de arquivo na execução (validado no form antes de processar).
+
+#### Integração Groq
+- **Novo provedor de IA: Groq** — API compatível com OpenAI, gratuita, com modelos Llama 3 e Mixtral de alta velocidade.
+- Suporte a TXT e CSV como entrada (texto puro). PDF e imagens não são suportados pelo Groq.
+- Instruções JSON injetadas automaticamente no prompt quando o formato de saída exige JSON.
+- Cadastro via Integrações → Nova integração → tipo Groq.
+
+#### Configurações Gerais
+- **Nova tela "Configurações Gerais"** no sidebar de Administrador com controle de visibilidade do dashboard e limpeza automática.
+- **Registro no Django Admin** com campos avançados de limpeza.
+
+#### Experiência e Interface
+- **Botão de download modernizado** na tela de Processamentos: ícone SVG + texto "Baixar", borda neon, hover com glow.
+- **Modal de arquivo deletado** — ao tentar baixar um arquivo removido pela limpeza automática, exibe mensagem amigável explicando que o arquivo não está mais disponível.
+- **Hints dinâmicos no formulário de agente:** ao selecionar Modo de Entrada (Individual, Grupo único, Lote por pasta) e Empacotamento da Saída, uma caixa explicativa aparece descrevendo o comportamento de cada opção.
+- **Remoção da opção "Arquivo local fixo"** da interface de criação de agentes (mantida no backend para compatibilidade).
+
+#### Telas de Login Alternativas
+- **Sistema de seleção de tela de login** — novo model `ConfiguracaoTelaLogin` (singleton) com tela ativa configurável pelo administrador.
+- **Tela 2** — layout split com robô animado à esquerda e card de login à direita, balão de fala com efeito máquina de escrever e data do dia dinâmica.
+- **Tela 3** — tema escuro profundo (quase preto), robô com paleta neon do sistema via `mix-blend-mode: color`, sem iluminação branca.
+- **Preview por URL** — rota `/login-preview/<tela>/` permite visualizar qualquer tela de login sem ativar.
+
+#### Custo por Processamento
+- **App `custos`** — novo módulo com models `PrecificacaoModelo` (preço por 1M tokens de entrada/saída por modelo de IA) e `ConfiguracaoFinanceira` (cotação do dólar em reais).
+- **Tela "Configuração de Custos"** — nova seção no sidebar de Administrador para cadastrar precificações por modelo e atualizar a cotação do dólar manualmente.
+- **Cálculo automático de custo** — após cada processamento, o sistema calcula `custo_usd` e `custo_brl` com base nos tokens consumidos, no preço do modelo e na cotação configurada. Tokens de raciocínio (thinking) são somados aos de saída, pois a API os cobra à mesma taxa.
+- **Exibição de custo na Auditoria** — chip "Custo R$ X,XXXX" adicionado na faixa de tokens do card de auditoria, exibindo o custo com 4 casas decimais.
+- **Campos `custo_usd` e `custo_brl`** adicionados nos models `Processamento` e `ProcessamentoExecucaoIA`.
+
+#### Telas de Login Alternativas
+- **Sistema de seleção de tela de login** — novo model `ConfiguracaoTelaLogin` (singleton) com tela ativa configurável pelo administrador.
+- **Tela "Tela de Login"** no sidebar de Administrador — cards com preview real (iframe) de cada tela e botão para ativar sem reiniciar o sistema.
+- **Tela 2** — layout split com robô animado à esquerda e card de login à direita, balão de fala com efeito máquina de escrever e data do dia dinâmica.
+- **Tela 3** — tema escuro profundo (quase preto), robô com paleta neon do sistema via `mix-blend-mode: color`, sem iluminação branca.
+- **Preview por URL** — rota `/login-preview/<tela>/` permite visualizar qualquer tela de login sem ativar.
+
+#### Pasta Local — Mapeamento Windows
+- **Tradução automática de caminhos** — ao cadastrar uma fonte local com caminho Windows (ex: `C:\HubAgentes\contratos`), o sistema converte automaticamente para o caminho interno do container (`/app/entradas/contratos`), sem exigir que o usuário conheça a estrutura interna Docker.
+- **Exibição do caminho no formato do sistema operacional** — integrações e fontes locais exibem o caminho no formato Windows (`C:\HubAgentes\...`) independentemente do servidor onde o sistema roda.
+- **Volume Docker `C:\HubAgentes → /app/entradas`** — mapeamento configurado via variável `LOCAL_STORAGE_PATH` no `.env`.
+
+#### Subpastas no Formulário de Agente
+- **Carregamento automático de subpastas** — ao selecionar uma pasta local no cadastro de agente, o sistema busca as subpastas via AJAX e exibe um dropdown, eliminando a necessidade de digitar o caminho relativo manualmente.
+- **Endpoint `/agentes/api/subpastas-local/<id>/`** — retorna JSON com as subpastas disponíveis da integração selecionada.
+
+#### Interface e Documentação
+- **Favicon** — ícone do robô adicionado a todas as 22 páginas do portal.
+- **Sidebar mais vibrante** — cores do menu atualizadas para neon cyan, fundo mais escuro e profundo, text-shadow nas opções ativas.
+- **Mensagem amigável para pasta local offline** — quando o agente não consegue acessar a pasta local configurada, a mensagem de erro informa que a máquina que hospeda a pasta pode estar desligada ou fora da rede.
+- **Documentação de Configuração de Custos** — nova página em Documentação → Configuração de Custos com fórmula de cálculo, campos explicados e observações importantes.
+- **Documentação de Integrações atualizada** — seção "Pasta local" reescrita com tabela de mapeamento Windows → servidor e exemplos corretos de caminho.
+- **Documentação de Gerenciar Agentes atualizada** — campo "Caminho relativo padrão" agora documenta o carregamento automático de subpastas.
+- **Documentação de Fontes de Documentos atualizada** — nova seção "Como funciona o mapeamento" com exemplos de correspondência entre caminhos Windows e container.
+
+### Corrigido
+
+#### Críticos (CHECKLIST)
+- **C-1:** `SECRET_KEY` sem fallback público — o servidor agora falha ao subir se a variável não estiver definida.
+- **C-2:** `FIELD_ENCRYPTION_KEY` elevada de Warning para Error — o servidor não sobe sem a chave de criptografia.
+- **C-3:** Integração Groq agora exige `api_key` obrigatória para ser salva como Ativa.
+
+#### Altos (CHECKLIST)
+- **H-1:** `DocumentoEntrada.clean()` atualizado para aceitar todas as extensões suportadas além de PDF.
+- **H-2:** Groq adapter removeu implementação duplicada de `_post_json_request` — usa validações da classe base.
+- **H-3:** Reconciliador de processamentos removido dos selectors GET — executado apenas via worker periódico.
+- **H-4:** Sufixo aleatório do código de processamento aumentado de `token_hex(2)` para `token_hex(4)` (4B possibilidades).
+- **H-5:** Groq injeta instrução JSON no prompt quando `response_mime_type=application/json`.
+
+#### Médios (CHECKLIST)
+- **M-2:** `prefetch_related` adicionado ao selector de status — elimina N+1 queries em `_erro_operacional`.
+- **M-3:** Contagem de membros por grupo consolidada com `annotate(Count)` em vez de N+1 queries.
+- **M-4:** 4 queries COUNT no poll de status consolidadas em 1 query com `Case/When`.
+- **M-5:** Limite de 50 MB no upload de arquivo.
+- **M-6:** Import morto `groupby` removido de `agent_execution.py`.
+- **M-7:** Cache de precificação/cotação em batch — reduz de 2N queries para 2 por lote de documentos.
+- **M-8:** Download de saída restrito ao dono do processamento (admins acessam todos).
+- **M-9:** `runtime_fields_schema` lido antes do condicional — valida corretamente em todos os casos.
+
+#### Baixos (CHECKLIST)
+- **L-1:** Guard adicionado para FK de integração soft-deleted em `Processamento.save()`.
+- **L-2:** Checksum MD5 de arquivo local calculado em chunks de 64KB sem carregar o arquivo inteiro na memória.
+- **L-3:** `DEBUG` padrão alterado para `False`.
+- **L-7:** `LOCAL_FILE` preservado nas choices do form quando agente já usa esse tipo (legado).
+- **L-8:** `.env.example` documentado com aviso sobre `CSRF_TRUSTED_ORIGINS` obrigatório em produção.
+
+#### Interface e formulários
+- **Botão "Excluir" fora do padrão visual** em Configuração de Custos e outras telas — padronizado para `secondary-action danger-action`.
+- **Checkbox "Ler subpastas automaticamente"** no formulário de fonte local — substituído pelo toggle padrão do sistema (`.toggle-line`).
+- **Campo "Ativo" no formulário de precificação** — substituído pelo toggle padrão do sistema.
+- **Caminho `/app/media/entradas` desatualizado** nos guias de fontes locais — corrigido para `/app/entradas/...` em todos os exemplos e modelos de preenchimento.
+- **Usuário admin padrão** no entrypoint alterado de `eliasneto` para `admin` com senha `admin`.
+- **Formato de exibição da cotação** na tela de Configuração de Custos — exibe R$ com 2 casas decimais e só a data (sem horário).
+
+### Removido
+- **Atalhos de navegação do painel inicial** (módulos Agentes, Processamentos, etc.) — substituídos pelos dashboards.
+- **Opção "Arquivo local fixo"** do formulário de criação/edição de agentes.
+
+---
+
 ## [1.2.0] — 2026-06-01
 
 ### Adicionado

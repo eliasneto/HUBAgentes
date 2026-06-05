@@ -174,9 +174,6 @@ def listar_processamentos_para_portal(
     )
     paginator = Paginator(queryset, per_page)
     page_obj = paginator.get_page(page_number)
-    processamentos_brutos = [
-        reconciliar_processamento_orfao(p) for p in page_obj.object_list
-    ]
     processamentos = [
         ProcessamentoResumo(
             codigo=processamento.codigo,
@@ -208,7 +205,7 @@ def listar_processamentos_para_portal(
             ),
             tem_arquivo_saida=bool(processamento.arquivo_saida),
         )
-        for processamento in processamentos_brutos
+        for processamento in page_obj.object_list
     ]
 
     em_andamento_statuses = {
@@ -262,8 +259,10 @@ def _resolver_formato_saida_exibido(processamento: Processamento) -> str:
 
 
 def obter_status_processamento_para_portal(codigo: str) -> ProcessamentoStatusPortal:
-    processamento = reconciliar_processamento_orfao(
-        get_object_or_404(Processamento, codigo=codigo)
+    processamento = get_object_or_404(
+        Processamento.objects.select_related("agente", "ai_provider_integration_snapshot")
+        .prefetch_related("documentos", "documentos_saida", "execucoes_ia"),
+        codigo=codigo,
     )
     total_documentos = _total_documentos(processamento)
     total_processados = _total_processados(processamento)
@@ -297,21 +296,28 @@ def obter_status_processamento_para_portal(codigo: str) -> ProcessamentoStatusPo
             "portal_processamento_download_saida",
             kwargs={"codigo": processamento.codigo},
         ),
-        resumo_total=Processamento.objects.count(),
-        resumo_em_andamento=Processamento.objects.filter(
-            status__in={
-                ProcessingStatus.CRIADO,
-                ProcessingStatus.EM_FILA,
-                ProcessingStatus.EM_PROCESSAMENTO,
-            }
-        ).count(),
-        resumo_concluidos=Processamento.objects.filter(
-            status=ProcessingStatus.CONCLUIDO_SUCESSO
-        ).count(),
-        resumo_com_erro=Processamento.objects.filter(
-            status=ProcessingStatus.CONCLUIDO_ERRO
-        ).count(),
+        **_resumo_counts(),
     )
+
+
+def _resumo_counts() -> dict:
+    from django.db.models import Case, When, IntegerField, Sum, Value
+    result = Processamento.objects.aggregate(
+        resumo_total=Sum(Value(1), output_field=IntegerField()),
+        resumo_em_andamento=Sum(
+            Case(
+                When(status__in=[ProcessingStatus.CRIADO, ProcessingStatus.EM_FILA, ProcessingStatus.EM_PROCESSAMENTO], then=1),
+                default=0, output_field=IntegerField(),
+            )
+        ),
+        resumo_concluidos=Sum(
+            Case(When(status=ProcessingStatus.CONCLUIDO_SUCESSO, then=1), default=0, output_field=IntegerField())
+        ),
+        resumo_com_erro=Sum(
+            Case(When(status=ProcessingStatus.CONCLUIDO_ERRO, then=1), default=0, output_field=IntegerField())
+        ),
+    )
+    return {k: (v or 0) for k, v in result.items()}
 
 
 def _total_documentos(processamento: Processamento) -> int:

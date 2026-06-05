@@ -1,0 +1,192 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configurações Gerais - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260604-config-geral-1">
+  <style>
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 4px;
+    }
+    .radio-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 18px 22px;
+      border: 1px solid rgba(51, 244, 255, 0.15);
+      border-radius: 12px;
+      background: rgba(2, 10, 28, 0.5);
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .radio-option:has(input:checked) {
+      border-color: rgba(0, 216, 255, 0.7);
+      background: rgba(0, 216, 255, 0.06);
+      box-shadow: 0 0 16px rgba(0, 216, 255, 0.1);
+    }
+    .radio-option:hover {
+      border-color: rgba(0, 216, 255, 0.35);
+    }
+    .radio-option input[type="radio"] {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
+      border: 2px solid rgba(0, 216, 255, 0.5);
+      border-radius: 50%;
+      margin-top: 2px;
+      cursor: pointer;
+      position: relative;
+      transition: border-color .2s;
+    }
+    .radio-option input[type="radio"]:checked {
+      border-color: var(--neon-1, #00d8ff);
+    }
+    .radio-option input[type="radio"]:checked::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: var(--neon-1, #00d8ff);
+      box-shadow: 0 0 8px rgba(0, 216, 255, 0.8);
+    }
+    .radio-label { display: flex; flex-direction: column; gap: 4px; }
+    .radio-label strong { font-size: 14px; font-weight: 700; color: var(--text, #e8fbff); }
+    .radio-label small  { font-size: 12px; color: var(--muted, #7ca5b8); line-height: 1.5; }
+    .radio-badge {
+      margin-left: auto;
+      flex-shrink: 0;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 999px;
+      align-self: center;
+    }
+    .badge-admin    { background: rgba(0,216,255,.12); color:#00d8ff; border:1px solid rgba(0,216,255,.3); }
+    .badge-analista { background: rgba(120,80,255,.12); color:#a78bfa; border:1px solid rgba(120,80,255,.3); }
+    .badge-todos    { background: rgba(0,200,83,.12);  color:#4ade80; border:1px solid rgba(0,200,83,.3); }
+  </style>
+</head>
+<body>
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="configuracao_geral" %}
+
+    <section class="portal-main" aria-label="Configurações Gerais">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Administrador</p>
+          <h1>Configurações Gerais</h1>
+        </div>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if 'success' in message.tags %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <form method="post" action="{% url 'portal_configuracao_geral_salvar' %}" class="agent-builder-form" autocomplete="off">
+        {% csrf_token %}
+
+        <!-- Dashboard -->
+        <section class="builder-card">
+          <div class="form-section-heading">
+            <p class="eyebrow">Painel inicial</p>
+            <h2>Quem pode ver os dashboards?</h2>
+          </div>
+          <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+            Defina quais perfis de usuário têm acesso aos dashboards de desempenho exibidos no Painel inicial.
+            Usuários sem permissão verão apenas os atalhos de navegação, sem os gráficos.
+          </p>
+
+          <div class="radio-group">
+
+            <label class="radio-option">
+              <input type="radio" name="visibilidade_dashboard" value="administrador"
+                {% if config.visibilidade_dashboard == 'administrador' %}checked{% endif %}>
+              <div class="radio-label">
+                <strong>Apenas Administrador</strong>
+                <small>Somente usuários com perfil de administrador (superusuário ou grupo "administrador") visualizam os dashboards.</small>
+              </div>
+              <span class="radio-badge badge-admin">Restrito</span>
+            </label>
+
+            <label class="radio-option">
+              <input type="radio" name="visibilidade_dashboard" value="analista"
+                {% if config.visibilidade_dashboard == 'analista' %}checked{% endif %}>
+              <div class="radio-label">
+                <strong>Administrador e Analista</strong>
+                <small>Administradores e usuários do grupo "analista" visualizam os dashboards. Usuários operacionais não têm acesso.</small>
+              </div>
+              <span class="radio-badge badge-analista">Parcial</span>
+            </label>
+
+            <label class="radio-option">
+              <input type="radio" name="visibilidade_dashboard" value="operacional"
+                {% if config.visibilidade_dashboard == 'operacional' %}checked{% endif %}>
+              <div class="radio-label">
+                <strong>Todos os perfis</strong>
+                <small>Administradores, analistas e usuários operacionais visualizam os dashboards. Qualquer usuário autenticado tem acesso.</small>
+              </div>
+              <span class="radio-badge badge-todos">Aberto</span>
+            </label>
+
+          </div>
+        </section>
+
+        <!-- Limpeza automática -->
+        <section class="builder-card" style="margin-top:0">
+          <div class="form-section-heading">
+            <p class="eyebrow">Armazenamento</p>
+            <h2>Limpeza automática de arquivos de saída</h2>
+          </div>
+          <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:24px;line-height:1.6">
+            Quando ativa, no dia {{ config.dia_execucao_limpeza }} de cada mês à meia-noite o sistema deleta os arquivos
+            de saída com mais de {{ config.dias_retencao_arquivos }} dias. Os registros dos processamentos são mantidos.
+          </p>
+
+          <!-- Toggle liga/desliga -->
+          <label class="toggle-line" for="id_limpeza_toggle" style="max-width:420px">
+            <input type="checkbox" id="id_limpeza_toggle" name="limpeza_automatica_ativa" value="1"
+              {% if config.limpeza_automatica_ativa %}checked{% endif %}>
+            <span class="toggle-switch" aria-hidden="true"></span>
+            <span>
+              <strong>{% if config.limpeza_automatica_ativa %}Limpeza automática ativa{% else %}Limpeza automática inativa{% endif %}</strong>
+              <small id="limpeza-status-hint">{% if config.limpeza_automatica_ativa %}O sistema executará a limpeza mensalmente.{% else %}Nenhum arquivo será deletado automaticamente.{% endif %}</small>
+            </span>
+          </label>
+
+          {% if config.limpeza_automatica_ativa and proxima_limpeza %}
+          <div style="display:flex;gap:24px;margin-top:18px;flex-wrap:wrap">
+            <span style="font-size:12px;color:var(--muted,#7ca5b8)">
+              <strong style="color:var(--neon-1,#00d8ff)">Próxima execução:</strong>
+              {{ proxima_limpeza|date:"d/m/Y" }} às 00:00
+            </span>
+            <span style="font-size:12px;color:var(--muted,#7ca5b8)">
+              <strong style="color:var(--neon-1,#00d8ff)">Serão deletados:</strong>
+              arquivos gerados antes de {{ proxima_limpeza|date:"d/m/Y" }} - {{ config.dias_retencao_arquivos }} dias
+            </span>
+          </div>
+          {% endif %}
+
+        </section>
+
+        <div class="execution-actions builder-actions">
+          <button type="submit" class="start-button">Salvar configurações</button>
+        </div>
+
+      </form>
+    </section>
+  </main>
+</body>
+</html>

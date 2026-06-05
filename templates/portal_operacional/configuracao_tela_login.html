@@ -1,0 +1,319 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tela de Login - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260604-tela-login-2">
+  <style>
+    /* Stat tela ativa */
+    .tela-ativa-stat { display:flex; flex-shrink:0; }
+    .tela-ativa-stat > div {
+      display:flex; flex-direction:column; gap:6px;
+      background:rgba(0,216,255,0.06);
+      border:1px solid rgba(0,216,255,0.2);
+      border-radius:12px; padding:16px 24px;
+      min-width:160px; max-width:220px;
+    }
+    .tela-ativa-stat dt {
+      font-size:11px; font-weight:700; letter-spacing:.1em;
+      text-transform:uppercase; color:var(--muted,#7ca5b8);
+    }
+    .tela-ativa-stat dd {
+      font-size:15px; font-weight:700;
+      color:var(--neon-1,#00d8ff); margin:0; line-height:1.3;
+    }
+
+    /* Grid de cards */
+    .tela-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 4px;
+    }
+
+    .tela-card {
+      border: 2px solid rgba(51,244,255,0.14);
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(2,10,28,0.7);
+      transition: border-color .2s, box-shadow .2s, transform .2s;
+      cursor: default;
+    }
+    .tela-card:hover {
+      border-color: rgba(0,216,255,0.4);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(0,216,255,0.1);
+    }
+    .tela-card.ativa {
+      border-color: rgba(0,216,255,0.85);
+      box-shadow: 0 0 28px rgba(0,216,255,0.25);
+    }
+
+    /* Mockup do preview */
+    .tela-mockup {
+      width:100%; height:220px;
+      position:relative; overflow:hidden;
+      display:flex; align-items:center; justify-content:center;
+    }
+
+    /* Tela 1 — painel hex centralizado */
+    .mockup-principal {
+      background: radial-gradient(circle at 50% 40%, rgba(0,100,255,.2), transparent 55%),
+                  linear-gradient(135deg,#020c1f,#051a3a,#010710);
+    }
+    .mockup-principal .m-panel {
+      position:absolute; width:160px; height:96px;
+      background:linear-gradient(180deg,rgba(5,39,91,.85),rgba(2,12,35,.92));
+      clip-path:polygon(7% 18%,25% 18%,30% 7%,70% 7%,75% 18%,93% 18%,93% 82%,75% 82%,70% 95%,30% 95%,25% 82%,7% 82%);
+      border:1.5px solid rgba(0,216,255,.75);
+      box-shadow:0 0 22px rgba(0,216,255,.65);
+    }
+    .mockup-principal .m-robo {
+      position:absolute; width:90px; height:90px;
+      mix-blend-mode:multiply;
+      object-fit:contain;
+    }
+    .mockup-principal .m-lines {
+      position:absolute; width:80%; height:1px;
+      background:linear-gradient(90deg,transparent,rgba(0,216,255,.5),transparent);
+    }
+    .mockup-principal .m-lines.top { top:28%; }
+    .mockup-principal .m-lines.bot { top:72%; }
+
+    /* Tela 2 — split robô + card */
+    .mockup-v2 {
+      background: radial-gradient(circle at 30% 50%, rgba(0,100,200,.12), transparent 40%),
+                  linear-gradient(135deg,#061d36,#041329,#020817);
+    }
+    .mockup-v2 .m-left {
+      position:absolute; left:8%; top:50%; transform:translateY(-50%);
+      width:42%; display:flex; flex-direction:column; align-items:center; gap:6px;
+    }
+    .mockup-v2 .m-robo {
+      width:90px; height:90px;
+      mix-blend-mode:screen;
+      filter:contrast(2.0) saturate(1.9) brightness(1.1);
+      object-fit:contain;
+    }
+    .mockup-v2 .m-bubble {
+      background:rgba(3,16,42,.95);
+      border:1px solid rgba(0,216,255,.6);
+      border-radius:8px; padding:4px 10px;
+      font-size:8px; color:#fff; white-space:nowrap;
+    }
+    .mockup-v2 .m-card {
+      position:absolute; right:6%; top:50%; transform:translateY(-50%);
+      width:36%; height:76%;
+      background:linear-gradient(145deg,rgba(7,30,59,.9),rgba(2,13,31,.95));
+      border:1px solid rgba(0,216,255,.4); border-radius:10px;
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; gap:7px; padding:12px;
+    }
+    .mockup-v2 .m-card-line {
+      width:100%; height:7px; border-radius:3px;
+      background:rgba(0,216,255,.12); border:1px solid rgba(0,216,255,.22);
+    }
+    .mockup-v2 .m-btn {
+      width:100%; height:11px; border-radius:4px;
+      background:linear-gradient(90deg,#04c7ff,#2ae8f2); margin-top:4px;
+    }
+
+    /* Tela 3 — escura neon */
+    .mockup-v3 {
+      background: linear-gradient(160deg,#010509,#010a14,#000305);
+    }
+    .mockup-v3 .m-robo {
+      position:absolute; left:14%; top:50%; transform:translateY(-50%);
+      width:90px; height:90px;
+      mix-blend-mode:screen;
+      filter:contrast(1.8) saturate(1.2) brightness(0.65);
+      object-fit:contain;
+    }
+    .mockup-v3 .m-card-dark {
+      position:absolute; right:6%; top:50%; transform:translateY(-50%);
+      width:38%; height:78%;
+      background:linear-gradient(145deg,rgba(1,6,16,.98),rgba(0,4,12,.99));
+      border:1px solid rgba(0,216,255,.18); border-radius:10px;
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; gap:6px; padding:12px;
+    }
+    .mockup-v3 .m-line-dark {
+      width:100%; height:7px; border-radius:3px;
+      background:rgba(0,216,255,.07); border:1px solid rgba(0,216,255,.13);
+    }
+    .mockup-v3 .m-btn-dark {
+      width:100%; height:11px; border-radius:4px;
+      background:linear-gradient(90deg,#00a8e0,#00d8ff,#33f4ff); margin-top:4px;
+      box-shadow:0 0 8px rgba(0,216,255,.4);
+    }
+
+    /* Footer do card */
+    .tela-card-footer {
+      padding:14px 18px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      border-top:1px solid rgba(51,244,255,.08);
+      background:rgba(0,8,22,.4);
+    }
+    .tela-card-info { display:flex; flex-direction:column; gap:3px; }
+    .tela-card-nome { font-size:13px; font-weight:700; color:#e8fbff; }
+    .tela-card-desc { font-size:11px; color:var(--muted,#7ca5b8); line-height:1.4; }
+
+    .tela-badge-ativa {
+      flex-shrink:0;
+      font-size:10px; font-weight:800; letter-spacing:.1em;
+      text-transform:uppercase; padding:4px 12px;
+      border-radius:999px;
+      background:rgba(0,216,255,.15);
+      color:#00d8ff;
+      border:1px solid rgba(0,216,255,.4);
+    }
+
+    .tela-btn-preview {
+      flex-shrink:0;
+      font-size:11px; color:rgba(0,216,255,.7);
+      text-decoration:none;
+      padding:4px 10px;
+      border:1px solid rgba(0,216,255,.25);
+      border-radius:6px;
+      transition: color .15s, border-color .15s;
+    }
+    .tela-btn-preview:hover { color:#00d8ff; border-color:rgba(0,216,255,.6); }
+  </style>
+</head>
+<body>
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="configuracao_tela_login" %}
+
+    <section class="portal-main" aria-label="Tela de Login">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Administrador</p>
+          <h1>Tela de Login</h1>
+        </div>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if 'success' in message.tags %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="integrations-hero">
+        <div>
+          <p class="eyebrow">Aparencia</p>
+          <h2>Escolha a tela de login do sistema.</h2>
+          <p>A tela selecionada sera exibida para todos os usuarios ao acessar o portal. A alteracao e imediata — sem necessidade de reiniciar o sistema.</p>
+        </div>
+        <dl class="tela-ativa-stat" aria-label="Tela atual">
+          <div>
+            <dt>Tela ativa</dt>
+            <dd>{{ tela_ativa_label }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="sources-section">
+        <div class="section-heading">
+          <p class="eyebrow">Opcoes disponíveis</p>
+          <h2>Selecione a tela desejada</h2>
+        </div>
+
+        <div class="tela-grid">
+
+          <!-- Tela 1 -->
+          <article class="tela-card {% if tela_ativa == 'principal' %}ativa{% endif %}">
+            <div class="tela-mockup mockup-principal">
+              <div class="m-lines top"></div>
+              <div class="m-lines bot"></div>
+              <div class="m-panel"></div>
+              <img class="m-robo" src="{% static 'portal_operacional/img/hub-agentes-bot-transparent.png' %}" alt="">
+            </div>
+            <div class="tela-card-footer">
+              <div class="tela-card-info">
+                <span class="tela-card-nome">Tela Principal</span>
+                <span class="tela-card-desc">Robo animado com painel hexagonal centralizado</span>
+              </div>
+              <a class="tela-btn-preview" href="{% url 'portal_login_preview' 'principal' %}" target="_blank">Ver</a>
+              {% if tela_ativa == 'principal' %}
+                <span class="tela-badge-ativa">Ativa</span>
+              {% else %}
+                <form method="post" action="{% url 'portal_tela_login_ativar' %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="tela" value="principal">
+                  <button type="submit" class="secondary-action" style="font-size:12px;min-height:32px;padding:0 14px">Ativar</button>
+                </form>
+              {% endif %}
+            </div>
+          </article>
+
+          <!-- Tela 2 -->
+          <article class="tela-card {% if tela_ativa == 'v2' %}ativa{% endif %}">
+            <div class="tela-mockup mockup-v2">
+              <div class="m-left">
+                <img class="m-robo" src="{% static 'portal_operacional/img/robo-login.png.png' %}" alt="">
+                <div class="m-bubble">Olá! Bem-vindo 👋</div>
+              </div>
+              <div class="m-card">
+                <div class="m-card-line"></div>
+                <div class="m-card-line"></div>
+                <div class="m-btn"></div>
+              </div>
+            </div>
+            <div class="tela-card-footer">
+              <div class="tela-card-info">
+                <span class="tela-card-nome">Tela 2 — Robo + Painel</span>
+                <span class="tela-card-desc">Robo com balao de fala e formulario lateral</span>
+              </div>
+              <a class="tela-btn-preview" href="{% url 'portal_login_preview' 'v2' %}" target="_blank">Ver</a>
+              {% if tela_ativa == 'v2' %}
+                <span class="tela-badge-ativa">Ativa</span>
+              {% else %}
+                <form method="post" action="{% url 'portal_tela_login_ativar' %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="tela" value="v2">
+                  <button type="submit" class="secondary-action" style="font-size:12px;min-height:32px;padding:0 14px">Ativar</button>
+                </form>
+              {% endif %}
+            </div>
+          </article>
+
+          <!-- Tela 3 -->
+          <article class="tela-card {% if tela_ativa == 'v3' %}ativa{% endif %}">
+            <div class="tela-mockup mockup-v3">
+              <img class="m-robo" src="{% static 'portal_operacional/img/robo-login-v3.png' %}" alt="">
+              <div class="m-card-dark">
+                <div class="m-line-dark"></div>
+                <div class="m-line-dark"></div>
+                <div class="m-btn-dark"></div>
+              </div>
+            </div>
+            <div class="tela-card-footer">
+              <div class="tela-card-info">
+                <span class="tela-card-nome">Tela 3 — Escura Neon</span>
+                <span class="tela-card-desc">Tema escuro profundo com paleta neon do sistema</span>
+              </div>
+              <a class="tela-btn-preview" href="{% url 'portal_login_preview' 'v3' %}" target="_blank">Ver</a>
+              {% if tela_ativa == 'v3' %}
+                <span class="tela-badge-ativa">Ativa</span>
+              {% else %}
+                <form method="post" action="{% url 'portal_tela_login_ativar' %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="tela" value="v3">
+                  <button type="submit" class="secondary-action" style="font-size:12px;min-height:32px;padding:0 14px">Ativar</button>
+                </form>
+              {% endif %}
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+    </section>
+  </main>
+</body>
+</html>

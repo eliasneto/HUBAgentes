@@ -376,14 +376,7 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
                         )
                     }
                 )
-            if not self.default_local_relative_input_path:
-                raise ValidationError(
-                    {
-                        "default_local_relative_input_path": (
-                            "Informe o caminho local padrao."
-                        )
-                    }
-                )
+            # Caminho relativo vazio = raiz da pasta autorizada (comportamento válido)
 
         if (
             self.output_assembly_mode == AgentOutputAssemblyMode.UMA_POR_ENTRADA

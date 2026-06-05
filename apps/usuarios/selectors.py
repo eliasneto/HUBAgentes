@@ -44,12 +44,13 @@ def listar_usuarios_acessos_para_portal() -> UsuariosAcessosPortalResumo:
         .order_by("username")
     )
     usuarios = [_build_usuario_resumo(user) for user in usuarios_queryset]
+    from django.db.models import Count
     grupos = [
         GrupoPortalResumo(
             nome=grupo.name,
-            total_usuarios=grupo.user_set.count(),
+            total_usuarios=grupo.total_usuarios,
         )
-        for grupo in Group.objects.order_by("name")
+        for grupo in Group.objects.annotate(total_usuarios=Count("user")).order_by("name")
     ]
 
     return UsuariosAcessosPortalResumo(

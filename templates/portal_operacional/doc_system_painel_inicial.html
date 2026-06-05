@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doc Sistema - Painel inicial</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-painel-1">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260605-doc-painel-2">
 </head>
 <body class="agent-builder-page">
   <main class="portal-shell">
@@ -23,10 +23,10 @@
       <section class="agent-builder-hero">
         <div>
           <p class="eyebrow">Guia operacional</p>
-          <h2>Como usar a tela inicial do portal como ponto de entrada, navegacao e leitura rapida das areas principais.</h2>
+          <h2>Visao geral do sistema com dashboards operacionais em tempo real.</h2>
           <p>
-            Esta pagina documenta o painel inicial do portal. Ela explica o objetivo da tela,
-            o papel dos cards de acesso rapido e como o usuario deve usar esse painel como mapa geral do sistema.
+            O painel inicial e a primeira tela apos o login. Exibe dashboards de desempenho
+            e serve como ponto de orientacao para navegar pelas areas do sistema.
           </p>
         </div>
         <div class="builder-orb" aria-hidden="true">
@@ -37,122 +37,82 @@
 
       <section class="builder-card">
         <div class="form-section-heading">
-          <p class="eyebrow">Objetivo</p>
-          <h2>Para que serve o painel inicial</h2>
+          <p class="eyebrow">Dashboards</p>
+          <h2>Graficos exibidos no painel</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          Quatro dashboards sao exibidos automaticamente para usuarios com permissao. Cada dashboard exibe barras
+          proporcionais ao maior valor — o item com mais registros ocupa 100% e os demais sao relativos a ele.
+        </p>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Processamentos por agente</span>
+            <p>Quantidade total de execucoes agrupadas por agente. Identifica quais agentes sao mais utilizados.</p>
+            <small>Barra neon cyan.</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Tokens por integracao</span>
+            <p>Total de tokens consumidos agrupados por integracao de IA. Mostra o peso de uso de cada provedor.</p>
+            <small>Barra azul.</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Custo (R$) por integracao</span>
+            <p>Soma dos custos em reais agrupados por integracao. Requer precificacao configurada em Configuracao de Custos.</p>
+            <small>Barra verde. Valores em centavos (2 casas decimais).</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Documentos por agente</span>
+            <p>Total de documentos efetivamente processados agrupados por agente.</p>
+            <small>Barra laranja.</small>
+          </article>
         </div>
 
-        <ul class="doc-note-list">
-          <li>Ser a porta de entrada principal do portal depois do login.</li>
-          <li>Apresentar rapidamente as areas operacionais e administrativas.</li>
-          <li>Permitir navegacao direta para os modulos mais importantes sem depender de menu lateral apenas.</li>
-          <li>Funcionar como uma visao geral para usuarios que estao se orientando no sistema.</li>
+        <ul class="doc-note-list" style="margin-top:16px">
+          <li>Os dashboards sao visiveis apenas para os perfis configurados em <strong>Administrador → Configuracoes Gerais</strong>.</li>
+          <li>Usuarios sem permissao veem apenas a faixa de boas-vindas, sem graficos.</li>
         </ul>
       </section>
 
       <section class="builder-card">
         <div class="form-section-heading">
-          <p class="eyebrow">Estrutura</p>
-          <h2>Blocos principais exibidos na tela</h2>
-        </div>
-
-        <div class="doc-guide-grid">
-          <article class="doc-guide-card">
-            <span class="doc-chip">Cabecalho</span>
-            <p>Mostra o nome da tela e o estado visual da sessao.</p>
-          </article>
-
-          <article class="doc-guide-card">
-            <span class="doc-chip">Faixa principal</span>
-            <p>Resume a proposta do portal como esteira de leitura e organizacao operacional.</p>
-          </article>
-
-          <article class="doc-guide-card">
-            <span class="doc-chip">Cards de acesso rapido</span>
-            <p>Atalhos visuais para os modulos mais usados do sistema.</p>
-          </article>
-
-          <article class="doc-guide-card">
-            <span class="doc-chip">Rodape da tela</span>
-            <p>Indica observacoes de fluxo ou estado do prototipo quando aplicavel.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="builder-card">
-        <div class="form-section-heading">
-          <p class="eyebrow">Cards</p>
-          <h2>O que cada card do painel representa</h2>
+          <p class="eyebrow">Visibilidade dos dashboards</p>
+          <h2>Quem pode ver os graficos</h2>
         </div>
 
         <div class="doc-table">
           <div class="doc-table-row doc-table-head">
-            <div>Card</div>
-            <div>Destino</div>
-            <div>Uso principal</div>
+            <div>Configuracao</div>
+            <div>Quem ve os dashboards</div>
           </div>
           <div class="doc-table-row">
-            <div><strong>Agentes</strong></div>
-            <div>Tela operacional de agentes</div>
-            <div>Executar agentes visiveis ao usuario.</div>
+            <div><strong>Apenas Administrador</strong></div>
+            <div>Superusuario e usuarios do grupo "administrador".</div>
           </div>
           <div class="doc-table-row">
-            <div><strong>Gerenciar agentes</strong></div>
-            <div>Tela administrativa de configuracao</div>
-            <div>Criar, revisar e editar agentes.</div>
+            <div><strong>Administrador e Analista</strong></div>
+            <div>Administradores e usuarios do grupo "analista". Operacionais nao veem.</div>
           </div>
           <div class="doc-table-row">
-            <div><strong>Fontes de documentos</strong></div>
-            <div>Cadastro de origens documentais</div>
-            <div>Definir de onde os documentos serao lidos.</div>
-          </div>
-          <div class="doc-table-row">
-            <div><strong>Integracoes</strong></div>
-            <div>Cadastro de conexoes</div>
-            <div>Manter IA, Google Drive e pasta local.</div>
-          </div>
-          <div class="doc-table-row">
-            <div><strong>Processamentos</strong></div>
-            <div>Painel de acompanhamento</div>
-            <div>Monitorar progresso, erro e saida final.</div>
-          </div>
-          <div class="doc-table-row">
-            <div><strong>Historico e auditoria</strong></div>
-            <div>Espaco previsto</div>
-            <div>Reservado para trilha de eventos e rastreabilidade.</div>
-          </div>
-          <div class="doc-table-row">
-            <div><strong>Usuarios e acessos</strong></div>
-            <div>Gestao de contas</div>
-            <div>Controlar perfis, grupos e permissoes.</div>
+            <div><strong>Todos os perfis</strong></div>
+            <div>Qualquer usuario autenticado visualiza os dashboards.</div>
           </div>
         </div>
-      </section>
 
-      <section class="builder-card">
-        <div class="form-section-heading">
-          <p class="eyebrow">Fluxo recomendado</p>
-          <h2>Como um usuario costuma usar o painel inicial</h2>
-        </div>
-
-        <ol class="doc-step-list">
-          <li>Entrar no sistema e confirmar que o login foi realizado com sucesso.</li>
-          <li>Escolher o card da area desejada.</li>
-          <li>Navegar para a tela operacional ou administrativa correspondente.</li>
-          <li>Voltar ao painel quando quiser trocar rapidamente de contexto.</li>
-        </ol>
+        <p style="font-size:12px;color:var(--muted,#7ca5b8);margin-top:12px">
+          Configure em <strong>Administrador → Configuracoes Gerais</strong>.
+        </p>
       </section>
 
       <section class="builder-card">
         <div class="form-section-heading">
           <p class="eyebrow">Observacoes importantes</p>
-          <h2>Cuidados ao interpretar essa tela</h2>
+          <h2>Pontos de atencao</h2>
         </div>
-
         <ul class="doc-note-list">
-          <li>O painel inicial e um ponto de orientacao, nao uma tela de execucao detalhada.</li>
-          <li>Alguns cards representam areas operacionais, outros representam areas administrativas.</li>
-          <li>Se uma area ainda estiver em evolucao, o painel pode apontar para uma tela reservada ou prototipada.</li>
-          <li>O menu lateral continua sendo a navegacao principal persistente, enquanto os cards funcionam como atalhos.</li>
+          <li>Os dashboards refletem todos os processamentos registrados no banco — nao ha filtro por periodo.</li>
+          <li>Se nenhum custo estiver cadastrado em Configuracao de Custos, o dashboard de custo ficara vazio.</li>
+          <li>O menu lateral e a navegacao principal persistente para acessar todas as areas.</li>
         </ul>
       </section>
 

@@ -34,49 +34,115 @@
         </div>
       </section>
 
-      <section class="module-grid" aria-label="Areas do sistema">
-        <a class="module-card primary" href="{% url 'portal_agentes_leitura' %}">
-          <span class="module-kicker">Execute</span>
-          <strong>Agentes</strong>
-          <small>Veja e execute os agentes disponíveis para você.</small>
-        </a>
 
-        <a class="module-card" href="{% url 'portal_agentes_gerenciar' %}">
-          <span class="module-kicker">Configure</span>
-          <strong>Gerenciar agentes</strong>
-          <small>Crie, edite e ative agentes.</small>
-        </a>
+      <!-- Dashboards -->
+      {% if exibir_dashboard %}
+      <section class="painel-dashboards" aria-label="Dashboards operacionais">
 
-        <a class="module-card" href="{% url 'portal_fontes_documentos' %}">
-          <span class="module-kicker">Documentos</span>
-          <strong>Fontes de documentos</strong>
-          <small>Google Drive, pasta local e uploads.</small>
-        </a>
+        <!-- 1. Processamentos por agente -->
+        <article class="dash-card">
+          <header class="dash-card-header">
+            <p class="eyebrow">Operação</p>
+            <h3>Processamentos por agente</h3>
+          </header>
+          {% if dashboard.proc_por_agente %}
+            <ul class="dash-bar-list">
+              {% with max_val=dashboard.proc_por_agente.0.total %}
+              {% for item in dashboard.proc_por_agente %}
+                <li>
+                  <span class="dash-bar-label" title="{{ item.agente__nome }}">{{ item.agente__nome }}</span>
+                  <div class="dash-bar-track">
+                    <div class="dash-bar-fill" style="width:{% widthratio item.total max_val 100 %}%"></div>
+                  </div>
+                  <span class="dash-bar-value">{{ item.total }}</span>
+                </li>
+              {% endfor %}
+              {% endwith %}
+            </ul>
+          {% else %}
+            <p class="dash-empty">Nenhum processamento registrado ainda.</p>
+          {% endif %}
+        </article>
 
-        <a class="module-card" href="{% url 'portal_integracoes' %}">
-          <span class="module-kicker">Conexões</span>
-          <strong>Integrações</strong>
-          <small>Provedores de IA e serviços conectados.</small>
-        </a>
+        <!-- 2. Tokens por integração -->
+        <article class="dash-card">
+          <header class="dash-card-header">
+            <p class="eyebrow">Consumo de IA</p>
+            <h3>Tokens por integração</h3>
+          </header>
+          {% if dashboard.tokens_por_integracao %}
+            <ul class="dash-bar-list">
+              {% with max_val=dashboard.tokens_por_integracao.0.total %}
+              {% for item in dashboard.tokens_por_integracao %}
+                <li>
+                  <span class="dash-bar-label" title="{{ item.ai_provider_integration_snapshot__nome }}">{{ item.ai_provider_integration_snapshot__nome }}</span>
+                  <div class="dash-bar-track">
+                    <div class="dash-bar-fill dash-bar-fill--tokens" style="width:{% widthratio item.total max_val 100 %}%"></div>
+                  </div>
+                  <span class="dash-bar-value">{{ item.total|floatformat:0 }}</span>
+                </li>
+              {% endfor %}
+              {% endwith %}
+            </ul>
+          {% else %}
+            <p class="dash-empty">Nenhum dado de tokens registrado ainda.</p>
+          {% endif %}
+        </article>
 
-        <a class="module-card" href="{% url 'portal_processamentos' %}">
-          <span class="module-kicker">Execuções</span>
-          <strong>Processamentos</strong>
-          <small>Acompanhe o andamento e resultados das execuções.</small>
-        </a>
+        <!-- 3. Custo em BRL por integração -->
+        <article class="dash-card">
+          <header class="dash-card-header">
+            <p class="eyebrow">Financeiro</p>
+            <h3>Custo (R$) por integração</h3>
+          </header>
+          {% if dashboard.custo_por_integracao %}
+            <ul class="dash-bar-list">
+              {% with max_val=dashboard.custo_por_integracao.0.total %}
+              {% for item in dashboard.custo_por_integracao %}
+                <li>
+                  <span class="dash-bar-label" title="{{ item.ai_provider_integration_snapshot__nome }}">{{ item.ai_provider_integration_snapshot__nome }}</span>
+                  <div class="dash-bar-track">
+                    <div class="dash-bar-fill dash-bar-fill--custo" style="width:{% widthratio item.total max_val 100 %}%"></div>
+                  </div>
+                  <span class="dash-bar-value">R$ {{ item.total|floatformat:2 }}</span>
+                </li>
+              {% endfor %}
+              {% endwith %}
+            </ul>
+          {% else %}
+            <p class="dash-empty">Nenhum custo calculado ainda. Configure precificação em Administrador → Configuração de Custos.</p>
+          {% endif %}
+        </article>
 
-        <a class="module-card" href="{% url 'portal_auditoria' %}">
-          <span class="module-kicker">Histórico</span>
-          <strong>Histórico e auditoria</strong>
-          <small>Eventos, erros e uso de recursos.</small>
-        </a>
+        <!-- 4. Documentos processados por agente -->
+        <article class="dash-card">
+          <header class="dash-card-header">
+            <p class="eyebrow">Produtividade</p>
+            <h3>Documentos processados por agente</h3>
+          </header>
+          {% if dashboard.docs_por_agente %}
+            <ul class="dash-bar-list">
+              {% with max_val=dashboard.docs_por_agente.0.total %}
+              {% for item in dashboard.docs_por_agente %}
+                {% if item.total %}
+                <li>
+                  <span class="dash-bar-label" title="{{ item.agente__nome }}">{{ item.agente__nome }}</span>
+                  <div class="dash-bar-track">
+                    <div class="dash-bar-fill dash-bar-fill--docs" style="width:{% widthratio item.total max_val 100 %}%"></div>
+                  </div>
+                  <span class="dash-bar-value">{{ item.total }}</span>
+                </li>
+                {% endif %}
+              {% endfor %}
+              {% endwith %}
+            </ul>
+          {% else %}
+            <p class="dash-empty">Nenhum documento processado ainda.</p>
+          {% endif %}
+        </article>
 
-        <a class="module-card" href="{% url 'portal_usuarios_acessos' %}">
-          <span class="module-kicker">Usuários</span>
-          <strong>Usuários e acessos</strong>
-          <small>Perfis, grupos e permissões.</small>
-        </a>
       </section>
+      {% endif %}
 
       <footer class="prototype-note">
         <span>HUB Agentes — Portal operacional</span>

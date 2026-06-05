@@ -63,14 +63,22 @@
               <div class="processing-card-top">
                 <span class="agent-status" data-status-label>{{ processamento.status }}</span>
                 <span class="agent-type" data-output-format>{{ processamento.formato_saida }}</span>
-                <a
-                  class="agent-type processing-download-pill"
+                <button
+                  class="processing-download-btn"
                   data-output-download
-                  href="{% if processamento.tem_arquivo_saida %}{{ processamento.download_saida_url }}{% else %}#{% endif %}"
+                  data-download-url="{{ processamento.download_saida_url }}"
+                  data-verificar-url="{% url 'portal_processamento_verificar_saida' processamento.codigo %}"
                   aria-label="Baixar arquivo de saida"
                   title="Baixar arquivo de saida"
+                  type="button"
                   {% if not processamento.tem_arquivo_saida %}hidden{% endif %}
-                ></a>
+                >
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3 12h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
+                  <span>Baixar</span>
+                </button>
               </div>
               <div class="processing-title-block">
                 <p class="processing-code">{{ processamento.codigo }}</p>
@@ -124,18 +132,6 @@
               <div>
                 <dt>Tokens total</dt>
                 <dd data-meta-tokens>{{ processamento.total_tokens|default:"—" }}</dd>
-              </div>
-              <div>
-                <dt>Entrada</dt>
-                <dd>{{ processamento.input_tokens|default:"—" }}</dd>
-              </div>
-              <div>
-                <dt>Processamento</dt>
-                <dd>{{ processamento.processing_tokens|default:"—" }}</dd>
-              </div>
-              <div>
-                <dt>Saída</dt>
-                <dd>{{ processamento.output_tokens|default:"—" }}</dd>
               </div>
               <div>
                 <dt>Duração</dt>
@@ -228,5 +224,85 @@
       {% endif %}
     </section>
   </main>
+
+  <!-- Modal: arquivo deletado -->
+  <div id="modal-arquivo-deletado" role="dialog" aria-modal="true" aria-labelledby="modal-titulo" style="
+    display:none;position:fixed;inset:0;z-index:9999;
+    background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);
+    align-items:center;justify-content:center;">
+    <div style="
+      background:linear-gradient(145deg,#07142e,#020c1e);
+      border:1px solid rgba(0,216,255,0.35);
+      border-radius:18px;
+      padding:36px 40px;
+      max-width:440px;
+      width:90%;
+      box-shadow:0 0 40px rgba(0,216,255,0.15),0 24px 60px rgba(0,0,0,0.6);
+      text-align:center;">
+      <div style="
+        width:56px;height:56px;margin:0 auto 20px;
+        border-radius:50%;
+        background:rgba(255,180,0,0.1);
+        border:1px solid rgba(255,180,0,0.4);
+        display:flex;align-items:center;justify-content:center;
+        font-size:26px;">⏳</div>
+      <h2 id="modal-titulo" style="font-size:20px;font-weight:800;color:#fff;margin-bottom:12px">
+        Arquivo não disponível
+      </h2>
+      <p style="font-size:14px;color:rgba(200,230,255,0.75);line-height:1.7;margin-bottom:8px">
+        Este arquivo de saída foi <strong style="color:#ffd166">removido automaticamente</strong>
+        por ter mais de 30 dias.
+      </p>
+      <p style="font-size:13px;color:rgba(160,200,230,0.55);line-height:1.6;margin-bottom:28px">
+        O registro do processamento continua disponível para consulta,
+        mas o arquivo físico não pode mais ser baixado.
+        Se precisar do resultado, execute o agente novamente.
+      </p>
+      <button onclick="document.getElementById('modal-arquivo-deletado').style.display='none'" style="
+        padding:10px 28px;border:none;border-radius:8px;
+        background:linear-gradient(90deg,#04c7ff,#2ae8f2);
+        color:#03142a;font-weight:800;font-size:14px;
+        cursor:pointer;letter-spacing:0.5px;">
+        Entendi
+      </button>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var modal = document.getElementById('modal-arquivo-deletado');
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-output-download][data-verificar-url]');
+      if (!btn) return;
+      e.preventDefault();
+
+      var verificarUrl = btn.dataset.verificarUrl;
+      var downloadUrl  = btn.dataset.downloadUrl;
+
+      fetch(verificarUrl, { credentials: 'same-origin' })
+        .then(function (r) {
+          if (r.ok) {
+            window.location.href = downloadUrl;
+          } else {
+            modal.style.display = 'flex';
+          }
+        })
+        .catch(function () {
+          modal.style.display = 'flex';
+        });
+    });
+
+    // Fecha modal clicando fora
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) modal.style.display = 'none';
+    });
+
+    // Fecha com Escape
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') modal.style.display = 'none';
+    });
+  }());
+  </script>
 </body>
 </html>

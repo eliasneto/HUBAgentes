@@ -36,7 +36,12 @@ from apps.processamentos.services.document_sources import (
     load_document_bytes,
     prepare_documentos,
 )
-from apps.custos.selectors import calcular_custo_processamento
+from apps.custos.selectors import (
+    calcular_custo_com_cache,
+    calcular_custo_processamento,
+    obter_cotacao_dolar,
+    obter_precificacao_modelo,
+)
 from apps.processamentos.services.error_handling import normalizar_erro_processamento
 from apps.processamentos.services.output_packaging import (
     OutputPackagingError,
@@ -359,6 +364,7 @@ def _execute_documents_individually(
     total_errors = 0
     last_error_message = ""
     last_technical_error_message = ""
+    _custo_cache: dict = {}  # cache de precificacao/cotacao para o batch
 
     for documento in documentos:
         execution_started_at = timezone.now()
@@ -486,7 +492,7 @@ def _execute_documents_by_folder(
     execution_params,
     actor,
 ):
-    from itertools import groupby
+
 
     output_records = []
     total_success = 0
@@ -775,11 +781,12 @@ def _execute_document(
         _build_output_basename(processamento, documento, processamento.output_format),
     )
 
-    custo_usd_exec, custo_brl_exec = calcular_custo_processamento(
+    custo_usd_exec, custo_brl_exec = calcular_custo_com_cache(
         nome_modelo=model_name,
         input_tokens=telemetry["input_tokens"],
         output_tokens=telemetry["output_tokens"],
         processing_tokens=telemetry["processing_tokens"],
+        _cache=_custo_cache,
     )
 
     with transaction.atomic():

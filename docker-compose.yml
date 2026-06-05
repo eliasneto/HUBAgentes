@@ -70,10 +70,22 @@ services:
       - media_data:/app/media
       - ${LOCAL_STORAGE_PATH:-./entradas}:/app/entradas:ro
     command: >
-      sh -c "while true; do
-        python manage.py reconciliar_processamentos_orfaos;
-        sleep 300;
-      done"
+      sh -c "
+        ULTIMO_MES_LIMPEZA='';
+        while true; do
+          python manage.py reconciliar_processamentos_orfaos;
+          HORA_ATUAL=$(date +%H);
+          DIA_ATUAL=$(date +%d);
+          MES_ATUAL=$(date +%Y-%m);
+          if [ \"$$HORA_ATUAL\" = '00' ] && [ \"$$MES_ATUAL\" != \"$$ULTIMO_MES_LIMPEZA\" ]; then
+            python manage.py limpar_arquivos_saida --check-day;
+            if [ $$? -eq 0 ]; then
+              ULTIMO_MES_LIMPEZA=$$MES_ATUAL;
+            fi;
+          fi;
+          sleep 300;
+        done
+      "
 
 volumes:
   mysql_data:

@@ -3,6 +3,7 @@ from apps.integracoes.models import AIProviderType
 from .anthropic_adapter import AnthropicProviderAdapter
 from .base import AIProviderServiceError
 from .gemini_adapter import GeminiProviderAdapter
+from .groq_adapter import GroqProviderAdapter
 from .openai_adapter import OpenAIProviderAdapter
 
 
@@ -11,6 +12,7 @@ def get_ai_provider_adapter(integration):
         AIProviderType.OPENAI: OpenAIProviderAdapter,
         AIProviderType.ANTHROPIC: AnthropicProviderAdapter,
         AIProviderType.GEMINI: GeminiProviderAdapter,
+        AIProviderType.GROQ: GroqProviderAdapter,
     }
     adapter_class = adapters.get(integration.provider_type)
     if adapter_class is None:

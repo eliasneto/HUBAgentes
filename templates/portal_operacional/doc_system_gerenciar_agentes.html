@@ -150,7 +150,7 @@
           <div class="doc-table-row">
             <div><strong>Modo de entrada</strong></div>
             <div><code>individual</code>, <code>grupo_unico</code>, <code>lote_por_pasta</code></div>
-            <div>Controla se a IA analisa um arquivo, um grupo unico ou um lote organizado por pasta.</div>
+            <div>Controla se a IA analisa um arquivo por vez, todos juntos ou organizados por subpasta. Veja a secao abaixo para detalhes de cada opcao.</div>
           </div>
         </div>
       </section>
@@ -222,76 +222,132 @@ Uso no prompt: {{pergunta_usuario}}{% endverbatim %}</code></pre>
 
       <section class="builder-card">
         <div class="form-section-heading">
-          <p class="eyebrow">Combinacoes</p>
-          <h2>Como entrada e saida funcionam juntas</h2>
+          <p class="eyebrow">Combinacoes de entrada e saida</p>
+          <h2>Todas as combinacoes possíveis — com exemplos e orientacao de uso</h2>
         </div>
 
-        <ul class="doc-note-list" style="margin-bottom: 1.5rem;">
-          <li><strong>O sistema gerencia o recebimento dos arquivos de entrada e a entrega dos arquivos de saida. O processamento e a transformacao do conteudo sao responsabilidade exclusiva do prompt.</strong> Escreva o prompt de acordo com o volume e o formato que a combinacao escolhida vai exigir da IA.</li>
+        <ul class="doc-note-list" style="margin-bottom:1.5rem">
+          <li><strong>O sistema gerencia o recebimento dos arquivos e a entrega da saida. A transformacao do conteudo e responsabilidade do prompt.</strong> Escreva o prompt de acordo com o volume e o formato que a combinacao exige da IA.</li>
+          <li>Os tres parametros que definem o comportamento sao: <strong>Modo de entrada</strong> (como os arquivos chegam à IA), <strong>Modo de saida</strong> (quantos arquivos de resultado) e <strong>Empacotamento</strong> (como o resultado e entregue).</li>
         </ul>
 
-        <div class="doc-table">
-          <div class="doc-table-row doc-table-head">
-            <div>Combinacao</div>
-            <div>Configuracao</div>
-            <div>Exemplo de entrada</div>
-            <div>Exemplo de saida</div>
-          </div>
+        <!-- COMBINAÇÃO 1 -->
+        <div class="doc-code-panel" style="margin-bottom:16px">
+          <strong>Combinacao 1 — 1 arquivo → 1 saida (sem ZIP)</strong>
+          <pre><code>Modo de entrada : individual
+Modo de saida   : uma_por_entrada
+Empacotamento   : arquivo_unico
 
-          <div class="doc-table-row">
-            <div><strong>1 arquivo → 1 saida</strong></div>
-            <div>
-              Modo de entrada: <code>individual</code><br>
-              Modo de saida: <code>uma_por_entrada</code><br>
-              Empacotamento: <code>zip_se_multiplos</code>
-            </div>
-            <div><code>edital_01.pdf</code></div>
-            <div><code>edital_01.json</code></div>
-          </div>
+Entrada: contrato.pdf
+Saida  : contrato.json</code></pre>
+        </div>
+        <div class="doc-guide-grid" style="margin-bottom:24px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Exemplo</span>
+            <p>Um usuario faz upload de um unico contrato e recebe o JSON com os dados extraidos diretamente, sem compactacao.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Quando usar</span>
+            <p>Quando o agente processa sempre um unico arquivo por execucao e a entrega deve ser direta. Ideal para fluxos de upload avulso.</p>
+          </article>
+        </div>
 
-          <div class="doc-table-row">
-            <div><strong>N arquivos → N saidas em ZIP</strong></div>
-            <div>
-              Modo de entrada: <code>individual</code><br>
-              Modo de saida: <code>uma_por_entrada</code><br>
-              Empacotamento: <code>zip_se_multiplos</code>
-            </div>
-            <div><code>edital_01.pdf</code>, <code>edital_02.pdf</code>, <code>edital_03.pdf</code></div>
-            <div><code>resultados.zip</code> com <code>edital_01.json</code>, <code>edital_02.json</code>, <code>edital_03.json</code></div>
-          </div>
+        <!-- COMBINAÇÃO 2 -->
+        <div class="doc-code-panel" style="margin-bottom:16px">
+          <strong>Combinacao 2 — N arquivos → N saidas (ZIP se multiplos)</strong>
+          <pre><code>Modo de entrada : individual
+Modo de saida   : uma_por_entrada
+Empacotamento   : zip_se_multiplos
 
-          <div class="doc-table-row">
-            <div><strong>N arquivos → 1 saida sempre em ZIP</strong></div>
-            <div>
-              Modo de entrada: <code>individual</code><br>
-              Modo de saida: <code>uma_por_entrada</code><br>
-              Empacotamento: <code>sempre_zip</code>
-            </div>
-            <div><code>edital_01.pdf</code>, <code>edital_02.pdf</code></div>
-            <div><code>resultados.zip</code> com <code>edital_01.json</code>, <code>edital_02.json</code></div>
-          </div>
+Entrada: edital_01.pdf, edital_02.pdf, edital_03.pdf
+Saida  : resultados.zip → edital_01.json, edital_02.json, edital_03.json
+         (se 1 arquivo: entregue direto, sem ZIP)</code></pre>
+        </div>
+        <div class="doc-guide-grid" style="margin-bottom:24px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Exemplo</span>
+            <p>Pasta com 10 contratos → 10 JSONs individuais dentro de um ZIP. Se houver 1 contrato, entrega o JSON diretamente.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Quando usar</span>
+            <p>Processamento em lote onde cada documento tem seu proprio resultado. Use quando os documentos sao independentes entre si e o usuario precisa do resultado de cada um separadamente.</p>
+          </article>
+        </div>
 
-          <div class="doc-table-row">
-            <div><strong>N arquivos → 1 saida consolidada</strong></div>
-            <div>
-              Modo de entrada: <code>grupo_unico</code><br>
-              Modo de saida: <code>uma_saida_final</code><br>
-              Empacotamento: <code>arquivo_unico</code>
-            </div>
-            <div><code>edital_01.pdf</code>, <code>edital_02.pdf</code>, <code>edital_03.pdf</code></div>
-            <div><code>consolidado.xlsx</code> com dados de todos os editais em uma unica planilha</div>
-          </div>
+        <!-- COMBINAÇÃO 3 -->
+        <div class="doc-code-panel" style="margin-bottom:16px">
+          <strong>Combinacao 3 — N arquivos → N saidas (sempre ZIP)</strong>
+          <pre><code>Modo de entrada : individual
+Modo de saida   : uma_por_entrada
+Empacotamento   : sempre_zip
 
-          <div class="doc-table-row">
-            <div><strong>N arquivos → 1 saida consolidada em ZIP</strong></div>
-            <div>
-              Modo de entrada: <code>grupo_unico</code><br>
-              Modo de saida: <code>uma_saida_final</code><br>
-              Empacotamento: <code>sempre_zip</code>
-            </div>
-            <div><code>edital_01.pdf</code>, <code>edital_02.pdf</code>, <code>edital_03.pdf</code></div>
-            <div><code>resultado.zip</code> contendo <code>consolidado.xlsx</code></div>
-          </div>
+Entrada: nota_01.pdf, nota_02.pdf
+Saida  : resultados.zip → nota_01.json, nota_02.json
+         (mesmo com 1 arquivo: entregue em ZIP)</code></pre>
+        </div>
+        <div class="doc-guide-grid" style="margin-bottom:24px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Exemplo</span>
+            <p>Sistema integrado que sempre espera um arquivo ZIP como resposta, independente de quantos documentos foram processados.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Quando usar</span>
+            <p>Quando o sistema ou processo downstream sempre espera um ZIP. Garante consistencia no formato de entrega, mesmo com um unico arquivo.</p>
+          </article>
+        </div>
+
+        <!-- COMBINAÇÃO 4 -->
+        <div class="doc-code-panel" style="margin-bottom:16px">
+          <strong>Combinacao 4 — N arquivos → 1 saida consolidada (N→1)</strong>
+          <pre><code>Modo de entrada : grupo_unico
+Modo de saida   : uma_saida_final
+Empacotamento   : arquivo_unico
+
+Entrada: edital_01.pdf, edital_02.pdf, edital_03.pdf, edital_04.pdf
+Saida  : consolidado.json  ← 1 unico arquivo com analise de todos</code></pre>
+        </div>
+        <div class="doc-guide-grid" style="margin-bottom:24px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Exemplo</span>
+            <p>4 editais de licitacao enviados juntos à IA → relatório comparativo unico com pontos em comum, valores e prazos de todos. O prompt instrui a IA a consolidar.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Quando usar</span>
+            <p>Quando precisa de uma analise que integre <strong>todos os documentos em um unico resultado</strong>. A IA precisa ver todos ao mesmo tempo. Atencao: contexto maior = mais tokens consumidos.</p>
+          </article>
+        </div>
+
+        <!-- COMBINAÇÃO 5 -->
+        <div class="doc-code-panel" style="margin-bottom:16px">
+          <strong>Combinacao 5 — Por subpasta → 1 saida por subpasta</strong>
+          <pre><code>Modo de entrada : lote_por_pasta
+Modo de saida   : uma_saida_final
+Empacotamento   : arquivo_unico ou zip_se_multiplos
+
+Estrutura de pastas:
+  📁 Clientes/
+    📁 Empresa-A/  → contrato_1.pdf, contrato_2.pdf → relatorio_empresa_a.json
+    📁 Empresa-B/  → contrato_3.pdf                 → relatorio_empresa_b.json
+    📁 Empresa-C/  → contrato_4.pdf, contrato_5.pdf → relatorio_empresa_c.json</code></pre>
+        </div>
+        <div class="doc-guide-grid" style="margin-bottom:24px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Exemplo</span>
+            <p>Pasta de clientes organizada por empresa. Cada subpasta gera um relatorio independente. Ideal para processar volumes grandes de forma organizada.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Quando usar</span>
+            <p>Quando os documentos ja estao organizados por categoria, cliente ou periodo em subpastas. <strong>Requer subpastas</strong> — sem elas o agente retorna erro. Nao funciona com upload avulso.</p>
+          </article>
+        </div>
+
+        <div class="doc-code-panel">
+          <strong>Resumo rapido — escolha pelo resultado desejado</strong>
+          <pre><code>Quero 1 saida por documento          → individual + uma_por_entrada + zip_se_multiplos
+Quero 1 saida de todos juntos        → grupo_unico + uma_saida_final + arquivo_unico
+Quero 1 saida por categoria/cliente  → lote_por_pasta + uma_saida_final + arquivo_unico
+Sempre quero ZIP na entrega          → qualquer modo + sempre_zip
+Entrega sem ZIP quando for 1 arquivo → qualquer modo + zip_se_multiplos</code></pre>
         </div>
       </section>
 
@@ -317,6 +373,75 @@ Modo de entrada: individual
 Formato padrao de saida: json
 Modo de saida: uma_por_entrada
 Empacotamento da saida: zip_se_multiplos</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Empacotamento da saida</p>
+          <h2>Como o resultado e entregue ao usuario</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          O empacotamento define <strong>como o arquivo de saida chega ao usuario</strong> — diretamente ou dentro de um ZIP.
+          Nao afeta o conteudo, apenas o formato de entrega.
+        </p>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Arquivo único</span>
+            <p>Entrega <strong>sempre um arquivo direto</strong>, sem compactacao. Se o agente gerar mais de uma saida, apenas a ultima sera entregue.</p>
+            <small>Use somente quando o resultado for garantidamente 1 arquivo. Ex: grupo_unico + uma_saida_final.</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">ZIP se múltiplos</span>
+            <p>Entrega o arquivo <strong>direto quando ha apenas 1 saida</strong>; compacta em ZIP automaticamente quando ha 2 ou mais resultados.</p>
+            <small>Opcao recomendada para uso geral — o usuario nao recebe ZIP desnecessario em processamentos simples.</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Sempre ZIP</span>
+            <p>Compacta em ZIP <strong>independentemente da quantidade</strong> de arquivos gerados — mesmo que seja apenas 1 resultado.</p>
+            <small>Use quando o sistema ou processo que recebe o resultado espera sempre um arquivo ZIP como entrada.</small>
+          </article>
+        </div>
+
+        <div class="doc-code-panel" style="margin-top:16px">
+          <strong>Como escolher o empacotamento</strong>
+          <pre><code>Resultado sempre 1 arquivo e entrega direta  → arquivo_unico
+Resultado variavel (as vezes 1, as vezes N)  → zip_se_multiplos  ← recomendado
+Sistema destino sempre espera um ZIP         → sempre_zip</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Modos de entrada — detalhes</p>
+          <h2>Como cada modo processa os documentos</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Individual</span>
+            <p>Processa <strong>um arquivo por vez</strong>. O sistema faz uma chamada à IA para cada documento separadamente. Cada arquivo gera sua própria saída independente.</p>
+            <small>Use quando cada documento deve ser analisado de forma isolada. Ex: extrair dados de cada contrato individualmente.</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Grupo único</span>
+            <p>Envia <strong>todos os arquivos juntos em uma única chamada</strong> à IA. A IA recebe todos os documentos de uma vez e produz uma resposta consolidada.</p>
+            <small>Use quando precisa de uma análise que integre todos os documentos. Ex: 4 editais → 1 relatório comparativo. O prompt deve instruir a IA a consolidar.</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Lote por pasta</span>
+            <p>Organiza os arquivos <strong>por subpasta</strong> e faz uma chamada à IA por subpasta. Cada subpasta é um lote independente com sua própria saída.</p>
+            <small>Requer arquivos organizados em subpastas dentro da pasta configurada. Ex: Clientes/AcmeCorp/, Clientes/Empresa-XYZ/ — gera um relatório por cliente.</small>
+          </article>
+        </div>
+
+        <div class="doc-code-panel" style="margin-top:16px">
+          <strong>Quando usar cada modo — resumo</strong>
+          <pre><code>Individual    → 1 documento por chamada → N saídas (uma por documento)
+Grupo único   → todos os documentos em 1 chamada → 1 saída consolidada
+Lote por pasta→ 1 chamada por subpasta → 1 saída por subpasta</code></pre>
         </div>
       </section>
 
@@ -350,6 +475,31 @@ Empacotamento da saida: zip_se_multiplos</code></pre>
           <li><strong>Use <code>grupo_unico</code> com cuidado para lotes grandes.</strong> Todos os arquivos sao enviados juntos em uma unica chamada para a IA. O contexto cresce proporcionalmente ao numero e tamanho dos arquivos. Avalie o limite do modelo escolhido antes de usar esse modo com muitos documentos.</li>
           <li><strong>Alinhe o formato de saida com o modo de montagem.</strong> Se a saida e consolidada (<code>uma_saida_final</code>), o prompt deve retornar um unico bloco de dados. Se a saida e por entrada (<code>uma_por_entrada</code>), o prompt deve retornar apenas os dados relativos ao arquivo recebido naquela chamada.</li>
         </ul>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Ajuda no formulario</p>
+          <h2>Dicas contextuais automaticas</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          O formulario de criacao e edicao de agentes exibe automaticamente caixas de ajuda ao selecionar
+          determinados campos. Nao e necessario memorizar as regras — a explicacao aparece no momento certo.
+        </p>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Modo de entrada</span>
+            <p>Ao selecionar <strong>Individual</strong>, <strong>Grupo unico</strong> ou <strong>Lote por pasta</strong>,
+            uma caixa contextual explica o comportamento de cada modo com exemplos praticos.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Empacotamento da saida</span>
+            <p>Ao selecionar <strong>Arquivo unico</strong>, <strong>ZIP se multiplos</strong> ou
+            <strong>Sempre ZIP</strong>, uma caixa contextual explica quando cada opcao e adequada.</p>
+          </article>
+        </div>
       </section>
 
       <div class="execution-actions builder-actions">

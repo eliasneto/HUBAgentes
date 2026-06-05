@@ -38,4 +38,8 @@ urlpatterns = [
         "configuracao-custos/",
         include("apps.doc_system.configuracao_custos.urls"),
     ),
+    path(
+        "configuracoes-gerais/",
+        include("apps.doc_system.configuracoes_gerais.urls"),
+    ),
 ]

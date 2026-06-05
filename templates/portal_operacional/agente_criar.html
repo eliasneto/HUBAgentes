@@ -88,7 +88,7 @@
       {% if messages %}
         <section class="builder-messages" aria-label="Mensagens do sistema">
           {% for message in messages %}
-            <div class="form-alert">{{ message }}</div>
+            <div class="form-alert {% if message.tags == 'success' %}form-alert-success{% endif %}">{{ message }}</div>
           {% endfor %}
         </section>
       {% endif %}
@@ -147,7 +147,7 @@
           <div class="execution-field" data-builder-doc-config>
             <label for="{{ form.document_execution_mode.id_for_label }}">{{ form.document_execution_mode.label }}</label>
             {{ form.document_execution_mode }}
-            <small>Defina se o sistema executa um arquivo por vez ou trata o lote como um grupo.</small>
+            <div id="modo-entrada-hint" style="margin-top:8px;padding:12px 14px;border-radius:10px;border:1px solid rgba(51,244,255,0.2);background:rgba(0,216,255,0.05);font-size:13px;line-height:1.6;color:var(--muted,#7ca5b8);display:none"></div>
             {% for error in form.document_execution_mode.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
           </div>
 
@@ -158,13 +158,13 @@
               {% for error in form.default_folder_source.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
 
-            <div class="execution-field" data-builder-source="local_folder local_file">
+            <div class="execution-field" data-builder-source="local_folder">
               <label for="{{ form.default_local_storage_integration.id_for_label }}">{{ form.default_local_storage_integration.label }}</label>
               {{ form.default_local_storage_integration }}
               {% for error in form.default_local_storage_integration.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
 
-            <div class="execution-field builder-wide" data-builder-source="local_folder local_file">
+            <div class="execution-field builder-wide" data-builder-source="local_folder">
               <label for="{{ form.default_local_relative_input_path.id_for_label }}">{{ form.default_local_relative_input_path.label }}</label>
 
               <select id="subpastas-select" class="portal-input" style="display:none">
@@ -221,7 +221,7 @@
             <div class="execution-field" data-builder-doc-config>
               <label for="{{ form.output_packaging_mode.id_for_label }}">{{ form.output_packaging_mode.label }}</label>
               {{ form.output_packaging_mode }}
-              <small>Para 2 ou mais saidas, o ZIP preserva cada arquivo no formato configurado acima.</small>
+              <div id="empacotamento-hint" style="margin-top:8px;padding:12px 14px;border-radius:10px;border:1px solid rgba(51,244,255,0.2);background:rgba(0,216,255,0.05);font-size:13px;line-height:1.6;color:var(--muted,#7ca5b8);display:none"></div>
               {% for error in form.output_packaging_mode.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
           </div>
@@ -273,6 +273,50 @@
   </main>
 
 <script>
+// Hint dinâmico do Modo de Entrada
+(function () {
+  var select = document.getElementById('{{ form.document_execution_mode.id_for_label }}');
+  var hint   = document.getElementById('modo-entrada-hint');
+  if (!select || !hint) return;
+
+  var textos = {
+    'individual':    '<strong style="color:#e8fbff">Individual</strong> — Processa <strong>um arquivo por vez</strong>, uma chamada à IA por documento. Cada arquivo gera sua própria saída. Use quando cada documento deve ser analisado de forma independente.',
+    'grupo_unico':   '<strong style="color:#e8fbff">Grupo único</strong> — Envia <strong>todos os arquivos juntos em uma única chamada</strong> à IA. A IA recebe tudo de uma vez e produz uma resposta consolidada. Use quando precisa de uma análise que leve em conta todos os documentos ao mesmo tempo.',
+    'lote_por_pasta':'<strong style="color:#e8fbff">Lote por pasta</strong> — Organiza os arquivos <strong>por subpasta</strong> e faz uma chamada à IA por subpasta. Cada subpasta vira um lote com sua própria saída. Requer arquivos organizados em subpastas. Use quando quer análises separadas por cliente, categoria ou período.'
+  };
+
+  function atualizar() {
+    var t = textos[select.value];
+    if (t) { hint.innerHTML = t; hint.style.display = 'block'; }
+    else    { hint.style.display = 'none'; }
+  }
+
+  select.addEventListener('change', atualizar);
+  atualizar();
+}());
+
+// Hint dinâmico do Empacotamento da Saída
+(function () {
+  var select = document.getElementById('{{ form.output_packaging_mode.id_for_label }}');
+  var hint   = document.getElementById('empacotamento-hint');
+  if (!select || !hint) return;
+
+  var textos = {
+    'arquivo_unico':    '<strong style="color:#e8fbff">Arquivo único</strong> — Entrega <strong>sempre um arquivo direto</strong>, sem compactação. Se houver mais de uma saída, entregará apenas a última gerada. Use somente quando o resultado for sempre um único arquivo (ex: grupo único → 1 JSON).',
+    'zip_se_multiplos': '<strong style="color:#e8fbff">ZIP se múltiplos</strong> — Entrega o arquivo <strong>direto quando há apenas 1 saída</strong>; compacta em ZIP quando há 2 ou mais. Opção mais inteligente para uso geral — o usuário não recebe ZIP desnecessário em processamentos simples.',
+    'sempre_zip':       '<strong style="color:#e8fbff">Sempre ZIP</strong> — Compacta em ZIP <strong>independentemente da quantidade</strong> de arquivos gerados — mesmo com 1 único resultado. Use quando o sistema de destino espera sempre um ZIP.'
+  };
+
+  function atualizar() {
+    var t = textos[select.value];
+    if (t) { hint.innerHTML = t; hint.style.display = 'block'; }
+    else    { hint.style.display = 'none'; }
+  }
+
+  select.addEventListener('change', atualizar);
+  atualizar();
+}());
+
 (function () {
   var integracaoSelect = document.getElementById('{{ form.default_local_storage_integration.id_for_label }}');
   var subpastasSelect  = document.getElementById('subpastas-select');

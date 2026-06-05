@@ -21,6 +21,7 @@ class AIProviderType(models.TextChoices):
     OPENAI = "openai", "OpenAI"
     ANTHROPIC = "anthropic", "Anthropic"
     GEMINI = "gemini", "Gemini"
+    GROQ = "groq", "Groq"
 
 
 class FolderItemType(models.TextChoices):
@@ -49,16 +50,20 @@ class LocalStorageIntegration(SoftDeleteModel, UserStampedModel):
             models.Index(fields=["status"]),
         ]
 
+    EXTENSOES_SUPORTADAS = {"pdf", "txt", "csv", "png", "jpg", "jpeg", "xlsx"}
+
     def clean(self):
         super().clean()
         if not self.allowed_extensions:
             self.allowed_extensions = ["pdf"]
-        normalized_extensions = [str(extension).lower().lstrip(".") for extension in self.allowed_extensions]
-        if any(extension != "pdf" for extension in normalized_extensions):
+        normalized_extensions = [str(ext).lower().lstrip(".") for ext in self.allowed_extensions]
+        invalidas = [e for e in normalized_extensions if e not in self.EXTENSOES_SUPORTADAS]
+        if invalidas:
             raise ValidationError(
                 {
                     "allowed_extensions": (
-                        "No escopo atual, a integracao local aceita apenas arquivos PDF."
+                        f"Extensoes nao suportadas: {', '.join(invalidas)}. "
+                        f"Suportadas: {', '.join(sorted(self.EXTENSOES_SUPORTADAS))}"
                     )
                 }
             )
@@ -260,6 +265,7 @@ class OpenAIIntegration(SoftDeleteModel, UserStampedModel):
             AIProviderType.OPENAI,
             AIProviderType.ANTHROPIC,
             AIProviderType.GEMINI,
+            AIProviderType.GROQ,
         } and not self.api_key:
             raise ValidationError(
                 {

@@ -1,0 +1,156 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HUB Agentes - Login</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/login_v2.css' %}?v=20260604-v2-3">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+</head>
+<body>
+  <main class="login-page">
+
+    <!-- Lado esquerdo: robô -->
+    <section class="login-left">
+      <div class="robot-wrapper">
+        <div class="speech-bubble">
+          <div class="bubble-card">
+            <p class="bubble-greeting"><span class="bubble-text"></span><span class="bubble-cursor">|</span></p>
+            <p class="bubble-date" id="bubbleDate"></p>
+          </div>
+          <svg class="bubble-tail" viewBox="0 0 40 36" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 0,0 C 8,0 16,18 12,36 C 20,18 32,4 40,0 Z"
+              fill="rgba(3,16,42,0.96)"
+              stroke="rgba(0,218,255,0.55)"
+              stroke-width="1.5"
+              stroke-linejoin="round"
+              stroke-linecap="round"/>
+          </svg>
+        </div>
+        <img src="{% static 'portal_operacional/img/robo-login.png.png' %}" alt="Robo HUB Agentes" class="robot-img">
+      </div>
+    </section>
+
+    <!-- Lado direito: formulário -->
+    <section class="login-right">
+      <div class="login-card">
+        <div class="card-light"></div>
+
+        <div class="login-icon">
+          <i class="bi bi-shield-lock"></i>
+        </div>
+
+        <span class="welcome">Bem-vindo</span>
+        <h2>Acesse sua conta</h2>
+
+        <form action="{% url 'portal_login' %}" method="post" autocomplete="off">
+          {% csrf_token %}
+          {% if redirect_field_value %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+          {% elif request.GET.next %}
+            <input type="hidden" name="{{ redirect_field_name|default:'next' }}" value="{{ request.GET.next }}">
+          {% endif %}
+
+          <div class="form-group">
+            <label for="id_username">Usuario</label>
+            <div class="input-box">
+              <i class="bi bi-person"></i>
+              <input class="js-clear-login" type="text" id="id_username" name="username"
+                placeholder="Informe seu usuario" autocomplete="new-password"
+                autocapitalize="none" spellcheck="false" data-lpignore="true" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="id_password">Senha</label>
+            <div class="input-box">
+              <i class="bi bi-lock"></i>
+              <input class="js-clear-login" type="password" id="id_password" name="password"
+                placeholder="Informe sua senha" autocomplete="new-password"
+                data-lpignore="true" required>
+              <button type="button" class="show-password" id="showPassword">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="login-button">
+            Entrar <i class="bi bi-arrow-right"></i>
+          </button>
+
+          {% if messages %}
+            {% for message in messages %}
+              <div class="login-error" role="alert">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Mostrar/ocultar senha
+    const showPasswordBtn = document.getElementById("showPassword");
+    const passwordInput   = document.getElementById("id_password");
+    if (showPasswordBtn && passwordInput) {
+      showPasswordBtn.addEventListener("click", () => {
+        const isPassword = passwordInput.type === "password";
+        passwordInput.type = isPassword ? "text" : "password";
+        showPasswordBtn.innerHTML = isPassword
+          ? '<i class="bi bi-eye-slash"></i>'
+          : '<i class="bi bi-eye"></i>';
+      });
+    }
+
+    // Data atual no balão
+    (function () {
+      const el = document.getElementById("bubbleDate");
+      if (!el) return;
+      const now  = new Date();
+      const dias = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+      const meses = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+      el.textContent = dias[now.getDay()] + ", " + now.getDate() + " de " + meses[now.getMonth()] + " de " + now.getFullYear();
+    }());
+
+    // Efeito máquina de escrever no balão
+    (function () {
+      const text = "Olá! Bem-vindo ao HUB Agentes 👋";
+      const el   = document.querySelector(".bubble-text");
+      const cur  = document.querySelector(".bubble-cursor");
+      if (!el || !cur) return;
+      let i = 0;
+      setTimeout(function type() {
+        if (i < text.length) {
+          el.textContent += text[i++];
+          setTimeout(type, 55);
+        } else {
+          cur.style.animation = "cursorBlink 0.8s step-end infinite";
+        }
+      }, 600);
+    }());
+
+    // Limpar campos ao carregar (anti-preenchimento automático)
+    function clearLoginFields() {
+      document.querySelectorAll(".js-clear-login").forEach(function (input) {
+        input.value = "";
+        input.removeAttribute("value");
+      });
+    }
+    document.querySelectorAll(".js-clear-login").forEach(function (input) {
+      input.dataset.wasFocused = "false";
+      input.addEventListener("focus", function () {
+        if (input.dataset.wasFocused === "false") {
+          input.value = "";
+          input.dataset.wasFocused = "true";
+        }
+      });
+    });
+    window.addEventListener("DOMContentLoaded", clearLoginFields);
+    window.addEventListener("pageshow", clearLoginFields);
+    window.setTimeout(clearLoginFields, 300);
+  </script>
+</body>
+</html>

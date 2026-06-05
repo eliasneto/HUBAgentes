@@ -237,6 +237,35 @@
 
       <section class="builder-card">
         <div class="form-section-heading">
+          <p class="eyebrow">Download do arquivo de saida</p>
+          <h2>Como funciona o botao Baixar</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          O botao <strong>Baixar</strong> aparece apenas quando o processamento gerou um arquivo de saida. Ao clicar,
+          o sistema verifica se o arquivo ainda existe no servidor antes de iniciar o download.
+        </p>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Arquivo disponivel</span>
+            <p>O download e iniciado diretamente no navegador. O arquivo contem o resultado gerado pelo agente no formato configurado (JSON, Excel, CSV, PDF, TXT).</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Arquivo deletado</span>
+            <p>Um aviso e exibido informando que o arquivo foi removido automaticamente por ter mais de 30 dias. O registro do processamento continua disponivel para consulta.</p>
+            <small>Neste caso, execute o agente novamente para gerar um novo arquivo.</small>
+          </article>
+        </div>
+
+        <ul class="doc-note-list" style="margin-top:16px">
+          <li>Apenas o usuario que iniciou o processamento pode baixar o arquivo. Administradores tem acesso a todos.</li>
+          <li>A limpeza automatica de arquivos pode ser configurada em <strong>Administrador → Configuracoes Gerais</strong>.</li>
+        </ul>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
           <p class="eyebrow">Observacoes importantes</p>
           <h2>Cuidados ao interpretar a tela</h2>
         </div>
@@ -247,6 +276,7 @@
           <li>Um processamento pode concluir com erro mesmo tendo tratado parte dos documentos.</li>
           <li>O aviso de possivel travamento e um alerta operacional; ele nao confirma sozinho que houve falha definitiva.</li>
           <li>Se houver erro, a mensagem mostrada no portal e uma versao operacional do problema, sem expor detalhes tecnicos sensiveis.</li>
+          <li>Arquivos de saida podem ser deletados automaticamente apos o periodo de retencao configurado. O registro permanece.</li>
           <li>Para acompanhar execucoes longas, use a pagina de Processamentos como painel principal de monitoramento.</li>
         </ul>
       </section>

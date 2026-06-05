@@ -131,6 +131,8 @@ class AgenteExecucaoForm(forms.Form):
             .order_by("nome")
         )
 
+    MAX_UPLOAD_MB = 50
+
     def clean_arquivo_execucao_upload(self):
         arquivo = self.cleaned_data.get("arquivo_execucao_upload")
         if arquivo:
@@ -143,6 +145,11 @@ class AgenteExecucaoForm(forms.Form):
             if extension not in allowed_extensions:
                 raise forms.ValidationError(
                     "Envie um arquivo com extensao permitida para este agente."
+                )
+            max_bytes = self.MAX_UPLOAD_MB * 1024 * 1024
+            if arquivo.size > max_bytes:
+                raise forms.ValidationError(
+                    f"O arquivo excede o limite de {self.MAX_UPLOAD_MB} MB."
                 )
         return arquivo
 
@@ -175,13 +182,7 @@ class AgenteExecucaoForm(forms.Form):
                     "local_storage_integration",
                     "Selecione a pasta local autorizada.",
                 )
-            if not cleaned_data.get("local_relative_input_path") and not (
-                configuracao and configuracao.default_local_relative_input_path
-            ):
-                self.add_error(
-                    "local_relative_input_path",
-                    "Informe o caminho relativo.",
-                )
+            # Caminho relativo vazio = raiz da pasta autorizada (comportamento válido)
         elif source_type == ProcessingInputSourceType.UPLOAD_AT_EXECUTION:
             upload_required = (
                 configuracao is None

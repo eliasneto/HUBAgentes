@@ -53,19 +53,33 @@ class AgentePortalCreateForm(forms.Form):
         max_length=120,
         required=False,
     )
+    _CHOICES_PADRAO = (
+        (AgentDefaultInputSourceType.GOOGLE_DRIVE_FOLDER, "Google Drive - pasta"),
+        (AgentDefaultInputSourceType.LOCAL_FOLDER, "Pasta local"),
+        (AgentDefaultInputSourceType.NONE, "Sem origem documental"),
+    )
+    _CHOICES_COM_LOCAL_FILE = _CHOICES_PADRAO + (
+        (AgentDefaultInputSourceType.LOCAL_FILE, "Arquivo local fixo (legado)"),
+    )
+
     default_input_source_type = forms.ChoiceField(
         label="Origem padrao",
-        choices=(
-            (
-                AgentDefaultInputSourceType.GOOGLE_DRIVE_FOLDER,
-                "Google Drive - pasta",
-            ),
-            (AgentDefaultInputSourceType.LOCAL_FOLDER, "Pasta local"),
-            (AgentDefaultInputSourceType.LOCAL_FILE, "Arquivo local fixo"),
-            (AgentDefaultInputSourceType.NONE, "Sem origem documental"),
-        ),
+        choices=_CHOICES_PADRAO,
         initial=AgentDefaultInputSourceType.GOOGLE_DRIVE_FOLDER,
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Preserva LOCAL_FILE nas choices se o agente já usa esse tipo (legado)
+        instance = kwargs.get("instance")
+        if instance and hasattr(instance, "configuracao_operacional"):
+            try:
+                config = instance.configuracao_operacional
+                if getattr(config, "input_policy", None) == "local_file" or \
+                   getattr(config, "default_input_source_type", None) == AgentDefaultInputSourceType.LOCAL_FILE:
+                    self.fields["default_input_source_type"].choices = self._CHOICES_COM_LOCAL_FILE
+            except Exception:
+                pass
     default_folder_source = forms.ModelChoiceField(
         label="Pasta padrao do Google Drive",
         queryset=GoogleDriveFolderSource.objects.none(),
@@ -213,11 +227,7 @@ class AgentePortalCreateForm(forms.Form):
                     "default_local_storage_integration",
                     "Selecione a pasta local padrao para este agente.",
                 )
-            if not cleaned_data.get("default_local_relative_input_path"):
-                self.add_error(
-                    "default_local_relative_input_path",
-                    "Informe o caminho relativo padrao para este agente.",
-                )
+            # Caminho relativo vazio = raiz da pasta (comportamento válido)
 
         document_execution_mode = cleaned_data.get("document_execution_mode")
         output_assembly_mode = cleaned_data.get("output_assembly_mode")

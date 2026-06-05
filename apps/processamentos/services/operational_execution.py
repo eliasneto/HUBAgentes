@@ -169,7 +169,7 @@ def _criar_processamento(*, agente, actor, cleaned_data):
 
 def _gerar_codigo_processamento():
     timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
-    return f"PROC-{timestamp}-{token_hex(2).upper()}"
+    return f"PROC-{timestamp}-{token_hex(4).upper()}"
 
 
 def _format_validation_error(exc):

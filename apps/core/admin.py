@@ -3,6 +3,33 @@ from django.contrib import admin
 from django.db import models
 from django.forms import PasswordInput
 
+from apps.core.models import ConfiguracaoGeral
+
+
+@admin.register(ConfiguracaoGeral)
+class ConfiguracaoGeralAdmin(admin.ModelAdmin):
+    list_display = ("visibilidade_dashboard", "limpeza_automatica_ativa", "dias_retencao_arquivos", "updated_at", "atualizado_por")
+    readonly_fields = ("updated_at", "atualizado_por")
+    fieldsets = (
+        ("Painel inicial", {
+            "fields": ("visibilidade_dashboard",),
+        }),
+        ("Limpeza automática de arquivos", {
+            "fields": ("limpeza_automatica_ativa", "dia_execucao_limpeza", "dias_retencao_arquivos"),
+            "description": "Quando ativo, deleta arquivos de saída no dia configurado de cada mês. Ex: dia=30 → roda todo dia 30, apaga arquivos com mais de 30 dias.",
+        }),
+        ("Auditoria", {
+            "fields": ("atualizado_por", "updated_at"),
+            "classes": ("collapse",),
+        }),
+    )
+
+    def has_add_permission(self, request):
+        return not ConfiguracaoGeral.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 class UserStampedAdmin(admin.ModelAdmin):
     def get_exclude(self, request, obj=None):

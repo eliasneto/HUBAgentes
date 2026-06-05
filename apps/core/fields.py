@@ -27,15 +27,15 @@ def check_field_encryption_key(app_configs, **kwargs):
     key = getattr(settings, "FIELD_ENCRYPTION_KEY", None)
     if not key:
         errors.append(
-            checks.Warning(
+            checks.Error(
                 "FIELD_ENCRYPTION_KEY nao esta configurada.",
                 hint=(
                     "Campos sensiveis (api_key, credentials_json) serao armazenados "
-                    "sem criptografia. Defina FIELD_ENCRYPTION_KEY no .env de producao. "
+                    "sem criptografia. Defina FIELD_ENCRYPTION_KEY no .env e reinicie. "
                     "Gere com: python -c \"from cryptography.fernet import Fernet; "
                     "print(Fernet.generate_key().decode())\""
                 ),
-                id="core.W001",
+                id="core.E001",
             )
         )
     return errors

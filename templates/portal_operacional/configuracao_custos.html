@@ -115,9 +115,9 @@
           <h2 id="modelos-title">Precificacao por modelo</h2>
         </div>
 
-        {% if precificacoes %}
+        {% if precificacoes.itens %}
           <div class="integrations-grid">
-            {% for p in precificacoes %}
+            {% for p in precificacoes.itens %}
               <article class="integration-card ai-integration">
                 <div class="source-card-header">
                   <span class="agent-status {% if p.ativo %}active{% else %}inactive{% endif %}">
@@ -154,6 +154,36 @@
             <p>Adicione o preco por 1 milhao de tokens para cada modelo de IA que voce utiliza.</p>
             <a class="start-button" href="{% url 'portal_precificacao_criar' %}">Nova precificacao</a>
           </article>
+        {% endif %}
+
+        {% if precificacoes.total_paginas > 1 %}
+          <nav class="portal-pagination" aria-label="Paginação de precificações">
+            <div>
+              <span>{{ precificacoes.primeiro_item }}-{{ precificacoes.ultimo_item }} de {{ precificacoes.total }}</span>
+              <small>{{ precificacoes.itens_por_pagina }} por página</small>
+            </div>
+            <div class="pagination-actions">
+              {% if precificacoes.tem_pagina_anterior %}
+                <a class="pagination-button" href="?page={{ precificacoes.pagina_anterior }}" aria-label="Página anterior">&lsaquo;</a>
+              {% else %}
+                <span class="pagination-button disabled" aria-hidden="true">&lsaquo;</span>
+              {% endif %}
+              {% for pagina in precificacoes.paginas %}
+                {% if pagina == "..." %}
+                  <span class="pagination-ellipsis">...</span>
+                {% elif pagina == precificacoes.pagina_atual %}
+                  <span class="pagination-button active" aria-current="page">{{ pagina }}</span>
+                {% else %}
+                  <a class="pagination-button" href="?page={{ pagina }}">{{ pagina }}</a>
+                {% endif %}
+              {% endfor %}
+              {% if precificacoes.tem_proxima_pagina %}
+                <a class="pagination-button" href="?page={{ precificacoes.proxima_pagina }}" aria-label="Próxima página">&rsaquo;</a>
+              {% else %}
+                <span class="pagination-button disabled" aria-hidden="true">&rsaquo;</span>
+              {% endif %}
+            </div>
+          </nav>
         {% endif %}
       </section>
 

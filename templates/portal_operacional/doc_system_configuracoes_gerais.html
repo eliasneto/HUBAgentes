@@ -1,0 +1,158 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Configuracoes Gerais</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260605-doc-config-geral-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_configuracoes_gerais" %}
+
+    <section class="portal-main" aria-label="Documentacao de Configuracoes Gerais">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Configuracoes Gerais</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia operacional</p>
+          <h2>Configure comportamentos globais do sistema para todos os usuarios.</h2>
+          <p>
+            Esta tela documenta o modulo de Configuracoes Gerais do portal. Ela explica as opcoes
+            disponiveis, o impacto de cada configuracao e como alterar os parametros avancados.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>CFG</span>
+          <small>geral</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Visibilidade dos dashboards</p>
+          <h2>Quem pode ver os graficos do painel inicial</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          Controla quais perfis de usuario tem acesso aos 4 dashboards exibidos no Painel inicial.
+          Usuarios sem permissao veem apenas a faixa de boas-vindas, sem os graficos.
+        </p>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Opcao</div>
+            <div>Quem ve</div>
+            <div>Quando usar</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Apenas Administrador</strong></div>
+            <div>Superusuario e grupo "administrador"</div>
+            <div>Quando os dados de performance sao informacao interna restrita.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Administrador e Analista</strong></div>
+            <div>Administradores e grupo "analista"</div>
+            <div>Quando analistas precisam acompanhar o volume operacional sem acesso a configuracoes.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Todos os perfis</strong></div>
+            <div>Qualquer usuario autenticado</div>
+            <div>Quando a transparencia operacional e desejada para toda a equipe.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Limpeza automatica de arquivos</p>
+          <h2>Remocao mensal de arquivos de saida antigos</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          Quando ativa, a limpeza remove os arquivos fisicos de saida de processamentos antigos para liberar
+          espaco em disco. Os <strong>registros dos processamentos sao mantidos</strong> — apenas o arquivo
+          gerado (JSON, Excel, PDF, etc.) e deletado.
+        </p>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Como funciona</span>
+            <p>No dia configurado de cada mes (padrao: dia 30), à meia-noite, o sistema deleta todos os
+            arquivos de saida gerados ha mais de 30 dias.</p>
+            <small>Exemplo: em 30 de agosto, apaga arquivos anteriores a 31 de julho.</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Impacto no usuario</span>
+            <p>Ao clicar em "Baixar" em um processamento cujo arquivo foi deletado, o sistema exibe um
+            aviso amigavel informando que o arquivo nao esta mais disponivel.</p>
+            <small>O usuario pode executar o agente novamente para gerar um novo arquivo.</small>
+          </article>
+        </div>
+
+        <div class="doc-code-panel" style="margin-top:16px">
+          <strong>Exemplo de ciclo de limpeza</strong>
+          <pre><code>30 de julho   → limpeza executada → apaga arquivos anteriores a 30 de junho
+30 de agosto  → limpeza executada → apaga arquivos anteriores a 31 de julho
+30 de setembro→ limpeza executada → apaga arquivos anteriores a 31 de agosto</code></pre>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Configuracoes avancadas</p>
+          <h2>Campos disponiveis apenas no Django Admin</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>Descricao</div>
+            <div>Padrao</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>dia_execucao_limpeza</strong></div>
+            <div>Dia do mes em que a limpeza e executada.</div>
+            <div>30</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>dias_retencao_arquivos</strong></div>
+            <div>Quantidade de dias para manter os arquivos de saida antes de deletar.</div>
+            <div>30</div>
+          </div>
+        </div>
+
+        <p style="font-size:12px;color:var(--muted,#7ca5b8);margin-top:12px">
+          Acesse via <code>/admini/</code> → Core → Configuracao gerals para alterar esses campos.
+        </p>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Observacoes importantes</p>
+          <h2>Pontos de atencao</h2>
+        </div>
+        <ul class="doc-note-list">
+          <li>Apenas administradores podem acessar e alterar as Configuracoes Gerais.</li>
+          <li>A alteracao da visibilidade dos dashboards e imediata — sem necessidade de reiniciar o sistema.</li>
+          <li>A limpeza automatica requer que o servico <strong>worker</strong> esteja rodando (container Docker).</li>
+          <li>Para executar a limpeza manualmente, use: <code>python manage.py limpar_arquivos_saida --force</code></li>
+          <li>Para simular sem deletar: <code>python manage.py limpar_arquivos_saida --dry-run --force</code></li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_configuracao_geral' %}">Abrir Configuracoes Gerais</a>
+        <a class="start-button" href="/doc-system/configuracoes-gerais/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -11,13 +11,17 @@ VERSION_FILE = BASE_DIR / "VERSION"
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config(
-    "DJANGO_SECRET_KEY",
-    default="django-insecure-zlc7(+l#%@qd(s1v=72j9f&rrbk8#g+uxtscd_!!kag%7bj5gm",
-)
+_secret_key = config("DJANGO_SECRET_KEY", default=None)
+if not _secret_key:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY nao esta definida. "
+        "Adicione-a ao arquivo .env antes de iniciar o servidor."
+    )
+SECRET_KEY = _secret_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DJANGO_DEBUG", default=True, cast=bool)
+DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 
 APP_VERSION = config(
     "APP_VERSION",

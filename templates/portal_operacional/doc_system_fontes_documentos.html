@@ -249,6 +249,56 @@ C:\HubAgentes\clientes\empresa-xyz\ →  /app/entradas/clientes/empresa-xyz</cod
         </ul>
       </section>
 
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Formatos suportados</p>
+          <h2>Tipos de arquivo que o sistema aceita como entrada</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          O sistema aceita multiplos formatos alem de PDF. As extensoes permitidas sao configuradas
+          no cadastro de cada <strong>Integracao de pasta local</strong>.
+        </p>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Extensao</div>
+            <div>Tipo</div>
+            <div>Compativel com</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>pdf</code></div>
+            <div>Documento PDF</div>
+            <div>Gemini, OpenAI, Anthropic</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>txt</code></div>
+            <div>Texto puro</div>
+            <div>Gemini, OpenAI, Anthropic, Groq</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>csv</code></div>
+            <div>Dados tabulares</div>
+            <div>Gemini, OpenAI, Anthropic, Groq</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>png</code>, <code>jpg</code>, <code>jpeg</code></div>
+            <div>Imagens</div>
+            <div>Gemini, OpenAI, Anthropic</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>xlsx</code></div>
+            <div>Planilha Excel</div>
+            <div>Gemini</div>
+          </div>
+        </div>
+
+        <ul class="doc-note-list" style="margin-top:16px">
+          <li><strong>Groq</strong> aceita apenas TXT e CSV (texto puro). Use Gemini para PDFs e imagens.</li>
+          <li>Configure as extensoes aceitas no cadastro da integracao de pasta local — campo "Extensoes permitidas".</li>
+        </ul>
+      </section>
+
       <div class="execution-actions builder-actions">
         <a class="secondary-action" href="{% url 'portal_fontes_documentos' %}">Abrir fontes de documentos</a>
         <a class="start-button" href="/doc-system/fontes-documentos/">Recarregar esta documentacao</a>

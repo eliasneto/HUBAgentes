@@ -1,6 +1,20 @@
 import hashlib
 from pathlib import Path
 
+MIME_TYPE_MAP = {
+    "pdf":  "application/pdf",
+    "txt":  "text/plain",
+    "csv":  "text/csv",
+    "png":  "image/png",
+    "jpg":  "image/jpeg",
+    "jpeg": "image/jpeg",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+
+def _mime_type_for(file_path: Path) -> str:
+    ext = file_path.suffix.lower().lstrip(".")
+    return MIME_TYPE_MAP.get(ext, "application/octet-stream")
+
 
 class LocalStorageServiceError(Exception):
     pass
@@ -39,7 +53,8 @@ def list_pdf_files_from_relative_folder(local_storage_integration, relative_path
     if not target_folder.is_dir():
         raise LocalStorageServiceError("O caminho informado precisa apontar para uma pasta.")
 
-    patterns = ["*.pdf"]
+    extensoes = local_storage_integration.allowed_extensions or ["pdf"]
+    patterns = [f"*.{ext}" for ext in extensoes]
     files = []
     for pattern in patterns:
         iterator = (
@@ -107,14 +122,18 @@ def _build_local_file_payload(file_path, base_path, local_storage_integration):
     except ValueError:
         relative_reference = file_path.name
 
-    file_bytes = file_path.read_bytes()
-    checksum = hashlib.md5(file_bytes).hexdigest()
+    # Calcula MD5 em chunks para não carregar o arquivo inteiro na memória
+    md5 = hashlib.md5()
+    with file_path.open("rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            md5.update(chunk)
+
     return {
         "name": file_path.name,
         "relative_path": relative_reference,
         "absolute_path": str(file_path),
-        "mime_type": "application/pdf",
-        "checksum": checksum,
-        "size_bytes": len(file_bytes),
+        "mime_type": _mime_type_for(file_path),
+        "checksum": md5.hexdigest(),
+        "size_bytes": file_path.stat().st_size,
         "recursive_scan": local_storage_integration.recursive_scan,
     }

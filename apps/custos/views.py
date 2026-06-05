@@ -16,7 +16,10 @@ class ConfiguracaoCustosView(PortalAdministradorRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         config = obter_configuracao_financeira()
-        context["precificacoes"] = listar_precificacoes()
+        context["precificacoes"] = listar_precificacoes(
+            page_number=self.request.GET.get("page"),
+            per_page=20,
+        )
         context["configuracao"] = config
         context["form_cotacao"] = ConfiguracaoFinanceiraForm(instance=config)
         return context
