@@ -337,9 +337,11 @@ def _prepare_upload_document(processamento):
         )
 
     upload_name = Path(processamento.arquivo_execucao_upload.name).name
-    if not upload_name.lower().endswith(".pdf"):
+    _extensoes_ok = {"pdf", "txt", "csv", "png", "jpg", "jpeg", "xlsx"}
+    _ext = upload_name.lower().rsplit(".", 1)[-1] if "." in upload_name else ""
+    if _ext not in _extensoes_ok:
         raise DocumentSourcePreparationError(
-            "No modo de upload em execucao, somente PDFs sao aceitos."
+            f"Extensao '.{_ext}' nao suportada. Use: {', '.join(sorted(_extensoes_ok))}"
         )
 
     with processamento.arquivo_execucao_upload.open("rb") as upload_stream:
