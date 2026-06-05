@@ -282,7 +282,7 @@
   var textos = {
     'individual':    '<strong style="color:#e8fbff">Individual</strong> — Processa <strong>um arquivo por vez</strong>, uma chamada à IA por documento. Cada arquivo gera sua própria saída. Use quando cada documento deve ser analisado de forma independente.',
     'grupo_unico':   '<strong style="color:#e8fbff">Grupo único</strong> — Envia <strong>todos os arquivos juntos em uma única chamada</strong> à IA. A IA recebe tudo de uma vez e produz uma resposta consolidada. Use quando precisa de uma análise que leve em conta todos os documentos ao mesmo tempo.',
-    'lote_por_pasta':'<strong style="color:#e8fbff">Lote por pasta</strong> — Organiza os arquivos <strong>por subpasta</strong> e faz uma chamada à IA por subpasta. Cada subpasta vira um lote com sua própria saída. Requer arquivos organizados em subpastas. Use quando quer análises separadas por cliente, categoria ou período.'
+    'lote_por_pasta':'<strong style="color:#e8fbff">Lote por sub-pastas</strong> — Cada <strong>sub-pasta</strong> vira um processamento separado. Os arquivos da sub-pasta são enviados juntos à IA em uma única chamada, gerando uma saída por sub-pasta. Arquivos soltos na raiz são ignorados. Use quando os documentos já estão organizados por cliente, período ou categoria e você precisa de uma saída independente para cada grupo.'
   };
 
   function atualizar() {

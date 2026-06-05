@@ -197,6 +197,69 @@ Administrador total: Nao</code></pre>
 
       <section class="builder-card">
         <div class="form-section-heading">
+          <p class="eyebrow">Perfis de acesso</p>
+          <h2>O que cada perfil pode fazer no sistema</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          O sistema possui tres niveis de acesso controlados por grupos do Django.
+          Adicione o usuario ao grupo correspondente ao seu papel na operacao.
+        </p>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Operador</span>
+            <p>Usuario logado sem grupo especial. Pode <strong>visualizar e executar</strong> agentes disponiveis. Nao pode criar, editar ou configurar agentes.</p>
+            <small>Grupo no Django: nenhum (qualquer usuario autenticado).</small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Analista</span>
+            <p>Pode <strong>criar, editar e executar agentes</strong>. Tambem acessa a tela Gerenciar agentes. Nao acessa configuracoes do sistema (integracoes, usuarios, custos).</p>
+            <small>Grupo no Django: <code>analista</code></small>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Administrador</span>
+            <p>Acesso completo: cria agentes, configura integracoes, fontes de documentos, usuarios, custos, tela de login e configuracoes gerais do sistema.</p>
+            <small>Grupo no Django: <code>administrador</code> ou flag superusuario.</small>
+          </article>
+        </div>
+
+        <div class="doc-table" style="margin-top:20px">
+          <div class="doc-table-row doc-table-head">
+            <div>Funcionalidade</div>
+            <div>Operador</div>
+            <div>Analista</div>
+            <div>Administrador</div>
+          </div>
+          <div class="doc-table-row">
+            <div>Executar agente</div>
+            <div>✅</div><div>✅</div><div>✅</div>
+          </div>
+          <div class="doc-table-row">
+            <div>Criar e editar agentes</div>
+            <div>❌</div><div>✅</div><div>✅</div>
+          </div>
+          <div class="doc-table-row">
+            <div>Gerenciar integracoes e fontes</div>
+            <div>❌</div><div>❌</div><div>✅</div>
+          </div>
+          <div class="doc-table-row">
+            <div>Gerenciar usuarios e acessos</div>
+            <div>❌</div><div>❌</div><div>✅</div>
+          </div>
+          <div class="doc-table-row">
+            <div>Configuracoes do sistema (custos, tela login, etc.)</div>
+            <div>❌</div><div>❌</div><div>✅</div>
+          </div>
+          <div class="doc-table-row">
+            <div>Historico e auditoria</div>
+            <div>✅</div><div>✅</div><div>✅</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
           <p class="eyebrow">Observacoes importantes</p>
           <h2>Cuidados ao editar usuarios e permissoes</h2>
         </div>
@@ -206,7 +269,9 @@ Administrador total: Nao</code></pre>
           <li>Desativar um usuario impede o acesso ao portal, mas nao apaga a conta.</li>
           <li>Marcar <strong>Administrador total</strong> amplia bastante os privilegios, entao use com criterio.</li>
           <li>O proprio administrador nao deve remover seu proprio acesso critico sem validacao cuidadosa.</li>
-          <li>Grupos ajudam a organizar permissao de forma mais governavel do que liberar tudo diretamente.</li>
+          <li>Para criar um Analista: cadastre o usuario e adicione-o ao grupo <code>analista</code>.</li>
+          <li>Para criar um Administrador: cadastre o usuario, adicione ao grupo <code>administrador</code> ou marque como superusuario.</li>
+          <li>Usuarios sem grupo ficam automaticamente como Operadores.</li>
         </ul>
       </section>
 

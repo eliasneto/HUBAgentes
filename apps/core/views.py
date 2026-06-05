@@ -70,7 +70,23 @@ class PortalAdministradorRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     def handle_no_permission(self):
         if not self.request.user.is_authenticated:
             return super().handle_no_permission()
-        raise PermissionDenied("Apenas administradores podem gerenciar agentes.")
+        raise PermissionDenied("Apenas administradores podem acessar esta area.")
+
+
+class AnalistaOuAdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Permite acesso a administradores e analistas."""
+    login_url = reverse_lazy("portal_login")
+
+    def test_func(self):
+        user = self.request.user
+        return user.is_superuser or user.groups.filter(
+            name__in=["administrador", "analista"]
+        ).exists()
+
+    def handle_no_permission(self):
+        if not self.request.user.is_authenticated:
+            return super().handle_no_permission()
+        raise PermissionDenied("Apenas administradores e analistas podem acessar esta area.")
 
 
 _TEMPLATE_MAP = {
@@ -197,7 +213,7 @@ class AgentesLeituraView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class AgentesGerenciamentoView(PortalAdministradorRequiredMixin, TemplateView):
+class AgentesGerenciamentoView(AnalistaOuAdminRequiredMixin, TemplateView):
     template_name = "portal_operacional/agentes_leitura.html"
     login_url = reverse_lazy("portal_login")
 
@@ -208,7 +224,7 @@ class AgentesGerenciamentoView(PortalAdministradorRequiredMixin, TemplateView):
         return context
 
 
-class AgentePortalFormMixin(PortalAdministradorRequiredMixin):
+class AgentePortalFormMixin(AnalistaOuAdminRequiredMixin):
     form_class = AgentePortalCreateForm
     template_name = "portal_operacional/agente_criar.html"
     login_url = reverse_lazy("portal_login")
@@ -267,7 +283,7 @@ class AgentePortalUpdateView(AgentePortalFormMixin, FormView):
 
 
 class AgentePortalLegacyCreateRedirectView(
-    PortalAdministradorRequiredMixin,
+    AnalistaOuAdminRequiredMixin,
     RedirectView,
 ):
     permanent = False

@@ -117,6 +117,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - **Usuário admin padrão** no entrypoint alterado de `eliasneto` para `admin` com senha `admin`.
 - **Formato de exibição da cotação** na tela de Configuração de Custos — exibe R$ com 2 casas decimais e só a data (sem horário).
 
+#### Perfis de Acesso
+- **Sistema de perfis implementado corretamente:** Operador (qualquer usuário logado) só executa agentes; Analista (grupo `analista`) cria, edita e executa agentes; Administrador (grupo `administrador` ou superusuário) tem acesso completo ao sistema.
+- **Mixin `AnalistaOuAdminRequiredMixin`** criado — analistas agora conseguem acessar a tela Gerenciar Agentes e criar/editar agentes, antes restrito apenas a administradores.
+
+#### Nomenclatura
+- **"Lote por pasta" renomeado para "Lote por sub-pastas"** — nome mais claro para o usuário final, refletindo que cada sub-pasta é um processamento separado enviado à IA.
+
 ### Removido
 - **Atalhos de navegação do painel inicial** (módulos Agentes, Processamentos, etc.) — substituídos pelos dashboards.
 - **Opção "Arquivo local fixo"** do formulário de criação/edição de agentes.

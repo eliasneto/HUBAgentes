@@ -82,7 +82,7 @@ class AgentOutputDestination(models.TextChoices):
 class AgentDocumentExecutionMode(models.TextChoices):
     INDIVIDUAL = "individual", "Individual"
     GRUPO_UNICO = "grupo_unico", "Grupo unico"
-    LOTE_POR_PASTA = "lote_por_pasta", "Lote por pasta"
+    LOTE_POR_PASTA = "lote_por_pasta", "Lote por sub-pastas"
 
 
 class AgentOutputAssemblyMode(models.TextChoices):
