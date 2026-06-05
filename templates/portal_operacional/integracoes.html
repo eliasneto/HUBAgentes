@@ -230,6 +230,7 @@
               {% endif %}
               {% if pode_validar_integracoes %}
                 <div class="integration-actions">
+                  <a class="secondary-action" href="{% url 'portal_local_arquivos' integracao.id %}">Gerenciar arquivos</a>
                   <a class="secondary-action" href="{% url 'portal_integracao_editar' 'storage-local' integracao.id %}">Editar</a>
                   <form method="post" action="{{ integracao.validar_url }}">
                     {% csrf_token %}

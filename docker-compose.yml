@@ -42,7 +42,7 @@ services:
     volumes:
       - media_data:/app/media
       - staticfiles_data:/app/staticfiles
-      - ${LOCAL_STORAGE_PATH:-./entradas}:/app/entradas:ro
+      - ${LOCAL_STORAGE_PATH:-./entradas}:/app/entradas
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8010/ >/dev/null || exit 1"]
       interval: 30s
@@ -68,7 +68,7 @@ services:
         condition: service_healthy
     volumes:
       - media_data:/app/media
-      - ${LOCAL_STORAGE_PATH:-./entradas}:/app/entradas:ro
+      - ${LOCAL_STORAGE_PATH:-./entradas}:/app/entradas
     command: >
       sh -c "
         ULTIMO_MES_LIMPEZA='';

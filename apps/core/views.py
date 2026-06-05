@@ -759,6 +759,108 @@ class LocalStorageSubpastasView(LoginRequiredMixin, View):
             return JsonResponse({"subpastas": [], "erro": str(exc)})
 
 
+class LocalStorageArquivosView(AnalistaOuAdminRequiredMixin, View):
+    """Página de gerenciamento de arquivos de uma integração local."""
+
+    def _get_integration(self, pk):
+        return get_object_or_404(LocalStorageIntegration, pk=pk)
+
+    def _listar_arquivos(self, base_path: Path):
+        arquivos = []
+        if base_path.exists():
+            for f in sorted(base_path.rglob("*")):
+                if f.is_file():
+                    rel = f.relative_to(base_path)
+                    arquivos.append({
+                        "nome": f.name,
+                        "caminho": str(rel).replace("\\", "/"),
+                        "pasta": str(rel.parent).replace("\\", "/") if str(rel.parent) != "." else "",
+                        "tamanho": f.stat().st_size,
+                    })
+        return arquivos
+
+    def get(self, request, integracao_id):
+        integration = self._get_integration(integracao_id)
+        base_path = Path(integration.base_path)
+        arquivos = self._listar_arquivos(base_path)
+        return render(request, "portal_operacional/local_storage_arquivos.html", {
+            "integration": integration,
+            "arquivos": arquivos,
+            "total": len(arquivos),
+        })
+
+
+class LocalStorageUploadView(AnalistaOuAdminRequiredMixin, View):
+    """Recebe arquivos via POST e salva na base_path da integração."""
+
+    EXTENSOES_PERMITIDAS = {"pdf", "txt", "csv", "png", "jpg", "jpeg", "xlsx"}
+    MAX_ARQUIVO_MB = 100
+
+    def post(self, request, integracao_id):
+        from apps.integracoes.models import LocalStorageIntegration
+        integration = get_object_or_404(LocalStorageIntegration, pk=integracao_id)
+        base_path = Path(integration.base_path)
+        base_path.mkdir(parents=True, exist_ok=True)
+
+        enviados = []
+        erros = []
+
+        for campo, arquivo in request.FILES.items():
+            rel_path = request.POST.get(f"rel_{campo}", arquivo.name)
+            # segurança: impede path traversal
+            try:
+                destino = (base_path / rel_path).resolve()
+                destino.relative_to(base_path.resolve())
+            except ValueError:
+                erros.append(f"{arquivo.name}: caminho invalido")
+                continue
+
+            ext = destino.suffix.lstrip(".").lower()
+            if ext not in self.EXTENSOES_PERMITIDAS:
+                erros.append(f"{arquivo.name}: extensao .{ext} nao suportada")
+                continue
+
+            if arquivo.size > self.MAX_ARQUIVO_MB * 1024 * 1024:
+                erros.append(f"{arquivo.name}: arquivo maior que {self.MAX_ARQUIVO_MB} MB")
+                continue
+
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            with open(destino, "wb+") as f:
+                for chunk in arquivo.chunks():
+                    f.write(chunk)
+            enviados.append(str(Path(rel_path).as_posix()))
+
+        return JsonResponse({"enviados": enviados, "erros": erros})
+
+
+class LocalStorageExcluirArquivoView(AnalistaOuAdminRequiredMixin, View):
+    """Exclui um arquivo da base_path da integração via DELETE."""
+
+    def post(self, request, integracao_id):
+        import json
+        from apps.integracoes.models import LocalStorageIntegration
+        integration = get_object_or_404(LocalStorageIntegration, pk=integracao_id)
+        base_path = Path(integration.base_path).resolve()
+
+        try:
+            body = json.loads(request.body)
+            rel_path = body.get("caminho", "")
+        except (ValueError, KeyError):
+            return JsonResponse({"ok": False, "erro": "Payload invalido"}, status=400)
+
+        try:
+            alvo = (base_path / rel_path).resolve()
+            alvo.relative_to(base_path)
+        except ValueError:
+            return JsonResponse({"ok": False, "erro": "Caminho invalido"}, status=400)
+
+        if not alvo.is_file():
+            return JsonResponse({"ok": False, "erro": "Arquivo nao encontrado"}, status=404)
+
+        alvo.unlink()
+        return JsonResponse({"ok": True})
+
+
 class ProcessamentoStatusView(LoginRequiredMixin, View):
     login_url = reverse_lazy("portal_login")
 

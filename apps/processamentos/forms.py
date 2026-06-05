@@ -41,8 +41,11 @@ class AgenteExecucaoForm(forms.Form):
         required=False,
     )
     arquivo_execucao_upload = forms.FileField(
-        label="Arquivo PDF",
+        label="Arquivo",
         required=False,
+        widget=forms.ClearableFileInput(attrs={
+            "accept": ".pdf,.txt,.csv,.png,.jpg,.jpeg,.xlsx",
+        }),
     )
     output_format = forms.ChoiceField(
         label="Formato de saida",

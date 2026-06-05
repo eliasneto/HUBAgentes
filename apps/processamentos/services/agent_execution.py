@@ -781,12 +781,11 @@ def _execute_document(
         _build_output_basename(processamento, documento, processamento.output_format),
     )
 
-    custo_usd_exec, custo_brl_exec = calcular_custo_com_cache(
+    custo_usd_exec, custo_brl_exec = calcular_custo_processamento(
         nome_modelo=model_name,
         input_tokens=telemetry["input_tokens"],
         output_tokens=telemetry["output_tokens"],
         processing_tokens=telemetry["processing_tokens"],
-        _cache=_custo_cache,
     )
 
     with transaction.atomic():
@@ -1102,24 +1101,47 @@ def _parse_structured_output(output_text, requested_output_format=None):
         )
 
     normalized_text = output_text.strip()
+
+    # Remove blocos de markdown ```json ... ``` ou ``` ... ```
     if normalized_text.startswith("```"):
         lines = normalized_text.splitlines()
         if len(lines) >= 3:
             normalized_text = "\n".join(lines[1:-1]).strip()
 
+    # Tenta parse direto
     try:
         return json.loads(normalized_text)
-    except json.JSONDecodeError as exc:
-        if requested_output_format in _PLAIN_TEXT_FORMATS:
-            return normalized_text
-        raw_excerpt = _truncate_error_excerpt(normalized_text)
-        raise ProcessamentoExecutionError(
-            "A resposta da IA nao veio em JSON valido para este processamento.",
-            technical_message=(
-                "Falha ao interpretar JSON retornado pela IA. "
-                f"Erro: {exc}. Trecho da resposta: {raw_excerpt}"
-            ),
-        ) from exc
+    except json.JSONDecodeError:
+        pass
+
+    # Tenta extrair JSON do meio do texto (quando a IA adiciona texto antes/depois)
+    import re
+    # Procura objeto JSON {...}
+    json_match = re.search(r'\{[\s\S]*\}', normalized_text)
+    if json_match:
+        try:
+            return json.loads(json_match.group())
+        except json.JSONDecodeError:
+            pass
+    # Procura array JSON [...]
+    json_match = re.search(r'\[[\s\S]*\]', normalized_text)
+    if json_match:
+        try:
+            return json.loads(json_match.group())
+        except json.JSONDecodeError:
+            pass
+
+    if requested_output_format in _PLAIN_TEXT_FORMATS:
+        return normalized_text
+
+    raw_excerpt = _truncate_error_excerpt(normalized_text)
+    raise ProcessamentoExecutionError(
+        "A resposta da IA nao veio em JSON valido para este processamento.",
+        technical_message=(
+            "Falha ao interpretar JSON retornado pela IA. "
+            f"Trecho da resposta: {raw_excerpt}"
+        ),
+    )
 
 
 def _render_output_file(parsed_output, requested_output_format, output_basename):

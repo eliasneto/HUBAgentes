@@ -118,6 +118,7 @@ class GroqProviderAdapter(BaseAIProviderAdapter):
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": content}],
+            "max_tokens": 8000,  # suficiente para JSON detalhado sem estourar TPM
         }
         if isinstance(params, dict):
             if params.get("max_output_tokens"):

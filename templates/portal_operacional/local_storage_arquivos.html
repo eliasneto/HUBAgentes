@@ -1,0 +1,308 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arquivos — {{ integration.nome }} - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260605-local-arquivos-1">
+  <style>
+    .file-manager-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; }
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+      transition: border-color .2s, background .2s;
+      cursor: pointer;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+    .upload-zone.drag-over { border-color: var(--accent-cyan); background: rgba(0,255,255,.04); }
+    .upload-zone input[type=file] { display: none; }
+    .upload-zone .upload-icon { font-size: 2.5rem; margin-bottom: .5rem; opacity: .6; }
+    .upload-zone h3 { margin: 0 0 .25rem; font-size: 1rem; }
+    .upload-zone small { color: var(--text-muted); font-size: .8rem; }
+    .upload-btns { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem; }
+    .upload-progress { margin-top: 1rem; display: none; }
+    .upload-progress-bar-wrap { background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
+    .upload-progress-bar { background: var(--accent-cyan); height: 100%; width: 0; transition: width .2s; border-radius: 4px; }
+    .upload-status { font-size: .82rem; color: var(--text-muted); margin-top: .5rem; }
+    .file-list-section { margin-top: 1.5rem; }
+    .file-list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+    .file-list-header h3 { margin: 0; font-size: .95rem; }
+    .file-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .file-table th { text-align: left; padding: .5rem .75rem; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+    .file-table td { padding: .5rem .75rem; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+    .file-table tr:last-child td { border-bottom: none; }
+    .file-table tr:hover td { background: rgba(255,255,255,.02); }
+    .file-icon { margin-right: .4rem; opacity: .7; }
+    .file-folder { color: var(--text-muted); font-size: .8rem; }
+    .file-size { color: var(--text-muted); white-space: nowrap; }
+    .file-del-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: .25rem .5rem; border-radius: 4px; font-size: .8rem; }
+    .file-del-btn:hover { color: #ff4444; background: rgba(255,68,68,.08); }
+    .empty-files { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+    .empty-files .empty-icon { font-size: 2.5rem; display: block; margin-bottom: .75rem; opacity: .4; }
+    .toast-wrap { position: fixed; bottom: 1.5rem; right: 1.5rem; display: flex; flex-direction: column; gap: .5rem; z-index: 999; pointer-events: none; }
+    .toast { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: .75rem 1rem; font-size: .85rem; pointer-events: auto; max-width: 320px; }
+    .toast.ok { border-color: #00c97a; color: #00c97a; }
+    .toast.err { border-color: #ff4444; color: #ff4444; }
+    .upload-result-list { list-style: none; padding: 0; margin: .5rem 0 0; text-align: left; font-size: .8rem; max-height: 120px; overflow-y: auto; }
+    .upload-result-list li { padding: .2rem 0; }
+    .upload-result-list li.ok { color: #00c97a; }
+    .upload-result-list li.err { color: #ff4444; }
+  </style>
+</head>
+<body>
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="integracoes" %}
+
+    <section class="portal-main" aria-label="Arquivos da integração">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Pasta local</p>
+          <h1>{{ integration.nome }}</h1>
+        </div>
+        <a class="secondary-action" href="{% url 'portal_integracoes' %}">Voltar</a>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Gerenciamento de arquivos</p>
+          <h2>Envie documentos para esta pasta.</h2>
+          <p>
+            Selecione arquivos ou uma pasta inteira do seu computador. A estrutura de subpastas
+            sera preservada no servidor. Extensoes suportadas:
+            <strong>PDF, TXT, CSV, PNG, JPG, JPEG, XLSX</strong>.
+          </p>
+          <p class="field-path" style="font-family:monospace;font-size:.8rem;color:var(--text-muted);margin-top:.5rem;">
+            Caminho no servidor: {{ integration.base_path }}
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>&#128193;</span>
+          <small>{{ total }} arquivo{{ total|pluralize:"s" }}</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Upload</p>
+          <h2>Enviar arquivos ou pasta</h2>
+        </div>
+
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="fileInput" multiple
+            accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.xlsx">
+          <input type="file" id="folderInput" multiple webkitdirectory
+            accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.xlsx">
+          <div class="upload-icon">&#128196;</div>
+          <h3>Arraste arquivos ou clique para selecionar</h3>
+          <small>Maximo 100 MB por arquivo &bull; PDF, TXT, CSV, PNG, JPG, XLSX</small>
+          <div class="upload-btns">
+            <button class="secondary-action" type="button" onclick="document.getElementById('fileInput').click()">
+              Selecionar arquivos
+            </button>
+            <button class="secondary-action" type="button" onclick="document.getElementById('folderInput').click()">
+              Selecionar pasta inteira
+            </button>
+          </div>
+          <div class="upload-progress" id="uploadProgress">
+            <div class="upload-progress-bar-wrap">
+              <div class="upload-progress-bar" id="uploadProgressBar"></div>
+            </div>
+            <div class="upload-status" id="uploadStatus">Preparando...</div>
+            <ul class="upload-result-list" id="uploadResultList"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card file-list-section">
+        <div class="file-list-header">
+          <div class="form-section-heading" style="margin-bottom:0">
+            <p class="eyebrow">Conteudo</p>
+            <h2>Arquivos na pasta</h2>
+          </div>
+          <button class="secondary-action" type="button" id="refreshBtn" onclick="location.reload()">
+            Atualizar lista
+          </button>
+        </div>
+
+        {% if arquivos %}
+          <table class="file-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Subpasta</th>
+                <th>Tamanho</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="fileTableBody">
+              {% for arq in arquivos %}
+                <tr data-path="{{ arq.caminho }}">
+                  <td>
+                    <span class="file-icon">&#128196;</span>{{ arq.nome }}
+                  </td>
+                  <td class="file-folder">{{ arq.pasta|default:"/" }}</td>
+                  <td class="file-size">{{ arq.tamanho|filesizeformat }}</td>
+                  <td>
+                    <button class="file-del-btn" type="button"
+                      onclick="excluirArquivo('{{ arq.caminho|escapejs }}', this)"
+                      title="Excluir arquivo">
+                      &#128465;
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="empty-files">
+            <span class="empty-icon">&#128193;</span>
+            <p>Nenhum arquivo na pasta ainda.</p>
+            <small>Use o upload acima para enviar documentos.</small>
+          </div>
+        {% endif %}
+      </section>
+    </section>
+  </main>
+
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <script>
+    const UPLOAD_URL = "{% url 'portal_local_upload' integration.id %}";
+    const DELETE_URL = "{% url 'portal_local_excluir_arquivo' integration.id %}";
+    const CSRF = "{{ csrf_token }}";
+
+    function toast(msg, tipo) {
+      const wrap = document.getElementById("toastWrap");
+      const el = document.createElement("div");
+      el.className = "toast " + tipo;
+      el.textContent = msg;
+      wrap.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }
+
+    // Drag & drop
+    const zone = document.getElementById("uploadZone");
+    zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("drag-over"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+    zone.addEventListener("drop", e => {
+      e.preventDefault();
+      zone.classList.remove("drag-over");
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length) enviarArquivos(files, null);
+    });
+
+    document.getElementById("fileInput").addEventListener("change", function() {
+      if (this.files.length) enviarArquivos(Array.from(this.files), null);
+      this.value = "";
+    });
+
+    document.getElementById("folderInput").addEventListener("change", function() {
+      if (this.files.length) enviarArquivos(Array.from(this.files), this.files);
+      this.value = "";
+    });
+
+    async function enviarArquivos(files, filesWithPaths) {
+      const progress = document.getElementById("uploadProgress");
+      const bar = document.getElementById("uploadProgressBar");
+      const status = document.getElementById("uploadStatus");
+      const resultList = document.getElementById("uploadResultList");
+
+      progress.style.display = "block";
+      resultList.innerHTML = "";
+      bar.style.width = "0%";
+
+      const BATCH = 5;
+      let total = 0, feitos = 0;
+
+      // Split into batches
+      const batches = [];
+      for (let i = 0; i < files.length; i += BATCH) {
+        batches.push(files.slice(i, i + BATCH));
+        total += Math.min(BATCH, files.length - i);
+      }
+
+      for (const batch of batches) {
+        const fd = new FormData();
+        batch.forEach((file, i) => {
+          const key = "file_" + i + "_" + Date.now();
+          fd.append(key, file, file.name);
+          // webkitRelativePath preserves folder structure
+          const relPath = (filesWithPaths && file.webkitRelativePath)
+            ? file.webkitRelativePath
+            : file.name;
+          fd.append("rel_" + key, relPath);
+        });
+
+        status.textContent = `Enviando ${feitos + batch.length} de ${total} arquivo(s)...`;
+
+        try {
+          const resp = await fetch(UPLOAD_URL, {
+            method: "POST",
+            headers: { "X-CSRFToken": CSRF },
+            body: fd,
+          });
+          const data = await resp.json();
+
+          (data.enviados || []).forEach(p => {
+            const li = document.createElement("li");
+            li.className = "ok";
+            li.textContent = "✓ " + p;
+            resultList.appendChild(li);
+          });
+          (data.erros || []).forEach(e => {
+            const li = document.createElement("li");
+            li.className = "err";
+            li.textContent = "✗ " + e;
+            resultList.appendChild(li);
+          });
+        } catch (err) {
+          const li = document.createElement("li");
+          li.className = "err";
+          li.textContent = "✗ Erro de rede: " + err.message;
+          resultList.appendChild(li);
+        }
+
+        feitos += batch.length;
+        bar.style.width = Math.round((feitos / total) * 100) + "%";
+      }
+
+      status.textContent = `Concluido: ${feitos} arquivo(s) processado(s).`;
+      toast("Upload concluido. Atualize a lista para ver os arquivos.", "ok");
+    }
+
+    async function excluirArquivo(caminho, btn) {
+      if (!confirm(`Excluir "${caminho}"?`)) return;
+      btn.disabled = true;
+      try {
+        const resp = await fetch(DELETE_URL, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": CSRF,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ caminho }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          const row = btn.closest("tr");
+          row.remove();
+          toast("Arquivo excluido.", "ok");
+          const tbody = document.getElementById("fileTableBody");
+          if (tbody && !tbody.querySelector("tr")) location.reload();
+        } else {
+          toast("Erro: " + data.erro, "err");
+          btn.disabled = false;
+        }
+      } catch (err) {
+        toast("Erro de rede.", "err");
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

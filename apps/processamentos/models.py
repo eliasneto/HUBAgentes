@@ -100,7 +100,9 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     )
     agente = models.ForeignKey(
         AgenteIA,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="processamentos",
     )
     input_source_type = models.CharField(
@@ -110,21 +112,21 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     )
     google_drive_integration = models.ForeignKey(
         GoogleDriveIntegration,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="processamentos",
     )
     folder_source = models.ForeignKey(
         GoogleDriveFolderSource,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="processamentos",
     )
     local_storage_integration = models.ForeignKey(
         LocalStorageIntegration,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="processamentos",

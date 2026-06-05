@@ -127,6 +127,10 @@
             <div class="execution-field">
               <label for="{{ form.modelo_preferencial.id_for_label }}">{{ form.modelo_preferencial.label }}</label>
               {{ form.modelo_preferencial }}
+              <small class="field-hint">
+                Deixe em branco para usar o modelo padrão da integração.
+                Se preenchido, este valor <strong>sobrepõe</strong> o modelo configurado na integração de IA.
+              </small>
               {% for error in form.modelo_preferencial.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
           </div>
