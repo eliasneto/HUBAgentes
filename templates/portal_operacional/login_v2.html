@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HUB Agentes - Login</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/login_v2.css' %}?v=20260604-v2-3">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/login_v2.css' %}?v=20260605-v2-5">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 </head>
 <body>
@@ -14,36 +14,44 @@
 
     <!-- Lado esquerdo: robô -->
     <section class="login-left">
-      <div class="robot-wrapper">
+
+      <!-- Decoração de circuitos -->
+      <div class="circuit-dots">
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+      </div>
+
+      <div class="robot-area">
+        <!-- Balão de fala -->
         <div class="speech-bubble">
-          <div class="bubble-card">
-            <p class="bubble-greeting"><span class="bubble-text"></span><span class="bubble-cursor">|</span></p>
-            <p class="bubble-date" id="bubbleDate"></p>
-          </div>
-          <svg class="bubble-tail" viewBox="0 0 40 36" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 0,0 C 8,0 16,18 12,36 C 20,18 32,4 40,0 Z"
-              fill="rgba(3,16,42,0.96)"
-              stroke="rgba(0,218,255,0.55)"
-              stroke-width="1.5"
-              stroke-linejoin="round"
-              stroke-linecap="round"/>
-          </svg>
+          <p class="bubble-greeting-text"><span class="bubble-text"></span><span class="bubble-cursor">|</span></p>
+          <p class="bubble-sub" id="bubbleDate"></p>
         </div>
-        <img src="{% static 'portal_operacional/img/robo-login.png.png' %}" alt="Robo HUB Agentes" class="robot-img">
+
+        <!-- Robô -->
+        <div class="robot-wrapper">
+          <img src="{% static 'portal_operacional/img/robo-login-v2.png' %}" alt="Robo HUB Agentes" class="robot-img">
+          <!-- Plataforma brilhante -->
+          <div class="robot-platform">
+            <div class="platform-ring ring-1"></div>
+            <div class="platform-ring ring-2"></div>
+            <div class="platform-glow"></div>
+          </div>
+        </div>
       </div>
     </section>
 
     <!-- Lado direito: formulário -->
     <section class="login-right">
       <div class="login-card">
-        <div class="card-light"></div>
 
-        <div class="login-icon">
-          <i class="bi bi-shield-lock"></i>
+        <!-- Ícone escudo -->
+        <div class="shield-icon">
+          <i class="bi bi-shield-check"></i>
         </div>
 
-        <span class="welcome">Bem-vindo</span>
-        <h2>Acesse sua conta</h2>
+        <h1 class="card-title">Bem-vindo de volta</h1>
+        <p class="card-subtitle">Faça login para continuar sua jornada</p>
 
         <form action="{% url 'portal_login' %}" method="post" autocomplete="off">
           {% csrf_token %}
@@ -53,30 +61,31 @@
             <input type="hidden" name="{{ redirect_field_name|default:'next' }}" value="{{ request.GET.next }}">
           {% endif %}
 
-          <div class="form-group">
-            <label for="id_username">Usuario</label>
-            <div class="input-box">
-              <i class="bi bi-person"></i>
-              <input class="js-clear-login" type="text" id="id_username" name="username"
-                placeholder="Informe seu usuario" autocomplete="new-password"
-                autocapitalize="none" spellcheck="false" data-lpignore="true" required>
-            </div>
+          <div class="field-group">
+            <div class="field-icon"><i class="bi bi-person"></i></div>
+            <input class="js-clear-login" type="text" name="username"
+              placeholder="Usuário ou e-mail" autocomplete="new-password"
+              autocapitalize="none" spellcheck="false" data-lpignore="true" required>
           </div>
 
-          <div class="form-group">
-            <label for="id_password">Senha</label>
-            <div class="input-box">
-              <i class="bi bi-lock"></i>
-              <input class="js-clear-login" type="password" id="id_password" name="password"
-                placeholder="Informe sua senha" autocomplete="new-password"
-                data-lpignore="true" required>
-              <button type="button" class="show-password" id="showPassword">
-                <i class="bi bi-eye"></i>
-              </button>
-            </div>
+          <div class="field-group">
+            <div class="field-icon"><i class="bi bi-lock"></i></div>
+            <input class="js-clear-login" type="password" id="id_password" name="password"
+              placeholder="Senha" autocomplete="new-password"
+              data-lpignore="true" required>
+            <button type="button" class="field-eye" id="showPassword">
+              <i class="bi bi-eye"></i>
+            </button>
           </div>
 
-          <button type="submit" class="login-button">
+          <div class="remember-row">
+            <label class="remember-label">
+              <input type="checkbox" name="remember"> Lembrar de mim
+            </label>
+            <a href="#" class="forgot-link">Esqueceu a senha?</a>
+          </div>
+
+          <button type="submit" class="enter-btn">
             Entrar <i class="bi bi-arrow-right"></i>
           </button>
 
@@ -86,6 +95,11 @@
             {% endfor %}
           {% endif %}
         </form>
+
+        <p class="card-footer">
+          <i class="bi bi-shield-fill-check"></i>
+          Seguro. Inteligente. Sempre com você.
+        </p>
       </div>
     </section>
 
@@ -93,11 +107,11 @@
 
   <script>
     // Mostrar/ocultar senha
-    const showPasswordBtn = document.getElementById("showPassword");
-    const passwordInput   = document.getElementById("id_password");
+    var showPasswordBtn = document.getElementById("showPassword");
+    var passwordInput   = document.getElementById("id_password");
     if (showPasswordBtn && passwordInput) {
-      showPasswordBtn.addEventListener("click", () => {
-        const isPassword = passwordInput.type === "password";
+      showPasswordBtn.addEventListener("click", function () {
+        var isPassword = passwordInput.type === "password";
         passwordInput.type = isPassword ? "text" : "password";
         showPasswordBtn.innerHTML = isPassword
           ? '<i class="bi bi-eye-slash"></i>'
@@ -105,47 +119,39 @@
       });
     }
 
-    // Data atual no balão
+    // Data no balão
     (function () {
-      const el = document.getElementById("bubbleDate");
+      var el = document.getElementById("bubbleDate");
       if (!el) return;
-      const now  = new Date();
-      const dias = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
-      const meses = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
-      el.textContent = dias[now.getDay()] + ", " + now.getDate() + " de " + meses[now.getMonth()] + " de " + now.getFullYear();
+      var now   = new Date();
+      var dias  = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+      var meses = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+      el.textContent = dias[now.getDay()] + ", " + now.getDate() + " de " + meses[now.getMonth()];
     }());
 
-    // Efeito máquina de escrever no balão
+    // Typewriter no balão
     (function () {
-      const text = "Olá! Bem-vindo ao HUB Agentes 👋";
-      const el   = document.querySelector(".bubble-text");
-      const cur  = document.querySelector(".bubble-cursor");
+      var text = "Olá!";
+      var el   = document.querySelector(".bubble-text");
+      var cur  = document.querySelector(".bubble-cursor");
       if (!el || !cur) return;
-      let i = 0;
+      var i = 0;
       setTimeout(function type() {
-        if (i < text.length) {
-          el.textContent += text[i++];
-          setTimeout(type, 55);
-        } else {
-          cur.style.animation = "cursorBlink 0.8s step-end infinite";
-        }
-      }, 600);
+        if (i < text.length) { el.textContent += text[i++]; setTimeout(type, 80); }
+        else { cur.style.animation = "cursorBlink 0.8s step-end infinite"; }
+      }, 500);
     }());
 
-    // Limpar campos ao carregar (anti-preenchimento automático)
+    // Limpar campos
     function clearLoginFields() {
       document.querySelectorAll(".js-clear-login").forEach(function (input) {
-        input.value = "";
-        input.removeAttribute("value");
+        input.value = ""; input.removeAttribute("value");
       });
     }
     document.querySelectorAll(".js-clear-login").forEach(function (input) {
       input.dataset.wasFocused = "false";
       input.addEventListener("focus", function () {
-        if (input.dataset.wasFocused === "false") {
-          input.value = "";
-          input.dataset.wasFocused = "true";
-        }
+        if (input.dataset.wasFocused === "false") { input.value = ""; input.dataset.wasFocused = "true"; }
       });
     });
     window.addEventListener("DOMContentLoaded", clearLoginFields);

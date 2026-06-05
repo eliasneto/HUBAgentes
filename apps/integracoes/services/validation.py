@@ -133,6 +133,14 @@ def _build_ai_provider_user_message(error_message):
             "cota do provedor excedida. Verifique o plano, billing ou limites "
             "do projeto no provedor de IA."
         )
+    if "401" in normalized_error or "invalid_api_key" in normalized_error or "incorrect api key" in normalized_error:
+        return (
+            "chave de API invalida ou rejeitada pelo provedor. Verifique se: "
+            "(1) a chave foi copiada corretamente sem espacos extras, "
+            "(2) o tipo de provedor selecionado (Gemini, OpenAI, Groq...) corresponde "
+            "ao servico que emitiu a chave, "
+            "(3) a chave nao foi revogada ou expirou no painel do provedor."
+        )
     if "403" in normalized_error or "permission_denied" in normalized_error:
         return (
             "acesso negado pelo provedor. Verifique se a chave, o projeto e "

@@ -42,6 +42,7 @@ class LocalStorageFonteResumo:
     extensoes: str
     leitura_recursiva: bool
     ultima_validacao: datetime | None
+    criado_por: str
 
 
 @dataclass(frozen=True)
@@ -101,6 +102,7 @@ class LocalStorageIntegracaoResumo:
     ultima_validacao: datetime | None
     ultimo_erro: str
     validar_url: str
+    criado_por: str
 
 
 @dataclass(frozen=True)
@@ -140,7 +142,7 @@ def listar_fontes_documentos_para_portal() -> FontesDocumentosResumo:
         )
         .order_by("nome")
     )
-    fontes_locais = LocalStorageIntegration.objects.order_by("nome")
+    fontes_locais = LocalStorageIntegration.objects.select_related("created_by").order_by("nome")
 
     return FontesDocumentosResumo(
         google_drive=[
@@ -166,6 +168,7 @@ def listar_fontes_documentos_para_portal() -> FontesDocumentosResumo:
                 extensoes=", ".join(fonte.allowed_extensions or []),
                 leitura_recursiva=fonte.recursive_scan,
                 ultima_validacao=fonte.last_validated_at,
+                criado_por=str(fonte.created_by) if fonte.created_by else "—",
             )
             for fonte in fontes_locais
         ],
@@ -179,7 +182,7 @@ def listar_integracoes_para_portal() -> IntegracoesPortalResumo:
         GoogleDriveIntegration.objects.annotate(total_fontes=Count("folder_sources"))
         .order_by("nome")
     )
-    integracoes_locais = LocalStorageIntegration.objects.order_by("nome")
+    integracoes_locais = LocalStorageIntegration.objects.select_related("created_by").order_by("nome")
 
     return IntegracoesPortalResumo(
         ia=[
@@ -232,6 +235,7 @@ def listar_integracoes_para_portal() -> IntegracoesPortalResumo:
                     "portal_integracao_validar",
                     kwargs={"tipo": "storage-local", "integracao_id": integracao.pk},
                 ),
+                criado_por=str(integracao.created_by) if integracao.created_by else "—",
             )
             for integracao in integracoes_locais
         ],

@@ -69,6 +69,22 @@ a {
     linear-gradient(180deg, rgba(0, 10, 28, 0.98), rgba(1, 18, 46, 0.98));
   border-right: 1px solid rgba(0, 216, 255, 0.18);
   box-shadow: 18px 0 52px rgba(0, 0, 0, 0.45), inset -1px 0 0 rgba(0, 216, 255, 0.08);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.portal-sidebar::-webkit-scrollbar {
+  width: 3px;
+}
+.portal-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.portal-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(0, 216, 255, 0.25);
+  border-radius: 999px;
+}
+.portal-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 216, 255, 0.5);
 }
 
 .brand-block {

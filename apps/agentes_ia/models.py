@@ -98,7 +98,7 @@ class AgentOutputPackagingMode(models.TextChoices):
 
 
 def default_allowed_input_extensions():
-    return ["pdf"]
+    return ["pdf", "txt", "csv", "png", "jpg", "jpeg", "xlsx"]
 
 
 def default_concurrency_policy():
