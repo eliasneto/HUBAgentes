@@ -217,7 +217,7 @@
       bar.style.width = "0%";
 
       const BATCH = 5;
-      let total = 0, feitos = 0;
+      let total = 0, feitos = 0, totalErros = 0, totalEnviados = 0;
 
       // Split into batches
       const batches = [];
@@ -258,26 +258,37 @@
             li.className = "ok";
             li.textContent = "✓ " + p;
             resultList.appendChild(li);
+            totalEnviados++;
           });
           (data.erros || []).forEach(e => {
             const li = document.createElement("li");
             li.className = "err";
             li.textContent = "✗ " + e;
             resultList.appendChild(li);
+            totalErros++;
           });
         } catch (err) {
           const li = document.createElement("li");
           li.className = "err";
           li.textContent = "✗ Erro de rede: " + err.message;
           resultList.appendChild(li);
+          totalErros++;
         }
 
         feitos += batch.length;
         bar.style.width = Math.round((feitos / total) * 100) + "%";
       }
 
-      status.textContent = `Concluido: ${feitos} arquivo(s) processado(s).`;
-      toast("Upload concluido. Atualize a lista para ver os arquivos.", "ok");
+      if (totalErros > 0 && totalEnviados === 0) {
+        status.textContent = `Falha: ${totalErros} arquivo(s) com erro.`;
+        toast("Nenhum arquivo foi enviado. Verifique os erros acima.", "err");
+      } else if (totalErros > 0) {
+        status.textContent = `Concluido com erros: ${totalEnviados} enviado(s), ${totalErros} com erro.`;
+        toast(`${totalEnviados} arquivo(s) enviado(s), ${totalErros} com erro.`, "err");
+      } else {
+        status.textContent = `Concluido: ${totalEnviados} arquivo(s) enviado(s).`;
+        toast("Upload concluido. Atualize a lista para ver os arquivos.", "ok");
+      }
     }
 
     async function excluirArquivo(caminho, btn) {

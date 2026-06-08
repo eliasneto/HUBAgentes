@@ -13,6 +13,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Corrigido
 - **Upload para pasta sem permissão retornava HTML em vez de JSON** — `LocalStorageUploadView` agora retorna `JsonResponse` em todos os cenários de negação de acesso; o JS da tela de arquivos foi protegido contra respostas não-JSON, exibindo mensagem legível "Sem permissão de escrita nesta pasta" em vez de "Unexpected token '<'".
+- **Upload com falha exibia "Upload concluído" mesmo sem enviar arquivos** — JS da tela de arquivos agora rastreia `totalEnviados` e `totalErros` separadamente; toast e status final refletem o resultado real (sucesso, parcial ou falha total) em vez de sempre mostrar mensagem verde.
+- **Upload podia retornar 500 HTML em caso de erro inesperado** — `LocalStorageUploadView.post()` envolvido em try/except amplo; `OSError` em gravação de arquivo individual capturado por arquivo; qualquer exceção inesperada agora retorna `JsonResponse` com status 500 em vez de página de erro HTML.
 - **Exclusão de pasta local bloqueada por agente gerava 500** — `ExcluirPastaCompartilhadaView` agora captura `ProtectedError` (FK `on_delete=PROTECT` em `AgenteConfiguracaoOperacional`) e exibe mensagem indicando quais agentes precisam ser reconfigurados antes da exclusão. Adicionado fallback `except Exception` com log para erros inesperados.
 - **Mensagens do sistema não apareciam imediatamente** em quatro páginas de listagem — adicionado bloco `{% if messages %}` nos templates `fontes_documentos.html`, `processamentos.html`, `usuarios_acessos.html` e `auditoria.html`; anteriormente as mensagens acumulavam na sessão e só apareciam ao navegar para outra página que já tinha o bloco.
 

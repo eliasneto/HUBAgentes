@@ -920,41 +920,49 @@ class LocalStorageUploadView(AnalistaOuAdminRequiredMixin, View):
 
     def post(self, request, integracao_id):
         from apps.integracoes.models import LocalStorageIntegration
-        integration = get_object_or_404(LocalStorageIntegration, pk=integracao_id)
-        if not _usuario_pode_escrever(request.user, integration):
-            return JsonResponse({"enviados": [], "erros": ["Voce nao tem permissao de escrita nesta pasta."]}, status=403)
-        base_path = Path(integration.base_path)
-        base_path.mkdir(parents=True, exist_ok=True)
+        try:
+            integration = get_object_or_404(LocalStorageIntegration, pk=integracao_id)
+            if not _usuario_pode_escrever(request.user, integration):
+                return JsonResponse({"enviados": [], "erros": ["Voce nao tem permissao de escrita nesta pasta."]}, status=403)
+            base_path = Path(integration.base_path)
+            base_path.mkdir(parents=True, exist_ok=True)
 
-        enviados = []
-        erros = []
+            enviados = []
+            erros = []
 
-        for campo, arquivo in request.FILES.items():
-            rel_path = request.POST.get(f"rel_{campo}", arquivo.name)
-            # segurança: impede path traversal
-            try:
-                destino = (base_path / rel_path).resolve()
-                destino.relative_to(base_path.resolve())
-            except ValueError:
-                erros.append(f"{arquivo.name}: caminho invalido")
-                continue
+            for campo, arquivo in request.FILES.items():
+                rel_path = request.POST.get(f"rel_{campo}", arquivo.name)
+                # segurança: impede path traversal
+                try:
+                    destino = (base_path / rel_path).resolve()
+                    destino.relative_to(base_path.resolve())
+                except ValueError:
+                    erros.append(f"{arquivo.name}: caminho invalido")
+                    continue
 
-            ext = destino.suffix.lstrip(".").lower()
-            if ext not in self.EXTENSOES_PERMITIDAS:
-                erros.append(f"{arquivo.name}: extensao .{ext} nao suportada")
-                continue
+                ext = destino.suffix.lstrip(".").lower()
+                if ext not in self.EXTENSOES_PERMITIDAS:
+                    erros.append(f"{arquivo.name}: extensao .{ext} nao suportada")
+                    continue
 
-            if arquivo.size > self.MAX_ARQUIVO_MB * 1024 * 1024:
-                erros.append(f"{arquivo.name}: arquivo maior que {self.MAX_ARQUIVO_MB} MB")
-                continue
+                if arquivo.size > self.MAX_ARQUIVO_MB * 1024 * 1024:
+                    erros.append(f"{arquivo.name}: arquivo maior que {self.MAX_ARQUIVO_MB} MB")
+                    continue
 
-            destino.parent.mkdir(parents=True, exist_ok=True)
-            with open(destino, "wb+") as f:
-                for chunk in arquivo.chunks():
-                    f.write(chunk)
-            enviados.append(str(Path(rel_path).as_posix()))
+                try:
+                    destino.parent.mkdir(parents=True, exist_ok=True)
+                    with open(destino, "wb+") as f:
+                        for chunk in arquivo.chunks():
+                            f.write(chunk)
+                    enviados.append(str(Path(rel_path).as_posix()))
+                except OSError as exc:
+                    logger.exception("Erro ao salvar arquivo %s na pasta %s", arquivo.name, base_path)
+                    erros.append(f"{arquivo.name}: erro ao salvar ({exc})")
 
-        return JsonResponse({"enviados": enviados, "erros": erros})
+            return JsonResponse({"enviados": enviados, "erros": erros})
+        except Exception as exc:
+            logger.exception("Erro inesperado no upload para integracao_id=%s", integracao_id)
+            return JsonResponse({"enviados": [], "erros": [f"Erro interno: {exc}"]}, status=500)
 
 
 class LocalStorageExcluirArquivoView(AnalistaOuAdminRequiredMixin, View):
