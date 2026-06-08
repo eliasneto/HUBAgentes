@@ -20,6 +20,14 @@
         </div>
       </header>
 
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if 'success' in message.tags %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
       <section class="access-hero">
         <div>
           <p class="eyebrow">Quem tem acesso</p>

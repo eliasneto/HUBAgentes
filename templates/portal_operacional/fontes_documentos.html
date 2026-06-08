@@ -21,6 +21,14 @@
         <a class="toolbar-action primary" href="{% url 'portal_fonte_documento_criar' %}">Nova fonte</a>
       </header>
 
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if 'success' in message.tags %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
       <section class="sources-hero">
         <div>
           <p class="eyebrow">Fontes cadastradas</p>

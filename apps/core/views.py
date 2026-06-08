@@ -1178,6 +1178,10 @@ class ExcluirPastaCompartilhadaView(PortalAdministradorRequiredMixin, View):
                     f"Não foi possível excluir '{nome}'. Ela ainda está em uso por outros registros do sistema.",
                 )
             return redirect(redirect_url)
+        except Exception as exc:
+            logger.exception("Erro inesperado ao excluir pasta id=%s", integracao_id)
+            messages.error(request, f"Erro inesperado ao excluir '{nome}': {exc}")
+            return redirect(redirect_url)
         try:
             if base_path and Path(base_path).exists():
                 shutil.rmtree(base_path)
