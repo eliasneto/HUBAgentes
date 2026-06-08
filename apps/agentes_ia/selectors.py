@@ -32,6 +32,7 @@ class AgenteLeituraResumo:
     motivo_bloqueio: str
     executar_url: str
     editar_url: str
+    excluir_url: str
     permite_upload_execucao: bool
     tipo_entrada: str = ""
     nome_integracao_local: str = ""
@@ -106,6 +107,7 @@ def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]
                 motivo_bloqueio=disponibilidade.motivo,
                 executar_url=reverse("portal_agente_executar", kwargs={"slug": agente.slug}),
                 editar_url=reverse("portal_agente_editar", kwargs={"slug": agente.slug}),
+                excluir_url=reverse("portal_agente_excluir", kwargs={"slug": agente.slug}),
                 permite_upload_execucao=permite_upload_execucao,
                 tipo_entrada=tipo_entrada,
                 nome_integracao_local=nome_integ,

@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doc Sistema - Usuarios e acessos</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-usuarios-1">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260608-doc-system-usuarios-2">
 </head>
 <body class="agent-builder-page">
   <main class="portal-shell">
@@ -44,9 +44,10 @@
         <ol class="doc-step-list">
           <li>Abra <strong>Administrador &gt; Usuarios e acessos</strong>.</li>
           <li>Use <strong>Novo usuario</strong> para criar uma conta ou <strong>Editar usuario</strong> para ajustar uma existente.</li>
-          <li>Preencha identificacao, papel principal e grupos.</li>
-          <li>Defina se a conta esta ativa, se possui acesso tecnico e se e administradora total.</li>
+          <li>Preencha identificacao (usuario, nome, e-mail) e selecione o perfil de acesso clicando no card visual (Operador, Analista, Administrador ou Sem perfil).</li>
+          <li>Defina se a conta esta ativa e, se necessario, marque como Administrador total.</li>
           <li>Preencha senha apenas quando estiver criando a conta ou trocando a senha atual.</li>
+          <li>Na <strong>edicao</strong>, use a secao <strong>Paginas extras</strong> para liberar paginas adicionais alem do padrao do perfil.</li>
           <li>Salve e revise a listagem para confirmar status, grupos e papel exibidos.</li>
         </ol>
       </section>
@@ -138,12 +139,11 @@ E-mail: opcional, mas recomendado</code></pre>
           </div>
 
           <div class="doc-code-panel">
-            <strong>Acesso</strong>
-            <pre><code>Papel principal: perfil operacional
-Grupos: multiplas selecoes
-Usuario ativo: libera login
-Acesso tecnico/staff: libera recursos tecnicos
-Administrador total: privilegio maximo</code></pre>
+            <strong>Perfil de acesso (cards visuais)</strong>
+            <pre><code>Operador    — executa agentes
+Analista    — cria, edita e executa agentes
+Administrador — acesso completo ao sistema
+Sem perfil  — acesso minimo</code></pre>
           </div>
         </div>
 
@@ -159,19 +159,29 @@ Administrador total: privilegio maximo</code></pre>
             <div>O sistema bloqueia duplicidade de login.</div>
           </div>
           <div class="doc-table-row">
-            <div><strong>Papel principal</strong></div>
-            <div>Uma opcao do perfil do usuario</div>
-            <div>Serve para classificar a funcao principal da conta.</div>
+            <div><strong>Perfil de acesso</strong></div>
+            <div>Card visual: Operador, Analista, Administrador ou Sem perfil</div>
+            <div>Define as paginas do menu e permissoes do usuario. Substitui o antigo campo de grupos.</div>
           </div>
           <div class="doc-table-row">
-            <div><strong>Grupos</strong></div>
-            <div>Uma ou mais selecoes</div>
-            <div>Permite combinar perfis de permissao.</div>
+            <div><strong>Usuario ativo</strong></div>
+            <div>Ligado / Desligado</div>
+            <div>Desativar impede o login sem remover a conta.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Administrador total</strong></div>
+            <div>Marcado / Desmarcado</div>
+            <div>Concede privilegio maximo (equivale a superusuario). Use com criterio.</div>
           </div>
           <div class="doc-table-row">
             <div><strong>Senha</strong></div>
             <div>Texto secreto</div>
             <div>Na edicao, so precisa ser preenchida quando houver troca.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Paginas extras</strong> (so edicao)</div>
+            <div>Grade de checkboxes</div>
+            <div>Paginas concedidas pelo perfil aparecem em ciano e desativadas. Paginas extras individuais sao marcaveis separadamente. Permite liberar acesso sem alterar o perfil do usuario.</div>
           </div>
         </div>
       </section>
@@ -187,11 +197,13 @@ Administrador total: privilegio maximo</code></pre>
 Nome: Maria
 Sobrenome: Oliveira
 E-mail: maria@empresa.com
-Papel principal: Operadora
-Grupos: portal_operacao, leitura_licitacao
+Perfil de acesso: Analista
 Usuario ativo: Sim
-Acesso tecnico/staff: Nao
-Administrador total: Nao</code></pre>
+Administrador total: Nao
+
+# Ao salvar, o sistema cria automaticamente:
+# - Pasta pessoal /app/entradas/maria.oliveira/
+# - Integracao "Pasta de Maria" vinculada a ela</code></pre>
         </div>
       </section>
 
@@ -269,9 +281,12 @@ Administrador total: Nao</code></pre>
           <li>Desativar um usuario impede o acesso ao portal, mas nao apaga a conta.</li>
           <li>Marcar <strong>Administrador total</strong> amplia bastante os privilegios, entao use com criterio.</li>
           <li>O proprio administrador nao deve remover seu proprio acesso critico sem validacao cuidadosa.</li>
-          <li>Para criar um Analista: cadastre o usuario e adicione-o ao grupo <code>analista</code>.</li>
-          <li>Para criar um Administrador: cadastre o usuario, adicione ao grupo <code>administrador</code> ou marque como superusuario.</li>
-          <li>Usuarios sem grupo ficam automaticamente como Operadores.</li>
+          <li>Ao criar um usuario, o sistema gera automaticamente uma <strong>pasta pessoal exclusiva</strong> (<code>/app/entradas/{username}/</code>) e uma integracao vinculada a ele. Essa pasta e visivel apenas para o proprio usuario — nem administradores tem acesso.</li>
+          <li>Para liberar acesso a uma <strong>pasta compartilhada</strong>, acesse Configuracoes Gerais e adicione o usuario como membro com permissao de Leitura ou Leitura e Escrita.</li>
+          <li>Para criar um Analista: selecione o card <strong>Analista</strong> no formulario de usuario.</li>
+          <li>Para criar um Administrador: selecione o card <strong>Administrador</strong> ou marque como superusuario.</li>
+          <li>Usuarios sem perfil selecionado ficam automaticamente como Operadores.</li>
+          <li>Use <strong>Paginas extras</strong> (na edicao) para liberar paginas especificas sem mudar o perfil do usuario.</li>
         </ul>
       </section>
 

@@ -5,6 +5,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.4.1] — 2026-06-08
+
+### Adicionado
+- **Exclusão de agente** — botão "Excluir" com confirmação aparece ao lado de "Editar" na tela Gerenciar agentes. Executa soft delete (preenche `deleted_at`); o agente é ocultado da listagem e dos processamentos sem ser apagado do banco.
+- **Hints de formato de saída** — no formulário de agente, ao selecionar o campo "Formato padrão de saída", uma descrição dinâmica aparece logo abaixo explicando o comportamento de cada opção (Definida pela IA, Definida pelo Prompt, JSON, Excel, CSV, PDF, TXT).
+
+### Corrigido
+- **Upload para pasta sem permissão retornava HTML em vez de JSON** — `LocalStorageUploadView` agora retorna `JsonResponse` em todos os cenários de negação de acesso; o JS da tela de arquivos foi protegido contra respostas não-JSON, exibindo mensagem legível "Sem permissão de escrita nesta pasta" em vez de "Unexpected token '<'".
+
+---
+
 ## [1.4.0] — 2026-06-07
 
 ### Adicionado

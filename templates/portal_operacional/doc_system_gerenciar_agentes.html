@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doc Sistema - Gerenciar agentes</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-gerenciar-agentes-1">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260608-doc-system-gerenciar-agentes-3">
 </head>
 <body class="agent-builder-page">
   <main class="portal-shell">
@@ -43,13 +43,13 @@
 
         <ol class="doc-step-list">
           <li>Abra <strong>Operacao &gt; Gerenciar agentes</strong> e clique em <strong>Novo agente</strong>.</li>
-          <li>Preencha a identidade do agente: nome, tipo, categoria, visibilidade, acionamento e status.</li>
-          <li>Descreva com clareza o objetivo operacional do agente.</li>
-          <li>Escolha a origem de entrada: Google Drive, pasta local, arquivo local fixo ou sem origem documental.</li>
+          <li>Preencha a identidade do agente: nome, status e modelo preferencial (opcional).</li>
+          <li>Escolha a origem de entrada: Google Drive, pasta local, arquivo informado na execucao ou sem origem documental.</li>
           <li>Defina como os documentos serao processados: individual, grupo unico ou lote por pasta.</li>
           <li>Selecione a integracao de IA e o formato padrao de saida.</li>
           <li>Escreva o prompt base e, se necessario, crie parametros reutilizaveis.</li>
           <li>Revise as combinacoes de entrada e saida antes de salvar.</li>
+          <li>Para <strong>excluir</strong> um agente, clique em <strong>Excluir</strong> ao lado do botao Editar e confirme a acao. O agente e ocultado imediatamente (soft delete).</li>
         </ol>
       </section>
 
@@ -62,50 +62,20 @@
         <div class="doc-guide-grid">
           <article class="doc-guide-card">
             <span class="doc-chip">Nome do agente</span>
-            <p>Texto livre com ate 120 caracteres.</p>
+            <p>Texto livre com ate 120 caracteres. Aparece no card da tela operacional e nos registros de processamento.</p>
             <small>Exemplo: <code>Leitor de edital PDF</code></small>
           </article>
 
           <article class="doc-guide-card">
-            <span class="doc-chip">Tipo</span>
-            <p>Valores aceitos: <code>classificador</code>, <code>extrator</code>, <code>validador</code>, <code>estruturador</code>, <code>generico</code>.</p>
-            <small>Exemplo recomendado: <code>extrator</code></small>
-          </article>
-
-          <article class="doc-guide-card">
-            <span class="doc-chip">Categoria operacional</span>
-            <p>Valores aceitos: <code>leitura_documento</code>, <code>decisao_documento</code>, <code>acao_sistema</code>, <code>leitura_arquivo</code>, <code>generico</code>.</p>
-            <small>Padrao da tela: <code>leitura_documento</code></small>
-          </article>
-
-          <article class="doc-guide-card">
-            <span class="doc-chip">Visibilidade</span>
-            <p>Valores aceitos: <code>usuario</code> e <code>tecnico</code>.</p>
-            <small><code>tecnico</code> nao aparece na lista operacional comum.</small>
-          </article>
-
-          <article class="doc-guide-card">
-            <span class="doc-chip">Modo de acionamento</span>
-            <p>Valores aceitos: <code>portal</code>, <code>botao_contextual</code>, <code>evento_sistema</code>, <code>agendado</code>, <code>interno</code>.</p>
-            <small>Padrao da tela: <code>portal</code></small>
-          </article>
-
-          <article class="doc-guide-card">
             <span class="doc-chip">Status</span>
-            <p>Na tela do portal o cadastro usa <code>ativo</code> e <code>inativo</code>.</p>
-            <small>Agente inativo nao aparece para execucao operacional.</small>
+            <p>Valores aceitos no portal: <code>ativo</code> e <code>inativo</code>.</p>
+            <small>Agente inativo nao aparece para execucao operacional. Um agente so pode ser ativado se a integracao de IA vinculada tambem estiver ativa.</small>
           </article>
 
           <article class="doc-guide-card">
             <span class="doc-chip">Modelo preferencial</span>
-            <p>Campo opcional para informar o modelo desejado na integracao de IA.</p>
-            <small>Exemplo: <code>gpt-4.1-mini</code></small>
-          </article>
-
-          <article class="doc-guide-card">
-            <span class="doc-chip">Objetivo</span>
-            <p>Texto descritivo do que o agente deve entregar.</p>
-            <small>Exemplo: <code>Extrair objeto, valor, prazo e anexos principais do edital.</code></small>
+            <p>Campo opcional. Quando preenchido, <strong>sobrepoem</strong> o modelo padrao da integracao de IA para este agente especifico.</p>
+            <small>Exemplo: integracao usa <code>gemini-2.5-flash</code>, agente usa <code>gemini-2.5-pro</code>. Deixe em branco para usar o padrao da integracao.</small>
           </article>
         </div>
       </section>
@@ -170,8 +140,8 @@
 
           <article class="doc-guide-card">
             <span class="doc-chip">Formato padrao de saida</span>
-            <p>Valores aceitos: <code>ai_defined</code>, <code>json</code>, <code>xlsx</code>, <code>csv</code>, <code>pdf</code>, <code>txt</code>.</p>
-            <small>Hoje a tela ainda nao suporta <code>jpg</code> como formato nativo.</small>
+            <p>Valores aceitos: <code>livre</code> (Definida pelo Prompt), <code>ai_defined</code> (Definida pela IA), <code>json</code>, <code>xlsx</code>, <code>csv</code>, <code>pdf</code>, <code>txt</code>.</p>
+            <small><code>livre</code> salva a resposta da IA exatamente como retornou, detectando extensao automaticamente (html, json, txt). <code>ai_defined</code> injeta instrucao no prompt pedindo que a IA escolha o melhor formato.</small>
           </article>
 
           <article class="doc-guide-card">
@@ -458,7 +428,8 @@ Lote por pasta→ 1 chamada por subpasta → 1 saída por subpasta</code></pre>
           <li><code>uma_saida_final</code> exige <code>grupo_unico</code> ou <code>lote_por_pasta</code>.</li>
           <li><code>uma_por_entrada</code> nao pode usar <code>arquivo_unico</code> no empacotamento.</li>
           <li>A integracao de IA precisa estar ativa para um agente ativo funcionar corretamente.</li>
-          <li>Hoje o fluxo padrao de entrada documental continua orientado a PDF nas configuracoes operacionais existentes.</li>
+          <li>Formatos aceitos como entrada: <code>pdf</code>, <code>txt</code>, <code>csv</code>, <code>png</code>, <code>jpg</code>, <code>jpeg</code>, <code>xlsx</code>. O Groq suporta apenas <code>txt</code> e <code>csv</code>.</li>
+          <li>Limite de 50 MB por arquivo no upload na execucao.</li>
         </ul>
       </section>
 
@@ -499,7 +470,25 @@ Lote por pasta→ 1 chamada por subpasta → 1 saída por subpasta</code></pre>
             <p>Ao selecionar <strong>Arquivo unico</strong>, <strong>ZIP se multiplos</strong> ou
             <strong>Sempre ZIP</strong>, uma caixa contextual explica quando cada opcao e adequada.</p>
           </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Formato padrao de saida</span>
+            <p>Ao selecionar qualquer opcao do campo <strong>Formato padrao de saida</strong>, uma descricao aparece explicando o comportamento: quando usar <strong>Definida pela IA</strong> ou <strong>Definida pelo Prompt</strong>, e o que cada formato fixo (JSON, Excel, CSV, PDF, TXT) produz.</p>
+          </article>
         </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Exclusao de agente</p>
+          <h2>Como excluir um agente existente</h2>
+        </div>
+
+        <ul class="doc-note-list">
+          <li>Na listagem de <strong>Gerenciar agentes</strong>, cada card exibe os botoes <strong>Editar</strong> e <strong>Excluir</strong> lado a lado.</li>
+          <li>Ao clicar em <strong>Excluir</strong>, o sistema exibe uma confirmacao com o nome do agente antes de prosseguir.</li>
+          <li>A exclusao e um <strong>soft delete</strong>: o agente e marcado com data de remocao e desaparece de todas as listagens, mas o registro permanece no banco. Historico de processamentos e dados relacionados sao preservados.</li>
+          <li>A acao nao pode ser desfeita pelo portal — caso precise restaurar, utilize o Django Admin.</li>
+        </ul>
       </section>
 
       <div class="execution-actions builder-actions">

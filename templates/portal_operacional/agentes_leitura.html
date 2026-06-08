@@ -129,17 +129,23 @@
                 <span>&#9888;</span> Você não tem acesso à pasta local configurada neste agente.
               </p>
             {% endif %}
-            <form
-              class="agent-actions agent-execution-card-form"
-              action="{{ agente.executar_url }}"
-              method="post"
-              enctype="multipart/form-data"
-              data-agent-card-form
-            >
-              {% csrf_token %}
-              {% if modo_gerenciamento_agentes %}
+            {% if modo_gerenciamento_agentes %}
+              <div class="agent-actions">
                 <a class="secondary-action" href="{{ agente.editar_url }}">Editar</a>
-              {% else %}
+                <form method="post" action="{{ agente.excluir_url }}" style="display:inline" onsubmit="return confirm('Excluir o agente \'{{ agente.nome|escapejs }}\'? Esta ação não pode ser desfeita.');">
+                  {% csrf_token %}
+                  <button type="submit" class="secondary-action danger-action">Excluir</button>
+                </form>
+              </div>
+            {% else %}
+              <form
+                class="agent-actions agent-execution-card-form"
+                action="{{ agente.executar_url }}"
+                method="post"
+                enctype="multipart/form-data"
+                data-agent-card-form
+              >
+                {% csrf_token %}
                 {% if agente.pode_executar and agente.usuario_tem_acesso %}
                   {% if agente.permite_upload_execucao %}
                     <label class="agent-folder-action" aria-label="Anexar documento antes de executar" title="Anexar documento">
@@ -154,8 +160,8 @@
                 {% else %}
                   <span class="agent-run-button disabled" aria-disabled="true">Indisponivel</span>
                 {% endif %}
-              {% endif %}
-            </form>
+              </form>
+            {% endif %}
           </article>
         {% empty %}
           <article class="empty-agents">

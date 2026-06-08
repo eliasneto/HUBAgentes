@@ -246,7 +246,12 @@
             headers: { "X-CSRFToken": CSRF },
             body: fd,
           });
-          const data = await resp.json();
+          let data;
+          try {
+            data = await resp.json();
+          } catch (_) {
+            data = { enviados: [], erros: [resp.status === 403 ? "Sem permissão de escrita nesta pasta." : `Erro ${resp.status} ao enviar.`] };
+          }
 
           (data.enviados || []).forEach(p => {
             const li = document.createElement("li");

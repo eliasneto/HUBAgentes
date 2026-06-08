@@ -211,7 +211,7 @@
             <div class="execution-field">
               <label for="{{ form.default_output_format.id_for_label }}">{{ form.default_output_format.label }}</label>
               {{ form.default_output_format }}
-              <small>Escolha um formato fixo ou permita que a IA informe `formato_saida` no JSON. O sistema valida e gera JSON, Excel, CSV, PDF ou TXT.</small>
+              <small id="output-format-hint" style="display:block;margin-top:4px"></small>
               {% for error in form.default_output_format.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
 
@@ -394,6 +394,26 @@
   if (integracaoSelect.value) {
     carregarSubpastas(integracaoSelect.value);
   }
+}());
+
+(function () {
+  const FORMAT_HINTS = {
+    'ai_defined': 'A IA decide o formato de saída retornando um campo <code>formato_saida</code> no JSON. O sistema converte automaticamente para JSON, Excel, CSV, PDF ou TXT.',
+    'livre':      'A resposta da IA é salva exatamente como veio, sem conversão. O sistema detecta a extensão automaticamente pelo conteúdo. Use quando o prompt define o formato completo.',
+    'json':       'A saída é salva como arquivo <strong>.json</strong>. A IA deve retornar um objeto JSON válido.',
+    'xlsx':       'A saída é convertida para <strong>Excel (.xlsx)</strong>. Requer que a IA retorne dados estruturados em formato de tabela.',
+    'csv':        'A saída é salva como <strong>CSV</strong>. Ideal para dados tabulares simples que serão importados em planilhas.',
+    'pdf':        'A saída é gerada como <strong>PDF</strong> a partir do texto retornado pela IA.',
+    'txt':        'A resposta da IA é salva como <strong>texto puro (.txt)</strong>, sem nenhuma conversão de formato.',
+  };
+  const sel  = document.getElementById('{{ form.default_output_format.id_for_label }}');
+  const hint = document.getElementById('output-format-hint');
+  if (!sel || !hint) return;
+  function updateHint() {
+    hint.innerHTML = FORMAT_HINTS[sel.value] || '';
+  }
+  sel.addEventListener('change', updateHint);
+  updateHint();
 }());
 </script>
 </body>

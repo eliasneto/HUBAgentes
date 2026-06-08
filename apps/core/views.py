@@ -109,9 +109,41 @@ _TEMPLATE_MAP = {
 }
 
 
+def _garantir_pasta_pessoal(usuario):
+    """Cria a pasta pessoal do usuário se ela não existir (usada no login e na criação de usuário)."""
+    from apps.integracoes.models import LocalStorageIntegration, IntegrationStatus
+    if LocalStorageIntegration.objects.filter(created_by=usuario, compartilhada=False).exists():
+        return
+    caminho = f"/app/entradas/{usuario.username}"
+    try:
+        Path(caminho).mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    nome = f"Pasta de {usuario.get_full_name() or usuario.username}"
+    sufixo = 1
+    nome_final = nome
+    while LocalStorageIntegration.objects.filter(nome=nome_final).exists():
+        sufixo += 1
+        nome_final = f"{nome} ({sufixo})"
+    LocalStorageIntegration.objects.create(
+        nome=nome_final,
+        base_path=caminho,
+        status=IntegrationStatus.ATIVA,
+        recursive_scan=True,
+        allowed_extensions=[],
+        created_by=usuario,
+        updated_by=usuario,
+    )
+
+
 class PortalLoginView(LoginView):
     redirect_authenticated_user = True
     next_page = reverse_lazy("portal_painel")
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        _garantir_pasta_pessoal(self.request.user)
+        return response
 
     @property
     def template_name(self):
@@ -293,6 +325,17 @@ class AgentePortalUpdateView(AgentePortalFormMixin, FormView):
         context["agente_edicao"] = self.agente
         context["modo_edicao"] = True
         return context
+
+
+class AgentePortalDeleteView(AnalistaOuAdminRequiredMixin, View):
+    login_url = reverse_lazy("portal_login")
+
+    def post(self, request, slug):
+        agente = get_object_or_404(AgenteIA, slug=slug)
+        nome = agente.nome
+        agente.delete()
+        messages.success(request, f"Agente '{nome}' excluído com sucesso.")
+        return redirect("portal_agentes_gerenciar")
 
 
 class AgentePortalLegacyCreateRedirectView(
@@ -741,36 +784,12 @@ class UsuarioPortalFormMixin(PortalAdministradorRequiredMixin):
 class UsuarioPortalCreateView(UsuarioPortalFormMixin, FormView):
     def form_valid(self, form):
         usuario = form.save()
-        self._criar_pasta_pessoal(usuario)
+        _garantir_pasta_pessoal(usuario)
         messages.success(
             self.request,
             f"Usuario {usuario.username} criado. Pasta pessoal configurada automaticamente.",
         )
         return redirect(reverse("portal_usuario_editar", kwargs={"user_id": usuario.pk}))
-
-    def _criar_pasta_pessoal(self, usuario):
-        from apps.integracoes.models import LocalStorageIntegration, IntegrationStatus
-        caminho = f"/app/entradas/{usuario.username}"
-        try:
-            Path(caminho).mkdir(parents=True, exist_ok=True)
-        except OSError:
-            pass
-        nome = f"Pasta de {usuario.get_full_name() or usuario.username}"
-        # garante nome unico se ja existir integracao com esse nome
-        sufixo = 1
-        nome_final = nome
-        while LocalStorageIntegration.objects.filter(nome=nome_final).exists():
-            sufixo += 1
-            nome_final = f"{nome} ({sufixo})"
-        LocalStorageIntegration.objects.create(
-            nome=nome_final,
-            base_path=caminho,
-            status=IntegrationStatus.ATIVA,
-            recursive_scan=True,
-            allowed_extensions=[],
-            created_by=usuario,      # dono é o próprio usuário, não quem criou
-            updated_by=usuario,
-        )
 
 
 class UsuarioPortalUpdateView(UsuarioPortalFormMixin, FormView):
@@ -893,6 +912,11 @@ class LocalStorageUploadView(AnalistaOuAdminRequiredMixin, View):
 
     EXTENSOES_PERMITIDAS = {"pdf", "txt", "csv", "png", "jpg", "jpeg", "xlsx"}
     MAX_ARQUIVO_MB = 100
+
+    def handle_no_permission(self):
+        if not self.request.user.is_authenticated:
+            return JsonResponse({"enviados": [], "erros": ["Sessão expirada. Faça login novamente."]}, status=401)
+        return JsonResponse({"enviados": [], "erros": ["Você não tem permissão para fazer upload nesta pasta."]}, status=403)
 
     def post(self, request, integracao_id):
         from apps.integracoes.models import LocalStorageIntegration
@@ -1127,13 +1151,21 @@ class CriarPastaCompartilhadaView(PortalAdministradorRequiredMixin, View):
 
 class ExcluirPastaCompartilhadaView(PortalAdministradorRequiredMixin, View):
     def post(self, request, integracao_id):
-        integration = get_object_or_404(
-            LocalStorageIntegration, pk=integracao_id, compartilhada=True
-        )
+        import shutil
+        integration = get_object_or_404(LocalStorageIntegration, pk=integracao_id)
         nome = integration.nome
-        integration.delete()
-        messages.success(request, f"Pasta compartilhada '{nome}' removida.")
-        return redirect("portal_configuracao_geral")
+        base_path = integration.base_path
+        eh_compartilhada = integration.compartilhada
+        integration.hard_delete()
+        try:
+            if base_path and Path(base_path).exists():
+                shutil.rmtree(base_path)
+        except OSError:
+            pass
+        messages.success(request, f"Pasta '{nome}' removida do sistema e do servidor.")
+        if eh_compartilhada:
+            return redirect("portal_configuracao_geral")
+        return redirect("portal_fontes_documentos")
 
 
 class AdicionarUsuarioPastaView(PortalAdministradorRequiredMixin, View):

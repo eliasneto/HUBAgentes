@@ -43,7 +43,9 @@ class LocalStorageFonteResumo:
     leitura_recursiva: bool
     ultima_validacao: datetime | None
     criado_por: str
+    criado_em: datetime | None
     pode_gerenciar: bool = False
+    pode_excluir: bool = False
 
 
 @dataclass(frozen=True)
@@ -147,14 +149,14 @@ def listar_fontes_documentos_para_portal(usuario=None) -> FontesDocumentosResumo
     fontes_locais_qs = LocalStorageIntegration.objects.select_related("created_by").prefetch_related("membros")
     is_admin = bool(usuario and (usuario.is_superuser or usuario.groups.filter(name="administrador").exists()))
     if usuario:
-        # Pasta pessoal: só o próprio dono (created_by == usuario), nunca outro
-        pasta_pessoal = Q(created_by=usuario, compartilhada=False)
-        # Pastas compartilhadas: admin vê todas; outros só onde foram adicionados
         if is_admin:
-            pastas_compartilhadas = Q(compartilhada=True)
+            # Admin vê todas as pastas do sistema (pessoais de todos + todas compartilhadas)
+            pass
         else:
+            # Usuário comum: só a pasta pessoal própria + compartilhadas onde foi adicionado
+            pasta_pessoal = Q(created_by=usuario, compartilhada=False)
             pastas_compartilhadas = Q(compartilhada=True, usuarios_autorizados=usuario)
-        fontes_locais_qs = fontes_locais_qs.filter(pasta_pessoal | pastas_compartilhadas)
+            fontes_locais_qs = fontes_locais_qs.filter(pasta_pessoal | pastas_compartilhadas)
     fontes_locais = fontes_locais_qs.order_by("nome")
 
     def _pode_gerenciar(fonte):
@@ -197,7 +199,9 @@ def listar_fontes_documentos_para_portal(usuario=None) -> FontesDocumentosResumo
                 criado_por=(
                     fonte.created_by.get_full_name() or fonte.created_by.username
                 ) if fonte.created_by else "—",
+                criado_em=fonte.created_at,
                 pode_gerenciar=_pode_gerenciar(fonte),
+                pode_excluir=is_admin,
             )
             for fonte in fontes_locais
         ],

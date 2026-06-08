@@ -126,6 +126,10 @@
                   <dd>{{ fonte.criado_por }}</dd>
                 </div>
                 <div>
+                  <dt>Criada em</dt>
+                  <dd>{{ fonte.criado_em|date:"d/m/Y" }}</dd>
+                </div>
+                <div>
                   <dt>Extensões</dt>
                   <dd>{{ fonte.extensoes|default:"Todas suportadas" }}</dd>
                 </div>
@@ -134,9 +138,18 @@
                   <dd>{% if fonte.leitura_recursiva %}Sim{% else %}Não{% endif %}</dd>
                 </div>
               </dl>
-              {% if fonte.pode_gerenciar %}
+              {% if fonte.pode_gerenciar or fonte.pode_excluir %}
                 <div class="integration-actions">
-                  <a class="secondary-action" href="{% url 'portal_local_arquivos' fonte.id %}">Gerenciar arquivos</a>
+                  {% if fonte.pode_gerenciar %}
+                    <a class="secondary-action" href="{% url 'portal_local_arquivos' fonte.id %}">Gerenciar arquivos</a>
+                  {% endif %}
+                  {% if fonte.pode_excluir %}
+                    <form method="post" action="{% url 'portal_fonte_local_excluir' fonte.id %}"
+                      onsubmit="return confirm('Excluir a pasta \'{{ fonte.nome|escapejs }}\' do sistema e do servidor? Esta ação não pode ser desfeita.')">
+                      {% csrf_token %}
+                      <button type="submit" class="secondary-action danger-action">Excluir pasta</button>
+                    </form>
+                  {% endif %}
                 </div>
               {% endif %}
             </article>

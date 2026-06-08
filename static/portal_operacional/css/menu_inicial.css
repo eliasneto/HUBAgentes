@@ -830,6 +830,19 @@ button.session-pill:hover,
   letter-spacing: 0.02em;
 }
 
+button.danger-action {
+  border-color: rgba(255, 91, 110, 0.5);
+  color: #ff6b82;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+button.danger-action:hover {
+  background: rgba(255, 91, 110, 0.12);
+  border-color: rgba(255, 91, 110, 0.8);
+}
+
 .agent-run-button,
 .start-button {
   border: none;
