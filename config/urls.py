@@ -21,10 +21,15 @@ from django.urls import include, path
 
 from apps.auditoria.views import AuditoriaView
 from apps.core.views import (
+    AdicionarUsuarioPastaView,
+    AlterarPermissaoPastaView,
     AgenteExecucaoView,
     AtivarTelaLoginView,
     ConfiguracaoGeralView,
     ConfiguracaoTelaLoginView,
+    CriarPastaCompartilhadaView,
+    ExcluirPastaCompartilhadaView,
+    RemoverUsuarioPastaView,
     LocalStorageArquivosView,
     LocalStorageExcluirArquivoView,
     LocalStorageSubpastasView,
@@ -89,6 +94,11 @@ urlpatterns = [
     path('usuarios-e-acessos/<int:user_id>/editar/', UsuarioPortalUpdateView.as_view(), name='portal_usuario_editar'),
     path('configuracoes-gerais/', ConfiguracaoGeralView.as_view(), name='portal_configuracao_geral'),
     path('configuracoes-gerais/salvar/', SalvarConfiguracaoGeralView.as_view(), name='portal_configuracao_geral_salvar'),
+    path('configuracoes-gerais/pastas-compartilhadas/criar/', CriarPastaCompartilhadaView.as_view(), name='portal_pasta_compartilhada_criar'),
+    path('configuracoes-gerais/pastas-compartilhadas/<int:integracao_id>/excluir/', ExcluirPastaCompartilhadaView.as_view(), name='portal_pasta_compartilhada_excluir'),
+    path('configuracoes-gerais/pastas-compartilhadas/<int:integracao_id>/usuarios/adicionar/', AdicionarUsuarioPastaView.as_view(), name='portal_pasta_usuario_adicionar'),
+    path('configuracoes-gerais/pastas-compartilhadas/<int:integracao_id>/usuarios/<int:user_id>/remover/', RemoverUsuarioPastaView.as_view(), name='portal_pasta_usuario_remover'),
+    path('configuracoes-gerais/pastas-compartilhadas/<int:integracao_id>/usuarios/<int:user_id>/permissao/', AlterarPermissaoPastaView.as_view(), name='portal_pasta_usuario_permissao'),
     path('configuracao-tela-login/', ConfiguracaoTelaLoginView.as_view(), name='portal_tela_login'),
     path('configuracao-tela-login/ativar/', AtivarTelaLoginView.as_view(), name='portal_tela_login_ativar'),
     path('login-preview/<str:tela>/', LoginPreviewView.as_view(), name='portal_login_preview'),

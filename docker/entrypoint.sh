@@ -37,8 +37,10 @@ else:
 PY
 fi
 
-# Cria migrations para mudancas de model ainda nao mapeadas
-python manage.py makemigrations --no-input
+# Verifica se ha mudancas de model sem migration (avisa, mas NAO gera)
+# Migrations devem ser geradas pelo desenvolvedor localmente e commitadas no git
+python manage.py makemigrations --check --dry-run --no-input 2>&1 || \
+  echo "AVISO: Existem mudancas de model sem migration. Execute 'python manage.py makemigrations' localmente e commite."
 
 # Aplica todas as migrations pendentes
 python manage.py migrate --noinput

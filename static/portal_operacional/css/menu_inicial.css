@@ -1751,6 +1751,38 @@ button.session-pill:hover,
   white-space: normal;
 }
 
+/* Variante amarela para status concluido_atencao */
+[data-status-code="concluido_atencao"] .processing-error-panel summary {
+  border-color: rgba(255, 193, 7, 0.46);
+  color: #fff8e1;
+  background: rgba(255, 193, 7, 0.10);
+  box-shadow: 0 0 16px rgba(255, 193, 7, 0.12);
+}
+
+[data-status-code="concluido_atencao"] .processing-error-panel summary::before {
+  content: "!";
+  background: #ffc107;
+  color: #1a1000;
+}
+
+[data-status-code="concluido_atencao"] .processing-error-panel[open] summary {
+  border-color: rgba(255, 193, 7, 0.72);
+  box-shadow: 0 0 22px rgba(255, 193, 7, 0.20);
+}
+
+[data-status-code="concluido_atencao"] .processing-error-panel div {
+  border-color: rgba(255, 193, 7, 0.30);
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.10), rgba(2, 13, 34, 0.88)), rgba(2, 13, 34, 0.82);
+}
+
+[data-status-code="concluido_atencao"] .processing-error-panel span {
+  color: #ffe082;
+}
+
+[data-status-code="concluido_atencao"] .processing-error-panel p {
+  color: #fff8e1;
+}
+
 .processing-meta {
   position: relative;
   z-index: 1;

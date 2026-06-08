@@ -114,10 +114,21 @@
                 <dd>{{ agente.visibilidade }}</dd>
               </div>
               <div>
-                <dt>Integracao</dt>
+                <dt>Integracao IA</dt>
                 <dd>{{ agente.integracao_ia }}</dd>
               </div>
+              <div>
+                <dt>Origem dos documentos</dt>
+                <dd>
+                  {{ agente.tipo_entrada }}{% if agente.nome_integracao_local %} &middot; <span style="color:var(--muted,#7ca5b8)">{{ agente.nome_integracao_local }}</span>{% endif %}
+                </dd>
+              </div>
             </dl>
+            {% if not agente.usuario_tem_acesso %}
+              <p style="font-size:.78rem;color:#ff9966;margin:.5rem 0 0;display:flex;align-items:center;gap:.4rem">
+                <span>&#9888;</span> Você não tem acesso à pasta local configurada neste agente.
+              </p>
+            {% endif %}
             <form
               class="agent-actions agent-execution-card-form"
               action="{{ agente.executar_url }}"
@@ -129,7 +140,7 @@
               {% if modo_gerenciamento_agentes %}
                 <a class="secondary-action" href="{{ agente.editar_url }}">Editar</a>
               {% else %}
-                {% if agente.pode_executar %}
+                {% if agente.pode_executar and agente.usuario_tem_acesso %}
                   {% if agente.permite_upload_execucao %}
                     <label class="agent-folder-action" aria-label="Anexar documento antes de executar" title="Anexar documento">
                       <input type="file" name="arquivo_execucao_upload" accept="application/pdf,.pdf" required data-agent-card-file>
@@ -138,6 +149,8 @@
                     <input type="hidden" name="input_source_type" value="upload_at_execution">
                   {% endif %}
                   <button class="agent-run-button" type="submit">Executar</button>
+                {% elif not agente.usuario_tem_acesso %}
+                  <span class="agent-run-button disabled" aria-disabled="true" title="Sem acesso à pasta configurada">Sem acesso</span>
                 {% else %}
                   <span class="agent-run-button disabled" aria-disabled="true">Indisponivel</span>
                 {% endif %}

@@ -79,6 +79,62 @@ class ConfiguracaoTelaLogin(models.Model):
         return obj
 
 
+class PermissaoMenu(models.Model):
+    """Página/rota do sistema que pode ser liberada por grupo ou por usuário."""
+
+    chave = models.CharField(max_length=60, unique=True)
+    label = models.CharField(max_length=100)
+    descricao = models.CharField(max_length=200, blank=True)
+    ordem = models.PositiveSmallIntegerField(default=0)
+
+    # Grupos que têm essa página por padrão
+    grupos = models.ManyToManyField(
+        "auth.Group",
+        blank=True,
+        related_name="permissoes_menu",
+    )
+    # Usuários com acesso extra (além do grupo)
+    usuarios_extras = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="permissoes_menu_extras",
+    )
+
+    class Meta:
+        verbose_name = "Permissao de menu"
+        verbose_name_plural = "Permissoes de menu"
+        ordering = ["ordem", "label"]
+
+    def __str__(self):
+        return self.label
+
+
+def usuario_pode_acessar_pagina(user, chave: str) -> bool:
+    """Verifica se o usuário tem acesso à página identificada por chave."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    from django.db.models import Q
+    return PermissaoMenu.objects.filter(chave=chave).filter(
+        Q(grupos__in=user.groups.all()) | Q(usuarios_extras=user)
+    ).exists()
+
+
+def paginas_do_usuario(user) -> set:
+    """Retorna o conjunto de chaves de páginas acessíveis pelo usuário."""
+    if not user or not user.is_authenticated:
+        return set()
+    if user.is_superuser:
+        return set(PermissaoMenu.objects.values_list("chave", flat=True))
+    from django.db.models import Q
+    return set(
+        PermissaoMenu.objects.filter(
+            Q(grupos__in=user.groups.all()) | Q(usuarios_extras=user)
+        ).values_list("chave", flat=True)
+    )
+
+
 class TimestampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

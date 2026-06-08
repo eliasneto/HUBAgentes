@@ -33,13 +33,61 @@ class AgenteLeituraResumo:
     executar_url: str
     editar_url: str
     permite_upload_execucao: bool
+    tipo_entrada: str = ""
+    nome_integracao_local: str = ""
+    usuario_tem_acesso: bool = True
 
 
-def _montar_resumos_agentes(queryset) -> list[AgenteLeituraResumo]:
+def _label_tipo_entrada(config) -> tuple[str, str]:
+    """Retorna (label_tipo_entrada, nome_integracao_local)."""
+    if not config:
+        return "Sem configuracao", ""
+    st = config.default_input_source_type
+    if st == "local_folder":
+        integ = config.default_local_storage_integration
+        return "Pasta local", (integ.nome if integ else "—")
+    if st == "google_drive_folder":
+        fonte = config.default_folder_source
+        return "Google Drive", (fonte.nome if fonte else "—")
+    if st == "upload_at_execution":
+        return "Upload na execucao", ""
+    if st == "local_file":
+        return "Arquivo local fixo", ""
+    return "Sem origem documental", ""
+
+
+def _usuario_pode_usar_entrada(agente, usuario) -> bool:
+    """False quando o agente usa pasta local fixa e o usuário não tem acesso."""
+    if usuario is None or usuario.is_superuser:
+        return True
+    config = getattr(agente, "configuracao_operacional", None)
+    if not config:
+        return True
+    from apps.agentes_ia.models import AgentInputPolicy, AgentDefaultInputSourceType
+    if config.input_policy != AgentInputPolicy.FIXA:
+        return True
+    if config.default_input_source_type != AgentDefaultInputSourceType.LOCAL_FOLDER:
+        return True
+    integ = config.default_local_storage_integration
+    if not integ:
+        return True
+    if not integ.compartilhada:
+        return integ.created_by_id == usuario.pk
+    # Pasta compartilhada: qualquer membro autorizado pode ler
+    from apps.integracoes.models import PastaCompartilhadaUsuario
+    return PastaCompartilhadaUsuario.objects.filter(
+        integracao=integ, usuario=usuario
+    ).exists()
+
+
+def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]:
     agentes_resumo = []
     for agente in queryset:
         disponibilidade = calcular_disponibilidade_agente(agente)
         permite_upload_execucao = _permite_upload_na_execucao(agente)
+        config = getattr(agente, "configuracao_operacional", None)
+        tipo_entrada, nome_integ = _label_tipo_entrada(config)
+        tem_acesso = _usuario_pode_usar_entrada(agente, usuario)
         agentes_resumo.append(
             AgenteLeituraResumo(
                 id=agente.id,
@@ -56,15 +104,12 @@ def _montar_resumos_agentes(queryset) -> list[AgenteLeituraResumo]:
                 disponibilidade_cor=disponibilidade.cor,
                 pode_executar=disponibilidade.pode_executar,
                 motivo_bloqueio=disponibilidade.motivo,
-                executar_url=reverse(
-                    "portal_agente_executar",
-                    kwargs={"slug": agente.slug},
-                ),
-                editar_url=reverse(
-                    "portal_agente_editar",
-                    kwargs={"slug": agente.slug},
-                ),
+                executar_url=reverse("portal_agente_executar", kwargs={"slug": agente.slug}),
+                editar_url=reverse("portal_agente_editar", kwargs={"slug": agente.slug}),
                 permite_upload_execucao=permite_upload_execucao,
+                tipo_entrada=tipo_entrada,
+                nome_integracao_local=nome_integ,
+                usuario_tem_acesso=tem_acesso,
             )
         )
     return agentes_resumo
@@ -82,7 +127,7 @@ def _permite_upload_na_execucao(agente):
     )
 
 
-def listar_agentes_para_portal() -> list[AgenteLeituraResumo]:
+def listar_agentes_para_portal(usuario=None) -> list[AgenteLeituraResumo]:
     """Retorna somente campos seguros para exibicao no Portal Operacional."""
     agentes = (
         AgenteIA.objects.select_related(
@@ -96,7 +141,7 @@ def listar_agentes_para_portal() -> list[AgenteLeituraResumo]:
         )
         .order_by("nome")
     )
-    return _montar_resumos_agentes(agentes)
+    return _montar_resumos_agentes(agentes, usuario=usuario)
 
 
 def listar_agentes_para_gerenciamento() -> list[AgenteLeituraResumo]:

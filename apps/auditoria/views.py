@@ -1,10 +1,10 @@
 from django.views.generic import TemplateView
 
 from apps.auditoria.selectors import listar_eventos_para_portal
-from apps.core.views import PortalAdministradorRequiredMixin
+from apps.core.views import AnalistaOuAdminRequiredMixin
 
 
-class AuditoriaView(PortalAdministradorRequiredMixin, TemplateView):
+class AuditoriaView(AnalistaOuAdminRequiredMixin, TemplateView):
     template_name = "portal_operacional/auditoria.html"
 
     def get_context_data(self, **kwargs):

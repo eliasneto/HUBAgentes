@@ -5,25 +5,45 @@
   <meta charset="UTF-8">
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% if modo_edicao %}Editar usuario{% else %}Novo usuario{% endif %} - Portal</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-usuario-form-3">
+  <title>{% if modo_edicao %}Editar usuário{% else %}Novo usuário{% endif %} - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260607-usuario-form-4">
+  <style>
+    .perfil-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .25rem; }
+    .perfil-option { display: flex; align-items: flex-start; gap: .75rem; padding: 1rem 1.1rem; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; transition: border-color .2s, background .2s; }
+    .perfil-option:has(input:checked) { border-color: rgba(0,216,255,.6); background: rgba(0,216,255,.06); }
+    .perfil-option input[type=radio] { margin-top: 3px; flex-shrink: 0; accent-color: var(--accent-cyan, #00d8ff); }
+    .perfil-option .perfil-label { display: flex; flex-direction: column; gap: 3px; }
+    .perfil-option strong { font-size: .9rem; }
+    .perfil-option small { color: var(--muted, #7ca5b8); font-size: .78rem; line-height: 1.4; }
+    .toggle-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .toggle-item { display: flex; align-items: center; gap: .6rem; padding: .6rem 1rem; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; font-size: .88rem; }
+    .toggle-item input { accent-color: var(--accent-cyan, #00d8ff); }
+    .pages-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: .6rem; }
+    .page-item { display: flex; align-items: flex-start; gap: .65rem; padding: .7rem .9rem; border-radius: 10px; border: 1px solid var(--border); transition: border-color .15s; }
+    .page-item.from-group { border-color: rgba(0,216,255,.3); background: rgba(0,216,255,.04); }
+    .page-item input { margin-top: 3px; flex-shrink: 0; accent-color: var(--accent-cyan,#00d8ff); }
+    .page-item .page-label { display: flex; flex-direction: column; gap: 2px; }
+    .page-item .page-label strong { font-size: .85rem; }
+    .page-item .page-label small { color: var(--muted,#7ca5b8); font-size: .74rem; }
+    .badge-grupo { font-size: .68rem; font-weight: 700; color: var(--accent-cyan,#00d8ff); letter-spacing: .05em; }
+  </style>
 </head>
 <body>
   <main class="portal-shell">
     {% include "portal_operacional/_portal_sidebar.html" with active_nav="usuarios_acessos" %}
 
-    <section class="portal-main" aria-label="{% if modo_edicao %}Editar usuario{% else %}Novo usuario{% endif %}">
+    <section class="portal-main" aria-label="{% if modo_edicao %}Editar usuário{% else %}Novo usuário{% endif %}">
       <header class="portal-topbar">
         <div>
           <p class="eyebrow">Controle de acesso</p>
-          <h1>{% if modo_edicao %}Editar usuario{% else %}Novo usuario{% endif %}</h1>
+          <h1>{% if modo_edicao %}Editar usuário{% else %}Novo usuário{% endif %}</h1>
         </div>
       </header>
 
       {% if messages %}
-        <section class="builder-messages" aria-label="Mensagens do sistema">
+        <section class="builder-messages" aria-label="Mensagens">
           {% for message in messages %}
-            <div class="form-alert {% if message.tags == 'success' %}form-alert-success{% endif %}">{{ message }}</div>
+            <div class="form-alert {% if 'success' in message.tags %}form-alert-success{% endif %}">{{ message }}</div>
           {% endfor %}
         </section>
       {% endif %}
@@ -31,11 +51,9 @@
       <section class="agent-builder-hero">
         <div>
           <p class="eyebrow">Perfil operacional</p>
-          <h2>{% if modo_edicao %}Ajuste acesso, grupos e status do usuario.{% else %}Cadastre uma conta para acessar o portal.{% endif %}</h2>
-          <p>
-            Senhas existentes nao sao exibidas. Na edicao, preencha os campos de
-            senha somente quando quiser trocar a senha do usuario.
-          </p>
+          <h2>{% if modo_edicao %}Ajuste o acesso do usuário.{% else %}Cadastre uma nova conta no portal.{% endif %}</h2>
+          <p>Escolha o perfil do usuário — ele determina quais páginas do menu estarão disponíveis.
+          Na edição você pode adicionar páginas extras além do padrão do perfil.</p>
         </div>
         <div class="builder-orb" aria-hidden="true">
           <span>US</span>
@@ -43,106 +61,149 @@
         </div>
       </section>
 
-      <form class="agent-builder-form" method="post" autocomplete="off" data-user-form-mode="{% if modo_edicao %}edit{% else %}create{% endif %}">
+      <form class="agent-builder-form" method="post" autocomplete="off">
         <input class="autofill-decoy" type="text" name="portal_fake_user" autocomplete="username" tabindex="-1" aria-hidden="true">
         <input class="autofill-decoy" type="password" name="portal_fake_password" autocomplete="current-password" tabindex="-1" aria-hidden="true">
         {% csrf_token %}
 
         {% if form.non_field_errors %}
-          <div class="form-alert">
-            {% for error in form.non_field_errors %}
-              <span>{{ error }}</span>
-            {% endfor %}
-          </div>
+          <div class="form-alert">{% for e in form.non_field_errors %}<span>{{ e }}</span>{% endfor %}</div>
         {% endif %}
 
+        <!-- Dados da conta -->
         <section class="builder-card">
           <div class="form-section-heading">
-            <p class="eyebrow">Identificacao</p>
+            <p class="eyebrow">Identificação</p>
             <h2>Dados da conta</h2>
           </div>
-
           <div class="execution-grid">
             <div class="execution-field">
-              <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+              <label for="{{ form.username.id_for_label }}">{{ form.username.label }}<span class="field-required">*</span></label>
               {{ form.username }}
-              {% for error in form.username.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              {% for e in form.username.errors %}<small class="field-error">{{ e }}</small>{% endfor %}
             </div>
             <div class="execution-field">
               <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
               {{ form.email }}
-              {% for error in form.email.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              {% for e in form.email.errors %}<small class="field-error">{{ e }}</small>{% endfor %}
             </div>
             <div class="execution-field">
               <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
               {{ form.first_name }}
-              {% for error in form.first_name.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
             <div class="execution-field">
               <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
               {{ form.last_name }}
-              {% for error in form.last_name.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
           </div>
         </section>
 
+        <!-- Perfil de acesso -->
         <section class="builder-card">
           <div class="form-section-heading">
             <p class="eyebrow">Acesso</p>
-            <h2>Papeis e permissoes</h2>
+            <h2>Perfil de acesso</h2>
+          </div>
+          <p style="font-size:.85rem;color:var(--muted,#7ca5b8);margin-bottom:1.25rem;line-height:1.6">
+            O perfil define quais páginas do menu o usuário pode acessar por padrão. Na edição você pode adicionar páginas extras.
+          </p>
+
+          <div class="perfil-grid">
+            <label class="perfil-option">
+              <input type="radio" name="perfil" value="operador" {% if form.initial.perfil == 'operador' %}checked{% endif %}>
+              <div class="perfil-label">
+                <strong>Operador</strong>
+                <small>Agentes, Processamentos e Fontes de documentos.</small>
+              </div>
+            </label>
+            <label class="perfil-option">
+              <input type="radio" name="perfil" value="analista" {% if form.initial.perfil == 'analista' %}checked{% endif %}>
+              <div class="perfil-label">
+                <strong>Analista</strong>
+                <small>Tudo do Operador + Gerenciar agentes, Integrações, Auditoria e Custos.</small>
+              </div>
+            </label>
+            <label class="perfil-option">
+              <input type="radio" name="perfil" value="administrador" {% if form.initial.perfil == 'administrador' %}checked{% endif %}>
+              <div class="perfil-label">
+                <strong>Administrador</strong>
+                <small>Acesso completo ao sistema incluindo usuários e configurações.</small>
+              </div>
+            </label>
+            <label class="perfil-option">
+              <input type="radio" name="perfil" value="" {% if not form.initial.perfil %}checked{% endif %}>
+              <div class="perfil-label">
+                <strong>Sem perfil</strong>
+                <small>Sem acesso predefinido. Configure as páginas manualmente abaixo.</small>
+              </div>
+            </label>
           </div>
 
-          <div class="execution-grid">
-            <div class="execution-field">
-              <label for="{{ form.papel_principal.id_for_label }}">{{ form.papel_principal.label }}</label>
-              {{ form.papel_principal }}
-              {% for error in form.papel_principal.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
-            </div>
-            <div class="user-switch-grid">
-              <label class="user-checkline">
-                {{ form.is_active }}
-                <span>{{ form.is_active.label }}</span>
-              </label>
-              <label class="user-checkline">
-                {{ form.is_staff }}
-                <span>{{ form.is_staff.label }}</span>
-              </label>
-              <label class="user-checkline">
-                {{ form.is_superuser }}
-                <span>{{ form.is_superuser.label }}</span>
-              </label>
-              {% for error in form.is_active.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
-              {% for error in form.is_staff.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
-              {% for error in form.is_superuser.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
-            </div>
-          </div>
+          {% for e in form.perfil.errors %}<small class="field-error" style="margin-top:.5rem;display:block">{{ e }}</small>{% endfor %}
 
-          <div class="execution-field builder-wide">
-            <label>{{ form.groups.label }}</label>
-            <div class="user-groups-panel">
-              {{ form.groups }}
-            </div>
-            {% for error in form.groups.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+          <div class="toggle-row" style="margin-top:1.5rem">
+            <label class="toggle-item">
+              {{ form.is_active }}
+              <span>
+                <strong>{{ form.is_active.label }}</strong>
+              </span>
+            </label>
+            <label class="toggle-item">
+              {{ form.is_superuser }}
+              <span>
+                <strong>{{ form.is_superuser.label }}</strong>
+                <small style="display:block;color:var(--muted,#7ca5b8);font-size:.75rem">Acesso irrestrito a tudo</small>
+              </span>
+            </label>
           </div>
+          {% for e in form.is_active.errors %}<small class="field-error">{{ e }}</small>{% endfor %}
+          {% for e in form.is_superuser.errors %}<small class="field-error">{{ e }}</small>{% endfor %}
         </section>
 
+        <!-- Páginas extras (só na edição) -->
+        {% if modo_edicao and todas_paginas %}
+        <section class="builder-card">
+          <div class="form-section-heading">
+            <p class="eyebrow">Personalização</p>
+            <h2>Páginas extras</h2>
+          </div>
+          <p style="font-size:.85rem;color:var(--muted,#7ca5b8);margin-bottom:1.25rem;line-height:1.6">
+            Páginas em <span style="color:var(--accent-cyan,#00d8ff)">ciano</span> já vêm com o perfil do usuário.
+            Marque páginas adicionais para liberar acesso individual além do padrão.
+          </p>
+          <div class="pages-grid">
+            {% for pagina in todas_paginas %}
+              <label class="page-item {% if pagina.chave in paginas_grupo %}from-group{% endif %}">
+                <input type="checkbox" name="permissao_extra" value="{{ pagina.chave }}"
+                  {% if pagina.chave in paginas_grupo %}disabled checked{% elif pagina.chave in paginas_extras %}checked{% endif %}>
+                <div class="page-label">
+                  <strong>{{ pagina.label }}</strong>
+                  <small>{{ pagina.descricao }}</small>
+                  {% if pagina.chave in paginas_grupo %}<span class="badge-grupo">· Pelo perfil</span>{% endif %}
+                </div>
+              </label>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+        <!-- Senha -->
         <section class="builder-card">
           <div class="form-section-heading">
             <p class="eyebrow">Senha</p>
             <h2>{% if modo_edicao %}Troca opcional{% else %}Senha inicial{% endif %}</h2>
           </div>
-
           <div class="execution-grid user-password-grid">
             <div class="execution-field">
-              <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+              <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}{% if not modo_edicao %}<span class="field-required">*</span>{% endif %}</label>
               {{ form.password1 }}
               {% if form.password1.help_text %}<small>{{ form.password1.help_text }}</small>{% endif %}
-              {% for error in form.password1.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              {% for e in form.password1.errors %}<small class="field-error">{{ e }}</small>{% endfor %}
             </div>
             <div class="execution-field">
               <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
               {{ form.password2 }}
-              {% for error in form.password2.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+              {% for e in form.password2.errors %}<small class="field-error">{{ e }}</small>{% endfor %}
             </div>
           </div>
         </section>
@@ -150,40 +211,11 @@
         <div class="execution-actions builder-actions">
           <a class="secondary-action" href="{% url 'portal_usuarios_acessos' %}">Voltar</a>
           <button class="start-button" type="submit">
-            {% if modo_edicao %}Salvar usuario{% else %}Criar usuario{% endif %}
+            {% if modo_edicao %}Salvar usuário{% else %}Criar usuário{% endif %}
           </button>
         </div>
       </form>
     </section>
   </main>
-
-  {% if not modo_edicao and not form.errors %}
-    <script>
-      (() => {
-        const fields = [
-          ["id_username", "off"],
-          ["id_email", "off"],
-          ["id_first_name", "off"],
-          ["id_last_name", "off"],
-          ["id_password1", "new-password"],
-          ["id_password2", "new-password"],
-        ];
-
-        const clearAutofill = () => {
-          fields.forEach(([id, autocomplete]) => {
-            const input = document.getElementById(id);
-            if (!input) return;
-            input.setAttribute("autocomplete", autocomplete);
-            input.value = "";
-          });
-        };
-
-        window.addEventListener("pageshow", clearAutofill);
-        document.addEventListener("DOMContentLoaded", clearAutofill);
-        setTimeout(clearAutofill, 150);
-        setTimeout(clearAutofill, 700);
-      })();
-    </script>
-  {% endif %}
 </body>
 </html>

@@ -130,6 +130,15 @@ class GoogleDriveIntegrationPortalForm(IntegrationPortalFormMixin, forms.ModelFo
 
 
 class LocalStorageIntegrationPortalForm(IntegrationPortalFormMixin, forms.ModelForm):
+    # Campo simplificado para criação: aceita só o nome da pasta (sem path completo)
+    nome_pasta = forms.CharField(
+        label="Nome da pasta compartilhada",
+        max_length=120,
+        required=False,
+        help_text="Ex: projeto_abc  →  a pasta /app/entradas/projeto_abc será criada automaticamente.",
+        widget=forms.TextInput(attrs={"placeholder": "Ex: projeto_abc"}),
+    )
+
     class Meta:
         model = LocalStorageIntegration
         fields = [
@@ -139,28 +148,39 @@ class LocalStorageIntegrationPortalForm(IntegrationPortalFormMixin, forms.ModelF
             "recursive_scan",
         ]
         labels = {
-            "nome": "Nome",
+            "nome": "Nome da integração",
             "status": "Status",
-            "base_path": "Caminho local autorizado",
+            "base_path": "Caminho interno (gerado automaticamente)",
             "recursive_scan": "Ler subpastas automaticamente",
         }
-        help_texts = {
-            "base_path": (
-                "Windows: C:\\HubAgentes\\contratos  |  "
-                "Servidor/container: /app/entradas/contratos"
-            ),
-        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Em criação (sem instance), base_path não é obrigatório — vem do nome_pasta
+        if not self.instance.pk:
+            self.fields["base_path"].required = False
+
+    def clean(self):
+        cleaned = super().clean()
+        nome_pasta = cleaned.get("nome_pasta", "").strip()
+        if nome_pasta:
+            import re
+            slug = re.sub(r"[^\w\-]", "_", nome_pasta).strip("_")
+            cleaned["base_path"] = f"/app/entradas/{slug}"
+        elif not self.instance.pk and not cleaned.get("base_path"):
+            self.add_error("nome_pasta", "Informe o nome da pasta compartilhada.")
+        return cleaned
 
     def clean_base_path(self):
         import os
         value = self.cleaned_data.get("base_path", "").strip()
+        if not value:
+            return value
         raw = value.replace("\\", "/")
         local_storage = os.environ.get("LOCAL_STORAGE_PATH", "").replace("\\", "/").rstrip("/")
         if local_storage and raw.upper().startswith(local_storage.upper()):
-            # Traduz caminho do host (Windows ou Linux) para caminho interno do container
             remainder = raw[len(local_storage):].lstrip("/")
             return "/app/entradas/" + remainder if remainder else "/app/entradas"
-        # Aceita caminho Windows C:\HubAgentes\ mesmo sem LOCAL_STORAGE_PATH compativel
         for win_prefix in ("c:/hubagentes", "c:\\hubagentes"):
             if raw.lower().startswith(win_prefix):
                 remainder = raw[len(win_prefix):].replace("\\", "/").lstrip("/")

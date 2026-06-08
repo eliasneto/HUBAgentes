@@ -113,9 +113,21 @@
                 </div>
               {% endif %}
               <details class="processing-error-panel" data-error-panel {% if not processamento.erro_operacional %}hidden{% endif %}>
-                <summary>Ver erro</summary>
+                <summary>
+                  {% if processamento.status_codigo == 'concluido_atencao' %}
+                    &#9888; Ver atenção
+                  {% else %}
+                    &#9888; Ver erro
+                  {% endif %}
+                </summary>
                 <div>
-                  <span>Detalhes do erro</span>
+                  <span>
+                    {% if processamento.status_codigo == 'concluido_atencao' %}
+                      Atenção
+                    {% else %}
+                      Detalhes do erro
+                    {% endif %}
+                  </span>
                   <p data-error-message>{{ processamento.erro_operacional|linebreaksbr }}</p>
                 </div>
               </details>

@@ -186,6 +186,158 @@
         </div>
 
       </form>
+
+      <!-- Pastas compartilhadas — form separado -->
+      <section class="builder-card" style="margin-top:1.5rem">
+        <div class="form-section-heading">
+          <p class="eyebrow">Armazenamento compartilhado</p>
+          <h2>Pastas compartilhadas</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:1.5rem;line-height:1.6">
+          Pastas compartilhadas ficam disponíveis para todos os usuários do sistema ao executar agentes de pasta local.
+          Cada pasta é criada automaticamente no servidor ao ser cadastrada aqui.
+        </p>
+
+        {% if pastas_compartilhadas %}
+          <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.5rem">
+            {% for pasta in pastas_compartilhadas %}
+              <div style="border:1px solid rgba(51,244,255,.15);border-radius:10px;overflow:hidden">
+
+                <!-- Cabeçalho da pasta -->
+                <div style="display:flex;align-items:center;gap:1rem;padding:.75rem 1rem;background:rgba(2,10,28,.5)">
+                  <div style="flex:1">
+                    <strong style="font-size:.9rem">{{ pasta.nome }}</strong>
+                    <code style="font-size:.75rem;color:#7ca5b8;margin-left:.75rem">{{ pasta.base_path }}</code>
+                  </div>
+                  <span style="font-size:.78rem;color:#7ca5b8">
+                    {{ pasta.usuarios_autorizados.count }} usuário{{ pasta.usuarios_autorizados.count|pluralize:"s" }}
+                  </span>
+                  <button type="button"
+                    onclick="toggleUsuarios('pasta-{{ pasta.id }}')"
+                    class="secondary-action" style="font-size:.78rem;padding:.3rem .75rem">
+                    Gerenciar usuários
+                  </button>
+                  <form method="post" action="{% url 'portal_pasta_compartilhada_excluir' pasta.id %}"
+                    onsubmit="return confirm('Remover \'{{ pasta.nome }}\'?')">
+                    {% csrf_token %}
+                    <button type="submit" class="secondary-action danger-action"
+                      style="font-size:.78rem;padding:.3rem .75rem">
+                      Remover
+                    </button>
+                  </form>
+                </div>
+
+                <!-- Painel de usuários (colapsável) -->
+                <div id="pasta-{{ pasta.id }}" style="display:none;padding:1rem;border-top:1px solid rgba(51,244,255,.1);background:rgba(0,0,0,.2)">
+
+                  <!-- Usuários já adicionados -->
+                  {% if pasta.membros.all %}
+                    <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-bottom:1rem">
+                      {% for membro in pasta.membros.all %}
+                        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+                          <td style="padding:.45rem .5rem">
+                            {{ membro.usuario.get_full_name|default:membro.usuario.username }}
+                            <span style="color:#7ca5b8;font-size:.75rem">({{ membro.usuario.username }})</span>
+                          </td>
+                          <td style="padding:.45rem .5rem">
+                            {% if membro.permissao == 'escrita' %}
+                              <span style="background:rgba(0,200,83,.12);color:#4ade80;border:1px solid rgba(0,200,83,.3);border-radius:999px;padding:.15rem .6rem;font-size:.72rem;font-weight:700">
+                                Leitura e escrita
+                              </span>
+                            {% else %}
+                              <span style="background:rgba(0,216,255,.08);color:#00d8ff;border:1px solid rgba(0,216,255,.2);border-radius:999px;padding:.15rem .6rem;font-size:.72rem;font-weight:700">
+                                Leitura
+                              </span>
+                            {% endif %}
+                          </td>
+                          <td style="padding:.45rem .5rem;text-align:right">
+                            <form method="post" action="{% url 'portal_pasta_usuario_permissao' pasta.id membro.usuario.id %}" style="display:inline">
+                              {% csrf_token %}
+                              <button type="submit" class="secondary-action" style="font-size:.72rem;padding:.2rem .6rem">
+                                {% if membro.permissao == 'escrita' %}Mudar para leitura{% else %}Dar escrita{% endif %}
+                              </button>
+                            </form>
+                            <form method="post" action="{% url 'portal_pasta_usuario_remover' pasta.id membro.usuario.id %}" style="display:inline;margin-left:.25rem">
+                              {% csrf_token %}
+                              <button type="submit" class="secondary-action danger-action" style="font-size:.72rem;padding:.2rem .6rem"
+                                onclick="return confirm('Remover {{ membro.usuario.username }}?')">
+                                Remover
+                              </button>
+                            </form>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </table>
+                  {% else %}
+                    <p style="font-size:.82rem;color:#7ca5b8;margin:0 0 1rem">Nenhum usuário adicionado ainda. Adicione abaixo.</p>
+                  {% endif %}
+
+                  <!-- Adicionar usuário -->
+                  <form method="post" action="{% url 'portal_pasta_usuario_adicionar' pasta.id %}"
+                    style="display:flex;gap:.75rem;align-items:flex-end">
+                    {% csrf_token %}
+                    <div class="execution-field" style="flex:1;max-width:320px;margin:0">
+                      <select name="user_id">
+                        <option value="">Selecionar usuário...</option>
+                        {% for u in todos_usuarios %}
+                          {% if u not in pasta.usuarios_autorizados.all %}
+                            <option value="{{ u.id }}">{{ u.get_full_name|default:u.username }} ({{ u.username }})</option>
+                          {% endif %}
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <button type="submit" class="secondary-action">Adicionar</button>
+                  </form>
+
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p style="font-size:.85rem;color:#7ca5b8;margin-bottom:1.5rem">Nenhuma pasta compartilhada cadastrada ainda.</p>
+        {% endif %}
+
+        <script>
+          function toggleUsuarios(id) {
+            var el = document.getElementById(id);
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+          }
+        </script>
+
+        <form method="post" action="{% url 'portal_pasta_compartilhada_criar' %}" autocomplete="off">
+          {% csrf_token %}
+          <div class="execution-grid">
+            <div class="execution-field">
+              <label>Nome da integração<span class="field-required">*</span></label>
+              <input type="text" name="nome_integracao" id="id_nome_integracao"
+                placeholder="Ex: Contratos 2026" required class="agent-input"
+                oninput="sincronizarNomePasta(this.value)">
+            </div>
+            <div class="execution-field">
+              <label>Pasta no servidor<span class="field-required">*</span></label>
+              <input type="text" name="nome_pasta" id="id_nome_pasta" required
+                class="agent-input" readonly
+                style="opacity:.7;cursor:default">
+              <small>Gerada automaticamente em <code>/app/entradas/</code> + nome da integração.</small>
+            </div>
+          </div>
+          <script>
+            function sincronizarNomePasta(valor) {
+              var slug = valor
+                .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos
+                .toLowerCase()
+                .replace(/\s+/g, '_')        // espaços → underline
+                .replace(/[^\w\-]/g, '')     // remove caracteres especiais
+                .replace(/^_+|_+$/g, '');    // trim underlines
+              document.getElementById('id_nome_pasta').value = slug;
+            }
+          </script>
+          <div style="margin-top:.75rem">
+            <button type="submit" class="start-button">Criar pasta compartilhada</button>
+          </div>
+        </form>
+      </section>
+
     </section>
   </main>
 </body>

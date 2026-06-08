@@ -8,16 +8,20 @@ from .base import AIProviderExecutionResult, BaseAIProviderAdapter
 class GeminiProviderAdapter(BaseAIProviderAdapter):
     default_base_url = "https://generativelanguage.googleapis.com/v1beta"
 
+    @staticmethod
+    def _limpar_nome_modelo(nome: str) -> str:
+        """Remove prefixo 'models/' caso o usuário tenha digitado por engano."""
+        return nome.removeprefix("models/").strip()
+
     def build_url(self):
         base_url = (self.integration.api_base_url or self.default_base_url).rstrip("/")
+        modelo = self._limpar_nome_modelo(self.integration.default_model)
         if "{model}" in base_url:
-            endpoint = base_url.format(model=self.integration.default_model)
+            endpoint = base_url.format(model=modelo)
         elif base_url.endswith(":generateContent"):
             endpoint = base_url
         else:
-            endpoint = (
-                f"{base_url}/models/{self.integration.default_model}:generateContent"
-            )
+            endpoint = f"{base_url}/models/{modelo}:generateContent"
         query_string = urlencode({"key": self.integration.api_key})
         separator = "&" if "?" in endpoint else "?"
         return f"{endpoint}{separator}{query_string}"
@@ -152,6 +156,7 @@ class GeminiProviderAdapter(BaseAIProviderAdapter):
 
     def _build_execution_url(self, model_name):
         base_url = (self.integration.api_base_url or self.default_base_url).rstrip("/")
+        model_name = self._limpar_nome_modelo(model_name)
         if "{model}" in base_url:
             endpoint = base_url.format(model=model_name)
         elif base_url.endswith(":generateContent"):

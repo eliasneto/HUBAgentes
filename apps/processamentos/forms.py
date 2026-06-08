@@ -50,7 +50,8 @@ class AgenteExecucaoForm(forms.Form):
     output_format = forms.ChoiceField(
         label="Formato de saida",
         choices=(
-            (ProcessingOutputFormat.AI_DEFINED, "Definido pela IA"),
+            (ProcessingOutputFormat.AI_DEFINED, "Definida pela IA"),
+            (ProcessingOutputFormat.LIVRE, "Definida pelo Prompt"),
             (ProcessingOutputFormat.JSON, "JSON"),
             (ProcessingOutputFormat.XLSX, "Excel"),
             (ProcessingOutputFormat.CSV, "CSV"),
@@ -69,6 +70,7 @@ class AgenteExecucaoForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         self.agente = kwargs.pop("agente", None)
+        self.actor = kwargs.pop("actor", None)
         super().__init__(*args, **kwargs)
         self.configuracao_operacional = (
             obter_ou_criar_configuracao_operacional(self.agente)
@@ -129,10 +131,23 @@ class AgenteExecucaoForm(forms.Form):
             configuracao.default_local_relative_input_path
         )
         self.fields["output_format"].initial = configuracao.default_output_format
-        self.fields["local_storage_integration"].queryset = (
-            LocalStorageIntegration.objects.filter(status=IntegrationStatus.ATIVA)
-            .order_by("nome")
-        )
+        from django.db.models import Q
+        qs = LocalStorageIntegration.objects.filter(status=IntegrationStatus.ATIVA)
+        if self.actor:
+            is_admin = (
+                self.actor.is_superuser
+                or self.actor.groups.filter(name__in=["administrador"]).exists()
+            )
+            if is_admin:
+                # admin vê todas as pastas ativas
+                pass
+            else:
+                # usuário comum: vê só a pasta pessoal + pastas compartilhadas onde foi adicionado
+                qs = qs.filter(
+                    Q(created_by=self.actor, compartilhada=False)
+                    | Q(compartilhada=True, usuarios_autorizados=self.actor)
+                )
+        self.fields["local_storage_integration"].queryset = qs.order_by("nome")
 
     MAX_UPLOAD_MB = 50
 

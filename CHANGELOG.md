@@ -5,6 +5,72 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.4.0] — 2026-06-07
+
+### Adicionado
+
+#### Gerenciamento de Arquivos em Pasta Local
+- **Upload de arquivos via interface web** — nova página "Gerenciar arquivos" acessível pelo card de cada integração de pasta local. Suporta seleção de arquivos individuais, pasta inteira (preservando estrutura de subpastas via `webkitdirectory`) e drag & drop.
+- **Progresso de upload em tempo real** — barra de progresso, lista de resultados por arquivo e mensagens de sucesso/erro individuais.
+- **Exclusão de arquivos** — botão de exclusão por arquivo com confirmação, direto na listagem da página de gerenciamento.
+- **Detecção automática de extensão** no modo "Definida pelo Prompt" — sistema detecta se o conteúdo é HTML (→ `.html`), JSON (→ `.json`) ou texto puro (→ `.txt`) e salva com a extensão correta.
+- **Volume `entradas` gravável** — removido o modo somente-leitura (`:ro`) do volume Docker para permitir upload via web.
+
+#### Sistema de Pastas Locais — Pastas Pessoais e Compartilhadas
+- **Pasta pessoal automática** — ao criar um usuário via portal, o sistema cria automaticamente uma pasta `/app/entradas/{username}/` e uma integração "Pasta de {nome}" vinculada a esse usuário como proprietário.
+- **Pastas compartilhadas** — nova seção em Configurações Gerais para criar pastas acessíveis a todos os usuários. Nome da pasta no servidor é gerado automaticamente a partir do nome da integração (slug).
+- **Controle de usuários por pasta compartilhada** — botão "Gerenciar usuários" em cada pasta compartilhada permite adicionar ou remover usuários com duas permissões: **Leitura** (só executa agentes) e **Leitura e escrita** (pode fazer upload e excluir arquivos). Permissão alterável a qualquer momento com um clique.
+- **Filtro de acesso no formulário de execução** — o dropdown de pasta local na execução exibe apenas pastas às quais o usuário tem acesso (pessoal ou compartilhadas onde foi adicionado).
+- **Regras de acesso ao botão "Gerenciar arquivos"**: pasta pessoal → só o dono; pasta compartilhada → admin ou membro com permissão de escrita.
+
+#### Sistema Híbrido de Permissões de Menu
+- **Model `PermissaoMenu`** — tabela com todas as páginas do sistema (11 rotas), vinculada a grupos (permissão padrão) e a usuários individuais (permissão extra).
+- **Perfis padrão por grupo:**
+  - **Operador:** Painel, Agentes, Processamentos, Fontes de documentos.
+  - **Analista:** tudo do Operador + Gerenciar agentes, Integrações, Histórico e auditoria, Configuração de Custos.
+  - **Administrador:** acesso completo (todas as 11 páginas).
+- **Permissões extras individuais** — na edição de usuário, o administrador pode marcar páginas adicionais além do padrão do grupo, sem alterar o grupo.
+- **Sidebar dinâmico** — itens do menu aparecem apenas se o usuário tiver permissão para aquela página; grupos inteiros (Operação/Administrador) desaparecem se nenhum item estiver disponível.
+- **Context processor `paginas_menu`** — injetado em todos os templates, evita N+1 queries calculando as páginas acessíveis uma única vez por request.
+- **Comando `seed_permissoes_menu`** — popula as páginas e vincula grupos em uma execução; idempotente (pode rodar múltiplas vezes sem duplicar dados).
+
+#### Formulário de Usuário Reformulado
+- **Seleção de perfil por cartões visuais** — substitui o dropdown "Papel principal" + checkboxes de grupos por 4 cartões clicáveis: Operador, Analista, Administrador e Sem perfil.
+- **Campos simplificados** — removidos "Acesso técnico/staff" e o multi-checkbox de grupos. Mantidos: Usuário ativo e Administrador total.
+- **Seção "Páginas extras"** (apenas na edição) — grade de checkboxes mostrando todas as páginas disponíveis. Páginas concedidas pelo perfil aparecem em ciano e desativadas; páginas extras individuais são marcáveis separadamente.
+
+#### Novos Modos de Saída
+- **"Definida pelo Prompt"** (`livre`) — sistema salva a resposta da IA exatamente como retornou, sem qualquer conversão. Extensão do arquivo detectada automaticamente pelo conteúdo (HTML → `.html`, JSON → `.json`, texto → `.txt`). Prompt não é modificado.
+- **"Definida pela IA" aprimorado** — instrução injetada no prompt agora inclui tabela de critérios para escolha do formato (xlsx para dados tabulares, pdf para relatórios, json para integração de sistemas, etc.) e campo `justificativa` no JSON de resposta.
+
+#### Card de Agente — Informações de Origem
+- **"Origem dos documentos"** exibida no card — mostra o tipo de entrada configurado no agente (Pasta local · nome-da-pasta, Google Drive · nome-da-fonte, Upload na execução, Sem origem documental).
+- **Verificação de acesso à pasta local** — se o agente usa pasta local fixa e o usuário não tem acesso a ela, o botão "Executar" é substituído por "Sem acesso" (desabilitado) e um aviso laranja é exibido no card.
+
+#### Fontes de Documentos
+- **Seção "Pastas locais" restaurada** em Fontes de documentos — exibe cards das pastas às quais o usuário tem acesso (pessoal ou compartilhadas), com botão "Gerenciar arquivos" para proprietários e membros com permissão de escrita.
+- **Campo renomeado:** "Criado por" → "Proprietário" com exibição do nome completo do usuário.
+
+### Corrigido
+- **Fix de migrations conflitantes** — resolvidas múltiplas colisões de `0017_alter_*` entre ambientes local e servidor; introduzidas migrations de merge e dependências corrigidas.
+- **`render` não importado em `core/views.py`** — causava `NameError` na página de gerenciamento de arquivos; import adicionado.
+- **Toggle "Ler subpastas automaticamente" em `integracao_form.html`** — corrigido para usar o padrão `.toggle-line` do sistema, igual ao `fonte_documento_form.html`.
+- **Prefixo `models/` no nome do modelo Gemini** — adaptador Gemini agora remove automaticamente o prefixo `models/` se o usuário o digitar por engano no campo Modelo padrão.
+- **Worker parado causava processamentos travados** — ao reiniciar o worker, processamentos em estado `em_processamento` são reconciliados automaticamente para `concluido_erro`.
+- **`compartilhada=True` em pastas pessoais** — pastas criadas manualmente antes do sistema automático eram marcadas como compartilhadas indevidamente; corrigidas via script e regra de criação ajustada.
+- **`created_by` incorreto em pastas pessoais** — ao criar usuário via portal, a pasta era atribuída ao admin logado em vez do novo usuário; corrigido para `created_by=usuario`.
+- **Acesso indevido do administrador a pastas de outros usuários** — regra de acesso ajustada: pasta pessoal é exclusiva do dono, mesmo para administradores; administradores gerenciam apenas pastas compartilhadas.
+- **403 em Histórico e auditoria para usuário Analista** — `AuditoriaView` e `ConfiguracaoCustosView` atualizadas para usar `AnalistaOuAdminRequiredMixin`.
+- **`TemplateSyntaxError` no sidebar** — `{% with var=expr %}` não aceita expressões booleanas em Django templates; substituído por `{% if %}` direto.
+
+### Alterado
+- **"Pasta local" movida de Fontes de documentos para Integrações** — criação de nova pasta local agora é feita exclusivamente em Integrações ou automaticamente ao criar usuário.
+- **Formulário de criação de pasta local simplificado** — campo "Caminho local autorizado" substituído por "Nome da pasta compartilhada"; caminho gerado automaticamente como `/app/entradas/{slug}`.
+- **"Fontes de documentos" movida para a aba Operação** no sidebar (era Administrador).
+- **Nomenclatura dos modos de saída:** "Livre (saída direta da IA)" → "Definida pelo Prompt"; "Definido pela IA" → "Definida pela IA" (feminino, consistente com "saída").
+
+---
+
 ## [1.3.0] — 2026-06-04
 
 ### Adicionado

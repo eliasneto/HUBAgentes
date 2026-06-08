@@ -11,6 +11,11 @@ from apps.integracoes.services.google_drive import (
 )
 
 
+class PermissaoPasta(models.TextChoices):
+    LEITURA = "leitura", "Leitura"
+    ESCRITA = "escrita", "Leitura e escrita"
+
+
 class IntegrationStatus(models.TextChoices):
     ATIVA = "ativa", "Ativa"
     INATIVA = "inativa", "Inativa"
@@ -38,6 +43,17 @@ class LocalStorageIntegration(SoftDeleteModel, UserStampedModel):
         default=IntegrationStatus.INATIVA,
     )
     base_path = models.CharField(max_length=500)
+    compartilhada = models.BooleanField(
+        default=False,
+        help_text="Pastas compartilhadas ficam visíveis para todos os usuários.",
+    )
+    usuarios_autorizados = models.ManyToManyField(
+        "auth.User",
+        blank=True,
+        through="PastaCompartilhadaUsuario",
+        related_name="integracoes_pasta_autorizada",
+        help_text="Usuários que podem usar esta pasta. Vazio = somente administradores.",
+    )
     allowed_extensions = models.JSONField(default=list, blank=True)
     recursive_scan = models.BooleanField(default=False)
     last_validated_at = models.DateTimeField(null=True, blank=True)
@@ -77,6 +93,31 @@ class LocalStorageIntegration(SoftDeleteModel, UserStampedModel):
 
     def __str__(self):
         return self.nome
+
+
+class PastaCompartilhadaUsuario(models.Model):
+    integracao = models.ForeignKey(
+        LocalStorageIntegration,
+        on_delete=models.CASCADE,
+        related_name="membros",
+    )
+    usuario = models.ForeignKey(
+        "auth.User",
+        on_delete=models.CASCADE,
+        related_name="membros_pasta",
+    )
+    permissao = models.CharField(
+        max_length=10,
+        choices=PermissaoPasta.choices,
+        default=PermissaoPasta.LEITURA,
+    )
+
+    class Meta:
+        unique_together = ("integracao", "usuario")
+        verbose_name = "Membro de pasta compartilhada"
+
+    def __str__(self):
+        return f"{self.usuario.username} → {self.integracao.nome} ({self.permissao})"
 
 
 class GoogleDriveIntegration(SoftDeleteModel, UserStampedModel):

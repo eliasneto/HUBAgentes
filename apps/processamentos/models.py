@@ -42,6 +42,7 @@ class ProcessingStatus(models.TextChoices):
     EM_PROCESSAMENTO = "em_processamento", "Em processamento"
     CONCLUIDO_SUCESSO = "concluido_sucesso", "Concluido com sucesso"
     CONCLUIDO_ERRO = "concluido_erro", "Concluido com erro"
+    CONCLUIDO_ATENCAO = "concluido_atencao", "Concluido com atencao"
     CANCELADO = "cancelado", "Cancelado"
 
 
@@ -66,7 +67,8 @@ class ProcessingInputSourceType(models.TextChoices):
 
 
 class ProcessingOutputFormat(models.TextChoices):
-    AI_DEFINED = "ai_defined", "Definido pela IA"
+    AI_DEFINED = "ai_defined", "Definida pela IA"
+    LIVRE = "livre", "Definida pelo Prompt"
     JSON = "json", "JSON"
     XLSX = "xlsx", "Excel"
     CSV = "csv", "CSV"
@@ -300,6 +302,7 @@ class Processamento(SoftDeleteModel, TimestampedModel):
             ProcessingStatus.EM_PROCESSAMENTO,
             ProcessingStatus.CONCLUIDO_SUCESSO,
             ProcessingStatus.CONCLUIDO_ERRO,
+            ProcessingStatus.CONCLUIDO_ATENCAO,
         }
         if self.status in status_requer_snapshot and self.agente_id:
             if not self.prompt_snapshot:

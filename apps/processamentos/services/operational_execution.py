@@ -88,9 +88,31 @@ def criar_e_iniciar_processamento_para_agente(*, agente, actor, cleaned_data):
     return processamento
 
 
+_MENSAGENS_ATENCAO = (
+    "nenhum pdf pendente",
+    "nenhum arquivo pendente",
+    "nenhuma subpasta encontrada",
+    "pasta local nao encontrada",
+    "pasta nao encontrada",
+    "caminho nao encontrado",
+    "nenhum documento encontrado",
+    "nenhum item encontrado",
+)
+
+
+def _e_situacao_atencao(mensagem: str) -> bool:
+    """Retorna True para situações que exigem atenção do usuário, não erro técnico."""
+    msg = mensagem.lower()
+    return any(p in msg for p in _MENSAGENS_ATENCAO)
+
+
 def _finalizar_processamento_com_erro(processamento, mensagem_operacional, mensagem_tecnica=""):
     processamento.refresh_from_db()
-    processamento.status = ProcessingStatus.CONCLUIDO_ERRO
+    processamento.status = (
+        ProcessingStatus.CONCLUIDO_ATENCAO
+        if _e_situacao_atencao(mensagem_operacional)
+        else ProcessingStatus.CONCLUIDO_ERRO
+    )
     processamento.mensagem_erro = mensagem_operacional
     processamento.mensagem_erro_tecnico = mensagem_tecnica
     processamento.finalizado_em = timezone.now()

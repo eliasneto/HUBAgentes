@@ -43,6 +43,7 @@ class LocalStorageFonteResumo:
     leitura_recursiva: bool
     ultima_validacao: datetime | None
     criado_por: str
+    pode_gerenciar: bool = False
 
 
 @dataclass(frozen=True)
@@ -128,7 +129,7 @@ class IntegracoesPortalResumo:
         return len(self.storage_local)
 
 
-def listar_fontes_documentos_para_portal() -> FontesDocumentosResumo:
+def listar_fontes_documentos_para_portal(usuario=None) -> FontesDocumentosResumo:
     """Retorna somente dados operacionais seguros das fontes de documentos."""
     fontes_google_drive = (
         GoogleDriveFolderSource.objects.select_related("google_drive_integration")
@@ -142,7 +143,32 @@ def listar_fontes_documentos_para_portal() -> FontesDocumentosResumo:
         )
         .order_by("nome")
     )
-    fontes_locais = LocalStorageIntegration.objects.select_related("created_by").order_by("nome")
+
+    fontes_locais_qs = LocalStorageIntegration.objects.select_related("created_by").prefetch_related("membros")
+    is_admin = bool(usuario and (usuario.is_superuser or usuario.groups.filter(name="administrador").exists()))
+    if usuario:
+        # Pasta pessoal: só o próprio dono (created_by == usuario), nunca outro
+        pasta_pessoal = Q(created_by=usuario, compartilhada=False)
+        # Pastas compartilhadas: admin vê todas; outros só onde foram adicionados
+        if is_admin:
+            pastas_compartilhadas = Q(compartilhada=True)
+        else:
+            pastas_compartilhadas = Q(compartilhada=True, usuarios_autorizados=usuario)
+        fontes_locais_qs = fontes_locais_qs.filter(pasta_pessoal | pastas_compartilhadas)
+    fontes_locais = fontes_locais_qs.order_by("nome")
+
+    def _pode_gerenciar(fonte):
+        if not usuario:
+            return False
+        # Pasta pessoal: só o dono, nunca o admin de outro
+        if not fonte.compartilhada:
+            return fonte.created_by_id == usuario.pk
+        # Pasta compartilhada: admin pode sempre; membros com escrita também
+        if is_admin:
+            return True
+        from apps.integracoes.models import PastaCompartilhadaUsuario, PermissaoPasta
+        membro = next((m for m in fonte.membros.all() if m.usuario_id == usuario.pk), None)
+        return membro is not None and membro.permissao == PermissaoPasta.ESCRITA
 
     return FontesDocumentosResumo(
         google_drive=[
@@ -168,7 +194,10 @@ def listar_fontes_documentos_para_portal() -> FontesDocumentosResumo:
                 extensoes=", ".join(fonte.allowed_extensions or []),
                 leitura_recursiva=fonte.recursive_scan,
                 ultima_validacao=fonte.last_validated_at,
-                criado_por=str(fonte.created_by) if fonte.created_by else "—",
+                criado_por=(
+                    fonte.created_by.get_full_name() or fonte.created_by.username
+                ) if fonte.created_by else "—",
+                pode_gerenciar=_pode_gerenciar(fonte),
             )
             for fonte in fontes_locais
         ],

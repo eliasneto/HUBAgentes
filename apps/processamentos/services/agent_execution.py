@@ -187,11 +187,14 @@ def execute_processing(processamento, actor):
         processamento.custo_brl = telemetry.get("custo_brl")
         processamento.finalizado_em = finished_at
         if batch_result["total_errors"]:
-            processamento.status = ProcessingStatus.CONCLUIDO_ERRO
-            processamento.mensagem_erro = (
-                batch_result["last_error_message"]
-                or "Uma ou mais execucoes terminaram com erro."
+            from apps.processamentos.services.operational_execution import _e_situacao_atencao
+            msg_erro = batch_result["last_error_message"] or "Uma ou mais execucoes terminaram com erro."
+            processamento.status = (
+                ProcessingStatus.CONCLUIDO_ATENCAO
+                if _e_situacao_atencao(msg_erro)
+                else ProcessingStatus.CONCLUIDO_ERRO
             )
+            processamento.mensagem_erro = msg_erro
             processamento.mensagem_erro_tecnico = (
                 batch_result["last_technical_error_message"]
             )
@@ -309,6 +312,7 @@ def _build_prompt_snapshot(processamento):
     )
     if processamento.output_format == ProcessingOutputFormat.AI_DEFINED:
         prompt = _adicionar_instrucao_formato_definido_pela_ia(prompt)
+    # LIVRE: nao altera o prompt — a IA retorna exatamente o que o prompt pede
     return prompt
 
 
@@ -328,16 +332,29 @@ def _adicionar_instrucao_formato_definido_pela_ia(prompt):
         return prompt
     return (
         f"{prompt.rstrip()}\n\n"
-        f"{AI_DEFINED_OUTPUT_INSTRUCTION_MARKER}:\n"
-        "- Como o formato de saida esta configurado como definido pela IA, "
-        "responda obrigatoriamente com um JSON valido contendo o campo "
-        '"formato_saida".\n'
-        '- O campo "formato_saida" deve ser exatamente um destes valores: '
-        '"json", "xlsx", "csv", "pdf" ou "txt".\n'
-        "- O conteudo a ser convertido pelo sistema deve ficar no campo "
-        '"dados".\n'
-        "- Nao use outros formatos e nao gere arquivo diretamente; o sistema "
-        "validara o formato e criara o arquivo final."
+        f"## {AI_DEFINED_OUTPUT_INSTRUCTION_MARKER}\n\n"
+        "Antes de responder, escolha o formato de saida mais adequado ao conteudo "
+        "que voce vai gerar, seguindo os criterios abaixo:\n\n"
+        "| Formato | Use quando a resposta for... |\n"
+        "|---------|------------------------------|\n"
+        "| xlsx    | Dados tabulares: listas, comparativos, rankings, planilhas de custo, cronogramas |\n"
+        "| csv     | Dados tabulares simples que precisam ser importados em outros sistemas |\n"
+        "| pdf     | Relatorio narrativo, analise, laudo, parecer ou documento formal com texto corrido |\n"
+        "| json    | Dados estruturados destinados a integracao com outros sistemas ou APIs |\n"
+        "| txt     | Texto corrido simples, sem formatacao especial |\n\n"
+        "Responda OBRIGATORIAMENTE com um JSON valido neste formato exato:\n"
+        "{\n"
+        '  "formato_saida": "<xlsx|csv|pdf|json|txt>",\n'
+        '  "justificativa": "<uma linha explicando por que escolheu este formato>",\n'
+        '  "dados": <conteudo completo da resposta no formato escolhido>\n'
+        "}\n\n"
+        "Regras:\n"
+        '- "dados" deve conter o conteudo completo e final — nao resuma nem trunque.\n'
+        '- Para xlsx e csv: "dados" deve ser uma lista de listas (primeira linha = cabecalhos).\n'
+        '- Para pdf: "dados" deve ser HTML completo com CSS interno.\n'
+        '- Para json: "dados" deve ser um objeto ou lista JSON.\n'
+        '- Para txt: "dados" deve ser uma string de texto puro.\n'
+        "- Nao gere arquivos diretamente. O sistema converte automaticamente."
     )
 
 
@@ -636,10 +653,11 @@ def _execute_without_document(
         execution_result.output_text,
         requested_output_format=processamento.output_format,
     )
+    _ext = "" if processamento.output_format == ProcessingOutputFormat.LIVRE else f".{processamento.output_format}"
     output_filename, output_bytes, output_format, render_payload = _render_output_file(
         parsed_output,
         processamento.output_format,
-        f"{processamento.codigo}_resultado.{processamento.output_format}",
+        f"{processamento.codigo}_resultado{_ext}",
     )
 
     custo_usd_exec, custo_brl_exec = calcular_custo_processamento(
@@ -1091,7 +1109,11 @@ def _aggregate_processing_telemetry(processamento):
     }
 
 
-_PLAIN_TEXT_FORMATS = {ProcessingOutputFormat.TXT, ProcessingOutputFormat.PDF}
+_PLAIN_TEXT_FORMATS = {
+    ProcessingOutputFormat.TXT,
+    ProcessingOutputFormat.PDF,
+    ProcessingOutputFormat.LIVRE,
+}
 
 
 def _parse_structured_output(output_text, requested_output_format=None):
@@ -1144,7 +1166,28 @@ def _parse_structured_output(output_text, requested_output_format=None):
     )
 
 
+def _detectar_extensao_livre(texto: str) -> str:
+    """Detecta a extensão correta para o modo livre baseado no conteúdo."""
+    stripped = texto.strip()
+    if stripped.lower().startswith(("<!doctype", "<html")):
+        return "html"
+    if stripped.startswith("{") or stripped.startswith("["):
+        try:
+            import json as _json
+            _json.loads(stripped)
+            return "json"
+        except ValueError:
+            pass
+    return "txt"
+
+
 def _render_output_file(parsed_output, requested_output_format, output_basename):
+    if requested_output_format == ProcessingOutputFormat.LIVRE:
+        texto = str(parsed_output)
+        ext = _detectar_extensao_livre(texto)
+        filename = f"{output_basename}.{ext}"
+        return filename, texto.encode("utf-8"), ProcessingOutputFormat.LIVRE, texto
+
     output_format, render_payload = _resolver_formato_e_payload_saida(
         parsed_output,
         requested_output_format,
@@ -1241,6 +1284,9 @@ def _truncate_error_excerpt(value, limit=1800):
 
 def _build_output_basename(processamento, documento, output_format):
     base_name = Path(documento.nome_arquivo).stem or "resultado"
+    if output_format == ProcessingOutputFormat.LIVRE:
+        # extensão será detectada pelo conteúdo em _render_output_file
+        return f"{processamento.codigo}_{base_name}"
     return f"{processamento.codigo}_{base_name}.{output_format}"
 
 

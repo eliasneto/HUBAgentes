@@ -67,7 +67,8 @@ class AgentDefaultInputSourceType(models.TextChoices):
 
 
 class AgentDefaultOutputFormat(models.TextChoices):
-    AI_DEFINED = "ai_defined", "Definido pela IA"
+    AI_DEFINED = "ai_defined", "Definida pela IA"
+    LIVRE = "livre", "Definida pelo Prompt"
     JSON = "json", "JSON"
     XLSX = "xlsx", "Excel"
     CSV = "csv", "CSV"

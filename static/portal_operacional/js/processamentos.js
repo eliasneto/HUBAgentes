@@ -132,6 +132,16 @@ document.addEventListener("DOMContentLoaded", function () {
       const message = payload.mensagem_erro || "";
       errorPanel.hidden = !message;
       errorMessage.textContent = message;
+      // Atualiza o texto do summary conforme o tipo de situação
+      const isAtencao = payload.status_codigo === "concluido_atencao";
+      const summary = errorPanel.querySelector("summary");
+      if (summary) {
+        summary.textContent = isAtencao ? "⚠ Ver atenção" : "⚠ Ver erro";
+      }
+      const errorSpan = errorPanel.querySelector("span");
+      if (errorSpan) {
+        errorSpan.textContent = isAtencao ? "Atenção" : "Detalhes do erro";
+      }
     }
 
     updateSummary(payload);

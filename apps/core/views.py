@@ -30,7 +30,6 @@ from apps.integracoes.forms import (
     AIProviderIntegrationPortalForm,
     GoogleDriveFolderSourcePortalForm,
     GoogleDriveIntegrationPortalForm,
-    LocalStorageFontePortalForm,
     LocalStorageIntegrationPortalForm,
 )
 from apps.integracoes.models import (
@@ -58,6 +57,20 @@ from apps.usuarios.selectors import listar_usuarios_acessos_para_portal
 from apps.usuarios.forms import UsuarioPortalForm
 
 logger = logging.getLogger(__name__)
+
+
+class PagePermissionMixin(LoginRequiredMixin):
+    """Verifica se o usuário tem acesso à página via PermissaoMenu."""
+    page_key = ""
+    login_url = reverse_lazy("portal_login")
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        from apps.core.models import usuario_pode_acessar_pagina
+        if not usuario_pode_acessar_pagina(request.user, self.page_key):
+            raise PermissionDenied("Voce nao tem permissao para acessar esta pagina.")
+        return super().dispatch(request, *args, **kwargs)
 
 
 class PortalAdministradorRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -209,7 +222,7 @@ class AgentesLeituraView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["agentes"] = listar_agentes_para_portal()
+        context["agentes"] = listar_agentes_para_portal(usuario=self.request.user)
         return context
 
 
@@ -321,6 +334,7 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
             request.POST,
             request.FILES,
             agente=self.agente,
+            actor=request.user,
         )
         show_upload = form.runtime_fields_schema.get("show_file_upload")
         if show_upload:
@@ -374,7 +388,7 @@ class FontesDocumentosView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["fontes"] = listar_fontes_documentos_para_portal()
+        context["fontes"] = listar_fontes_documentos_para_portal(usuario=self.request.user)
         return context
 
 
@@ -384,11 +398,9 @@ class FonteDocumentoPortalFormMixin(PortalAdministradorRequiredMixin):
 
     form_classes = {
         "google-drive-folder": GoogleDriveFolderSourcePortalForm,
-        "storage-local": LocalStorageFontePortalForm,
     }
     model_classes = {
         "google-drive-folder": GoogleDriveFolderSource,
-        "storage-local": LocalStorageIntegration,
     }
     type_metadata = {
         "google-drive-folder": {
@@ -398,14 +410,6 @@ class FonteDocumentoPortalFormMixin(PortalAdministradorRequiredMixin):
                 "Cadastre a pasta do Google Drive que sera usada como origem documental."
             ),
             "orb": "GD",
-        },
-        "storage-local": {
-            "label": "Pasta local",
-            "title": "Cadastrar fonte local",
-            "description": (
-                "Cadastre uma pasta local autorizada para leitura de documentos."
-            ),
-            "orb": "PC",
         },
     }
 
@@ -576,6 +580,25 @@ class IntegracaoCreateView(IntegracaoPortalFormMixin, FormView):
             self.integration_type = "ia"
         return super().dispatch(request, *args, **kwargs)
 
+    def form_valid(self, form):
+        integration = form.save(commit=False)
+        if self.integration_type == "storage-local":
+            integration.compartilhada = True
+            integration.save()
+            form.save_m2m()
+            try:
+                Path(integration.base_path).mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
+        else:
+            integration.save()
+            form.save_m2m()
+        messages.success(
+            self.request,
+            f"Conexao {integration.nome} criada com sucesso.",
+        )
+        return redirect("portal_integracoes")
+
 
 class IntegracaoUpdateView(IntegracaoPortalFormMixin, FormView):
     def dispatch(self, request, *args, **kwargs):
@@ -716,7 +739,38 @@ class UsuarioPortalFormMixin(PortalAdministradorRequiredMixin):
 
 
 class UsuarioPortalCreateView(UsuarioPortalFormMixin, FormView):
-    pass
+    def form_valid(self, form):
+        usuario = form.save()
+        self._criar_pasta_pessoal(usuario)
+        messages.success(
+            self.request,
+            f"Usuario {usuario.username} criado. Pasta pessoal configurada automaticamente.",
+        )
+        return redirect(reverse("portal_usuario_editar", kwargs={"user_id": usuario.pk}))
+
+    def _criar_pasta_pessoal(self, usuario):
+        from apps.integracoes.models import LocalStorageIntegration, IntegrationStatus
+        caminho = f"/app/entradas/{usuario.username}"
+        try:
+            Path(caminho).mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        nome = f"Pasta de {usuario.get_full_name() or usuario.username}"
+        # garante nome unico se ja existir integracao com esse nome
+        sufixo = 1
+        nome_final = nome
+        while LocalStorageIntegration.objects.filter(nome=nome_final).exists():
+            sufixo += 1
+            nome_final = f"{nome} ({sufixo})"
+        LocalStorageIntegration.objects.create(
+            nome=nome_final,
+            base_path=caminho,
+            status=IntegrationStatus.ATIVA,
+            recursive_scan=True,
+            allowed_extensions=[],
+            created_by=usuario,      # dono é o próprio usuário, não quem criou
+            updated_by=usuario,
+        )
 
 
 class UsuarioPortalUpdateView(UsuarioPortalFormMixin, FormView):
@@ -731,10 +785,39 @@ class UsuarioPortalUpdateView(UsuarioPortalFormMixin, FormView):
         return kwargs
 
     def get_context_data(self, **kwargs):
+        from apps.core.models import PermissaoMenu
         context = super().get_context_data(**kwargs)
         context["modo_edicao"] = True
         context["usuario_edicao"] = self.usuario_edicao
+        context["todas_paginas"] = PermissaoMenu.objects.all()
+        # Páginas que o grupo do usuário já concede
+        context["paginas_grupo"] = set(
+            PermissaoMenu.objects.filter(
+                grupos__in=self.usuario_edicao.groups.all()
+            ).values_list("chave", flat=True)
+        )
+        # Páginas extras individuais do usuário
+        context["paginas_extras"] = set(
+            self.usuario_edicao.permissoes_menu_extras.values_list("chave", flat=True)
+        )
         return context
+
+    def form_valid(self, form):
+        usuario = form.save()
+        # Salva permissões extras individuais
+        from apps.core.models import PermissaoMenu
+        chaves_extras = self.request.POST.getlist("permissao_extra")
+        # Filtra apenas as que NÃO vêm do grupo (não salvar redundâncias)
+        paginas_grupo = set(
+            PermissaoMenu.objects.filter(
+                grupos__in=usuario.groups.all()
+            ).values_list("chave", flat=True)
+        )
+        chaves_validas = [c for c in chaves_extras if c not in paginas_grupo]
+        extras = PermissaoMenu.objects.filter(chave__in=chaves_validas)
+        usuario.permissoes_menu_extras.set(extras)
+        messages.success(self.request, f"Usuario {usuario.username} salvo com sucesso.")
+        return redirect(reverse("portal_usuario_editar", kwargs={"user_id": usuario.pk}))
 
 
 class LocalStorageSubpastasView(LoginRequiredMixin, View):
@@ -790,6 +873,21 @@ class LocalStorageArquivosView(AnalistaOuAdminRequiredMixin, View):
         })
 
 
+def _usuario_pode_escrever(usuario, integration):
+    """Retorna True se o usuário tem permissão de escrita na integração."""
+    from apps.integracoes.models import PastaCompartilhadaUsuario, PermissaoPasta
+    # Pasta pessoal: só o dono, nunca outro (nem admin)
+    if not integration.compartilhada:
+        return integration.created_by_id == usuario.pk
+    # Pasta compartilhada: admin sempre pode; membros com escrita também
+    if usuario.is_superuser or usuario.groups.filter(name="administrador").exists():
+        return True
+    membro = PastaCompartilhadaUsuario.objects.filter(
+        integracao=integration, usuario=usuario
+    ).first()
+    return membro is not None and membro.permissao == PermissaoPasta.ESCRITA
+
+
 class LocalStorageUploadView(AnalistaOuAdminRequiredMixin, View):
     """Recebe arquivos via POST e salva na base_path da integração."""
 
@@ -799,6 +897,8 @@ class LocalStorageUploadView(AnalistaOuAdminRequiredMixin, View):
     def post(self, request, integracao_id):
         from apps.integracoes.models import LocalStorageIntegration
         integration = get_object_or_404(LocalStorageIntegration, pk=integracao_id)
+        if not _usuario_pode_escrever(request.user, integration):
+            return JsonResponse({"enviados": [], "erros": ["Voce nao tem permissao de escrita nesta pasta."]}, status=403)
         base_path = Path(integration.base_path)
         base_path.mkdir(parents=True, exist_ok=True)
 
@@ -840,6 +940,8 @@ class LocalStorageExcluirArquivoView(AnalistaOuAdminRequiredMixin, View):
         import json
         from apps.integracoes.models import LocalStorageIntegration
         integration = get_object_or_404(LocalStorageIntegration, pk=integracao_id)
+        if not _usuario_pode_escrever(request.user, integration):
+            return JsonResponse({"ok": False, "erro": "Voce nao tem permissao de escrita nesta pasta."}, status=403)
         base_path = Path(integration.base_path).resolve()
 
         try:
@@ -960,13 +1062,143 @@ class ConfiguracaoGeralView(PortalAdministradorRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         from apps.core.models import ConfiguracaoGeral, VisibilidadeDashboard
+        from apps.integracoes.models import LocalStorageIntegration
         context = super().get_context_data(**kwargs)
         config = ConfiguracaoGeral.obter()
         context["config"] = config
         context["opcoes"] = VisibilidadeDashboard.choices
         if config.limpeza_automatica_ativa:
             context["proxima_limpeza"] = _proxima_data_limpeza(config.dia_execucao_limpeza)
+        context["pastas_compartilhadas"] = (
+            LocalStorageIntegration.objects
+            .filter(compartilhada=True)
+            .select_related("created_by")
+            .prefetch_related("membros__usuario")
+            .order_by("nome")
+        )
+        User = get_user_model()
+        context["todos_usuarios"] = (
+            User.objects.filter(is_active=True).order_by("first_name", "username")
+        )
         return context
+
+
+class CriarPastaCompartilhadaView(PortalAdministradorRequiredMixin, View):
+    def post(self, request):
+        import re
+        nome_pasta = request.POST.get("nome_pasta", "").strip()
+        nome_integracao = request.POST.get("nome_integracao", "").strip()
+
+        if not nome_pasta or not nome_integracao:
+            messages.error(request, "Informe o nome da pasta e o nome da integração.")
+            return redirect("portal_configuracao_geral")
+
+        slug = re.sub(r"[^\w\-]", "_", nome_pasta).strip("_")
+        caminho = f"/app/entradas/{slug}"
+
+        if LocalStorageIntegration.objects.filter(base_path=caminho).exists():
+            messages.error(request, f"Já existe uma pasta configurada em {caminho}.")
+            return redirect("portal_configuracao_geral")
+
+        if LocalStorageIntegration.objects.filter(nome=nome_integracao).exists():
+            messages.error(request, f"Já existe uma integração com o nome '{nome_integracao}'.")
+            return redirect("portal_configuracao_geral")
+
+        try:
+            Path(caminho).mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            messages.error(request, f"Não foi possível criar a pasta no servidor: {exc}")
+            return redirect("portal_configuracao_geral")
+
+        from apps.integracoes.models import IntegrationStatus
+        LocalStorageIntegration.objects.create(
+            nome=nome_integracao,
+            base_path=caminho,
+            status=IntegrationStatus.ATIVA,
+            compartilhada=True,
+            recursive_scan=True,
+            allowed_extensions=[],
+            created_by=request.user,
+            updated_by=request.user,
+        )
+        messages.success(request, f"Pasta compartilhada '{nome_integracao}' criada com sucesso.")
+        return redirect("portal_configuracao_geral")
+
+
+class ExcluirPastaCompartilhadaView(PortalAdministradorRequiredMixin, View):
+    def post(self, request, integracao_id):
+        integration = get_object_or_404(
+            LocalStorageIntegration, pk=integracao_id, compartilhada=True
+        )
+        nome = integration.nome
+        integration.delete()
+        messages.success(request, f"Pasta compartilhada '{nome}' removida.")
+        return redirect("portal_configuracao_geral")
+
+
+class AdicionarUsuarioPastaView(PortalAdministradorRequiredMixin, View):
+    def post(self, request, integracao_id):
+        from apps.integracoes.models import PastaCompartilhadaUsuario, PermissaoPasta
+        integration = get_object_or_404(
+            LocalStorageIntegration, pk=integracao_id, compartilhada=True
+        )
+        User = get_user_model()
+        user_id = request.POST.get("user_id")
+        if not user_id:
+            messages.error(request, "Selecione um usuário.")
+            return redirect("portal_configuracao_geral")
+        usuario = get_object_or_404(User, pk=user_id)
+        PastaCompartilhadaUsuario.objects.get_or_create(
+            integracao=integration,
+            usuario=usuario,
+            defaults={"permissao": PermissaoPasta.LEITURA},
+        )
+        messages.success(
+            request,
+            f"Usuário {usuario.get_full_name() or usuario.username} adicionado com permissão de leitura.",
+        )
+        return redirect("portal_configuracao_geral")
+
+
+class RemoverUsuarioPastaView(PortalAdministradorRequiredMixin, View):
+    def post(self, request, integracao_id, user_id):
+        from apps.integracoes.models import PastaCompartilhadaUsuario
+        integration = get_object_or_404(
+            LocalStorageIntegration, pk=integracao_id, compartilhada=True
+        )
+        User = get_user_model()
+        usuario = get_object_or_404(User, pk=user_id)
+        PastaCompartilhadaUsuario.objects.filter(
+            integracao=integration, usuario=usuario
+        ).delete()
+        messages.success(
+            request,
+            f"Usuário {usuario.get_full_name() or usuario.username} removido da pasta '{integration.nome}'.",
+        )
+        return redirect("portal_configuracao_geral")
+
+
+class AlterarPermissaoPastaView(PortalAdministradorRequiredMixin, View):
+    def post(self, request, integracao_id, user_id):
+        from apps.integracoes.models import PastaCompartilhadaUsuario, PermissaoPasta
+        membro = get_object_or_404(
+            PastaCompartilhadaUsuario,
+            integracao_id=integracao_id,
+            usuario_id=user_id,
+        )
+        nova = (
+            PermissaoPasta.ESCRITA
+            if membro.permissao == PermissaoPasta.LEITURA
+            else PermissaoPasta.LEITURA
+        )
+        membro.permissao = nova
+        membro.save()
+        label = dict(PermissaoPasta.choices)[nova]
+        messages.success(
+            request,
+            f"Permissão de {membro.usuario.get_full_name() or membro.usuario.username} alterada para {label}.",
+        )
+        return redirect("portal_configuracao_geral")
 
 
 class SalvarConfiguracaoGeralView(PortalAdministradorRequiredMixin, View):

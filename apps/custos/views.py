@@ -4,13 +4,13 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import FormView, TemplateView
 
-from apps.core.views import PortalAdministradorRequiredMixin
+from apps.core.views import AnalistaOuAdminRequiredMixin, PortalAdministradorRequiredMixin
 from apps.custos.forms import ConfiguracaoFinanceiraForm, PrecificacaoModeloForm
 from apps.custos.models import ConfiguracaoFinanceira, PrecificacaoModelo
 from apps.custos.selectors import listar_precificacoes, obter_configuracao_financeira
 
 
-class ConfiguracaoCustosView(PortalAdministradorRequiredMixin, TemplateView):
+class ConfiguracaoCustosView(AnalistaOuAdminRequiredMixin, TemplateView):
     template_name = "portal_operacional/configuracao_custos.html"
 
     def get_context_data(self, **kwargs):

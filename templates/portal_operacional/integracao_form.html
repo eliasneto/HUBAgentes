@@ -102,6 +102,11 @@
               <div class="execution-field">
                 <label for="{{ form.default_model.id_for_label }}">{{ form.default_model.label }}{% if form.default_model.field.required %}<span class="field-required">*</span>{% endif %}</label>
                 {{ form.default_model }}
+                <small>
+                  Gemini: <code>gemini-2.0-flash</code> &nbsp;|&nbsp;
+                  OpenAI: <code>gpt-4o</code> &nbsp;|&nbsp;
+                  Groq: <code>llama-3.3-70b-versatile</code>
+                </small>
                 {% for error in form.default_model.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
               </div>
               <div class="execution-field">
@@ -211,18 +216,29 @@
         {% else %}
           <section class="builder-card">
             <div class="form-section-heading">
-              <p class="eyebrow">Pasta local</p>
-              <h2>Pasta autorizada</h2>
+              <p class="eyebrow">Pasta compartilhada</p>
+              <h2>{% if modo_edicao %}Pasta autorizada{% else %}Definir pasta compartilhada{% endif %}</h2>
             </div>
 
-            <div class="execution-grid">
-              <div class="execution-field builder-wide">
-                <label for="{{ form.base_path.id_for_label }}">{{ form.base_path.label }}{% if form.base_path.field.required %}<span class="field-required">*</span>{% endif %}</label>
-                {{ form.base_path }}
-                <small>Windows: C:\HubAgentes\contratos &nbsp;|&nbsp; Servidor: /app/entradas/contratos</small>
-                {% for error in form.base_path.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            {% if modo_edicao %}
+              <div class="execution-grid">
+                <div class="execution-field builder-wide">
+                  <label for="{{ form.base_path.id_for_label }}">Caminho no servidor</label>
+                  {{ form.base_path }}
+                  <small>Altere apenas se precisar mover a pasta. O caminho deve existir no servidor.</small>
+                  {% for error in form.base_path.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                </div>
               </div>
-            </div>
+            {% else %}
+              <div class="execution-grid">
+                <div class="execution-field builder-wide">
+                  <label for="{{ form.nome_pasta.id_for_label }}">{{ form.nome_pasta.label }}<span class="field-required">*</span></label>
+                  {{ form.nome_pasta }}
+                  <small>{{ form.nome_pasta.help_text }}</small>
+                  {% for error in form.nome_pasta.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                </div>
+              </div>
+            {% endif %}
 
             <div class="execution-grid">
               <div class="execution-field builder-wide">
@@ -240,17 +256,27 @@
 
             <aside class="integration-field-guide" aria-label="Modelo de preenchimento para pasta local">
               <div>
-                <p class="eyebrow">Modelo de preenchimento</p>
-                <h3>Como configurar a origem local</h3>
+                <p class="eyebrow">Como funciona</p>
+                <h3>Pastas compartilhadas</h3>
                 <small>Campos marcados com <span class="field-required">*</span> sao obrigatorios para salvar.</small>
               </div>
               <dl>
+                {% if not modo_edicao %}
+                  <div>
+                    <dt>Nome da pasta</dt>
+                    <dd>Use um nome simples sem espacos ou acentos. Ex: <code>contratos</code>, <code>projeto_abc</code>.</dd>
+                  </div>
+                  <div>
+                    <dt>Criacao automatica</dt>
+                    <dd>A pasta <code>/app/entradas/nome</code> sera criada no servidor automaticamente ao salvar.</dd>
+                  </div>
+                {% endif %}
                 <div>
-                  <dt>Caminho local autorizado</dt>
-                  <dd>Use o caminho Windows (ex: <code>C:\HubAgentes\contratos</code>) ou do servidor (ex: <code>/app/entradas/contratos</code>).</dd>
+                  <dt>Acesso compartilhado</dt>
+                  <dd>Qualquer agente configurado com esta integracao podera ler os arquivos enviados para ela.</dd>
                 </div>
                 <div>
-                  <dt>Ler subpastas automaticamente</dt>
+                  <dt>Ler subpastas</dt>
                   <dd>Ative quando os arquivos puderem estar em subpastas dentro da pasta raiz.</dd>
                 </div>
               </dl>
