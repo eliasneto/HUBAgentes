@@ -1152,20 +1152,39 @@ class CriarPastaCompartilhadaView(PortalAdministradorRequiredMixin, View):
 class ExcluirPastaCompartilhadaView(PortalAdministradorRequiredMixin, View):
     def post(self, request, integracao_id):
         import shutil
+        from django.db.models import ProtectedError
         integration = get_object_or_404(LocalStorageIntegration, pk=integracao_id)
         nome = integration.nome
         base_path = integration.base_path
         eh_compartilhada = integration.compartilhada
-        integration.hard_delete()
+        redirect_url = "portal_configuracao_geral" if eh_compartilhada else "portal_fontes_documentos"
+        try:
+            integration.hard_delete()
+        except ProtectedError as exc:
+            agentes_nomes = []
+            for obj in exc.protected_objects:
+                if hasattr(obj, "agente"):
+                    agentes_nomes.append(obj.agente.nome)
+            if agentes_nomes:
+                lista = ", ".join(f"'{n}'" for n in agentes_nomes)
+                messages.error(
+                    request,
+                    f"Não foi possível excluir '{nome}'. Ela está configurada como fonte padrão "
+                    f"dos agentes: {lista}. Reconfigure esses agentes antes de excluir a pasta.",
+                )
+            else:
+                messages.error(
+                    request,
+                    f"Não foi possível excluir '{nome}'. Ela ainda está em uso por outros registros do sistema.",
+                )
+            return redirect(redirect_url)
         try:
             if base_path and Path(base_path).exists():
                 shutil.rmtree(base_path)
         except OSError:
             pass
         messages.success(request, f"Pasta '{nome}' removida do sistema e do servidor.")
-        if eh_compartilhada:
-            return redirect("portal_configuracao_geral")
-        return redirect("portal_fontes_documentos")
+        return redirect(redirect_url)
 
 
 class AdicionarUsuarioPastaView(PortalAdministradorRequiredMixin, View):
