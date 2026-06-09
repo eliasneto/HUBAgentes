@@ -8,6 +8,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ## [1.4.1] — 2026-06-08
 
 ### Adicionado
+- **Upload em partes (chunked)** — arquivos são enviados em pedaços de 900 KB, contornando o limite de 1 MB do proxy reverso (Nginx Proxy Manager). Arquivos grandes (acima de 900 KB) que antes retornavam erro 500 agora são enviados com sucesso sem nenhuma alteração no servidor proxy.
 - **Exclusão de agente** — botão "Excluir" com confirmação aparece ao lado de "Editar" na tela Gerenciar agentes. Executa soft delete (preenche `deleted_at`); o agente é ocultado da listagem e dos processamentos sem ser apagado do banco.
 - **Hints de formato de saída** — no formulário de agente, ao selecionar o campo "Formato padrão de saída", uma descrição dinâmica aparece logo abaixo explicando o comportamento de cada opção (Definida pela IA, Definida pelo Prompt, JSON, Excel, CSV, PDF, TXT).
 

@@ -919,6 +919,8 @@ class LocalStorageUploadView(AnalistaOuAdminRequiredMixin, View):
         return JsonResponse({"enviados": [], "erros": ["Você não tem permissão para fazer upload nesta pasta."]}, status=403)
 
     def post(self, request, integracao_id):
+        if "chunk_index" in request.POST:
+            return self._handle_chunk(request, integracao_id)
         from apps.integracoes.models import LocalStorageIntegration
         try:
             integration = get_object_or_404(LocalStorageIntegration, pk=integracao_id)
@@ -932,7 +934,6 @@ class LocalStorageUploadView(AnalistaOuAdminRequiredMixin, View):
 
             for campo, arquivo in request.FILES.items():
                 rel_path = request.POST.get(f"rel_{campo}", arquivo.name)
-                # segurança: impede path traversal
                 try:
                     destino = (base_path / rel_path).resolve()
                     destino.relative_to(base_path.resolve())
@@ -962,6 +963,77 @@ class LocalStorageUploadView(AnalistaOuAdminRequiredMixin, View):
             return JsonResponse({"enviados": enviados, "erros": erros})
         except Exception as exc:
             logger.exception("Erro inesperado no upload para integracao_id=%s", integracao_id)
+            return JsonResponse({"enviados": [], "erros": [f"Erro interno: {exc}"]}, status=500)
+
+    def _handle_chunk(self, request, integracao_id):
+        import re
+        import shutil
+        import tempfile
+        from apps.integracoes.models import LocalStorageIntegration
+        try:
+            integration = get_object_or_404(LocalStorageIntegration, pk=integracao_id)
+            if not _usuario_pode_escrever(request.user, integration):
+                return JsonResponse({"enviados": [], "erros": ["Voce nao tem permissao de escrita nesta pasta."]}, status=403)
+
+            chunk_file = request.FILES.get("file_chunk")
+            if not chunk_file:
+                return JsonResponse({"enviados": [], "erros": ["Chunk nao encontrado."]}, status=400)
+
+            upload_id = request.POST.get("upload_id", "")
+            if not re.match(r'^[a-zA-Z0-9_\-]+$', upload_id):
+                return JsonResponse({"enviados": [], "erros": ["upload_id invalido."]}, status=400)
+
+            chunk_index = int(request.POST.get("chunk_index", 0))
+            total_chunks = int(request.POST.get("total_chunks", 1))
+            rel_path = request.POST.get("rel_path", chunk_file.name)
+
+            tmp_dir = Path(tempfile.gettempdir()) / "hub_uploads" / upload_id
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            chunk_path = tmp_dir / f"chunk_{chunk_index:04d}"
+
+            with open(chunk_path, "wb") as f:
+                for b in chunk_file.chunks():
+                    f.write(b)
+
+            received = list(tmp_dir.glob("chunk_*"))
+            if len(received) < total_chunks:
+                return JsonResponse({"enviados": [], "erros": []})
+
+            base_path = Path(integration.base_path)
+            try:
+                destino = (base_path / rel_path).resolve()
+                destino.relative_to(base_path.resolve())
+            except ValueError:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                return JsonResponse({"enviados": [], "erros": [f"{chunk_file.name}: caminho invalido"]})
+
+            ext = destino.suffix.lstrip(".").lower()
+            if ext not in self.EXTENSOES_PERMITIDAS:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                return JsonResponse({"enviados": [], "erros": [f"{chunk_file.name}: extensao .{ext} nao suportada"]})
+
+            total_size = sum(p.stat().st_size for p in received)
+            if total_size > self.MAX_ARQUIVO_MB * 1024 * 1024:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                return JsonResponse({"enviados": [], "erros": [f"{chunk_file.name}: arquivo maior que {self.MAX_ARQUIVO_MB} MB"]})
+
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with open(destino, "wb") as out_f:
+                    for i in range(total_chunks):
+                        cp = tmp_dir / f"chunk_{i:04d}"
+                        with open(cp, "rb") as cf:
+                            out_f.write(cf.read())
+            except OSError as exc:
+                logger.exception("Erro ao montar arquivo %s", destino)
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                return JsonResponse({"enviados": [], "erros": [f"{chunk_file.name}: erro ao salvar ({exc})"]})
+
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return JsonResponse({"enviados": [str(Path(rel_path).as_posix())], "erros": []})
+
+        except Exception as exc:
+            logger.exception("Erro inesperado no chunk upload para integracao_id=%s", integracao_id)
             return JsonResponse({"enviados": [], "erros": [f"Erro interno: {exc}"]}, status=500)
 
 
