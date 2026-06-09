@@ -68,18 +68,6 @@ class AgentePortalCreateForm(forms.Form):
         initial=AgentDefaultInputSourceType.GOOGLE_DRIVE_FOLDER,
     )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Preserva LOCAL_FILE nas choices se o agente já usa esse tipo (legado)
-        instance = kwargs.get("instance")
-        if instance and hasattr(instance, "configuracao_operacional"):
-            try:
-                config = instance.configuracao_operacional
-                if getattr(config, "input_policy", None) == "local_file" or \
-                   getattr(config, "default_input_source_type", None) == AgentDefaultInputSourceType.LOCAL_FILE:
-                    self.fields["default_input_source_type"].choices = self._CHOICES_COM_LOCAL_FILE
-            except Exception:
-                pass
     default_folder_source = forms.ModelChoiceField(
         label="Pasta padrao do Google Drive",
         queryset=GoogleDriveFolderSource.objects.none(),
@@ -145,6 +133,21 @@ class AgentePortalCreateForm(forms.Form):
             LocalStorageIntegration.objects.filter(status=IntegrationStatus.ATIVA)
             .order_by("nome")
         )
+        # Preserva LOCAL_FILE nas choices se o agente já usa esse tipo (legado)
+        if self.instance is not None:
+            try:
+                config = self.instance.configuracao_operacional
+                if (
+                    getattr(config, "input_policy", None) == "local_file"
+                    or getattr(config, "default_input_source_type", None)
+                    == AgentDefaultInputSourceType.LOCAL_FILE
+                ):
+                    self.fields["default_input_source_type"].choices = (
+                        self._CHOICES_COM_LOCAL_FILE
+                    )
+            except Exception:
+                pass
+
         if self.instance is not None and not self.is_bound:
             self._apply_initial_from_instance()
 
