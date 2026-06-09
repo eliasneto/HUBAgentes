@@ -206,9 +206,11 @@
       this.value = "";
     });
 
-    // NPM bloqueia acima de ~12 KB total (confirmado: 10 KB passa, 12 KB falha).
-    // Chunks de 10 KB + ~650 B overhead = ~10,9 KB por request — abaixo do limite.
-    const CHUNK_SIZE = 10 * 1024;
+    // NPM (OpenResty) falha de forma intermitente quando o corpo do request
+    // ultrapassa ~8,8 KB (precisa gravar body temp). Testes de carga: corpo
+    // ~8,8 KB passa 12/12; ~10,9 KB falha ~80%. Chunk de 7 KB + ~0,8 KB de
+    // overhead multipart = ~7,8 KB de corpo — dentro da zona confiável.
+    const CHUNK_SIZE = 7 * 1024;
     const PARALLEL_CHUNKS = 4;  // chunks simultâneos (exceto o último)
 
     async function _sendOneChunk(file, uploadId, totalChunks, chunkIdx, relPath) {
