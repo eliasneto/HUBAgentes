@@ -995,9 +995,14 @@ class LocalStorageUploadView(AnalistaOuAdminRequiredMixin, View):
                 for b in chunk_file.chunks():
                     f.write(b)
 
+            # O JS envia o último chunk (index == total_chunks-1) somente após confirmar
+            # todos os anteriores. Só ele dispara a montagem — sem corrida entre paralelos.
+            if chunk_index < total_chunks - 1:
+                return JsonResponse({"enviados": [], "erros": []})
+
             received = list(tmp_dir.glob("chunk_*"))
             if len(received) < total_chunks:
-                return JsonResponse({"enviados": [], "erros": []})
+                return JsonResponse({"enviados": [], "erros": [f"{chunk_file.name}: partes incompletas ({len(received)}/{total_chunks})"]}, status=400)
 
             base_path = Path(integration.base_path)
             try:

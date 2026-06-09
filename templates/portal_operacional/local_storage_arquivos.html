@@ -206,50 +206,48 @@
       this.value = "";
     });
 
-    // Envia em partes de 50 KB — NPM bloqueia acima de ~10 KB no caminho HTTPS
-    const CHUNK_SIZE = 50 * 1024;
+    // NPM bloqueia acima de ~12 KB total (confirmado: 10 KB passa, 12 KB falha).
+    // Chunks de 10 KB + ~650 B overhead = ~10,9 KB por request — abaixo do limite.
+    const CHUNK_SIZE = 10 * 1024;
+    const PARALLEL_CHUNKS = 4;  // chunks simultâneos (exceto o último)
+
+    async function _sendOneChunk(file, uploadId, totalChunks, chunkIdx, relPath) {
+      const start = chunkIdx * CHUNK_SIZE;
+      const chunk = file.slice(start, Math.min(start + CHUNK_SIZE, file.size));
+      const fd = new FormData();
+      fd.append("file_chunk", chunk, file.name);
+      fd.append("upload_id", uploadId);
+      fd.append("chunk_index", chunkIdx);
+      fd.append("total_chunks", totalChunks);
+      fd.append("rel_path", relPath);
+      let resp, data;
+      try {
+        resp = await fetch(UPLOAD_URL, { method: "POST", headers: { "X-CSRFToken": CSRF }, body: fd });
+        try { data = await resp.json(); }
+        catch (_) {
+          return { ok: false, error: resp.status === 403 ? "Sem permissão de escrita nesta pasta." : `Erro ${resp.status} ao enviar.` };
+        }
+      } catch (err) { return { ok: false, error: "Erro de rede: " + err.message }; }
+      if (data.erros && data.erros.length > 0) return { ok: false, error: data.erros[0] };
+      return { ok: true };
+    }
 
     async function uploadFileChunked(file, relPath, statusEl) {
       const uploadId = "up_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
       const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
 
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const chunk = file.slice(start, Math.min(start + CHUNK_SIZE, file.size));
-
-        const fd = new FormData();
-        fd.append("file_chunk", chunk, file.name);
-        fd.append("upload_id", uploadId);
-        fd.append("chunk_index", i);
-        fd.append("total_chunks", totalChunks);
-        fd.append("rel_path", relPath);
-
-        if (totalChunks > 1) {
-          statusEl.textContent = `Enviando ${file.name} (parte ${i + 1}/${totalChunks})...`;
-        }
-
-        let resp, data;
-        try {
-          resp = await fetch(UPLOAD_URL, {
-            method: "POST",
-            headers: { "X-CSRFToken": CSRF },
-            body: fd,
-          });
-          try {
-            data = await resp.json();
-          } catch (_) {
-            return { ok: false, error: resp.status === 403 ? "Sem permissão de escrita nesta pasta." : `Erro ${resp.status} ao enviar.` };
-          }
-        } catch (err) {
-          return { ok: false, error: "Erro de rede: " + err.message };
-        }
-
-        if (data.erros && data.erros.length > 0) {
-          return { ok: false, error: data.erros[0] };
-        }
+      // Chunks 0…N-2 em lotes paralelos; o último (N-1) sempre por último → dispara montagem
+      const nonLast = Array.from({ length: Math.max(0, totalChunks - 1) }, (_, i) => i);
+      for (let i = 0; i < nonLast.length; i += PARALLEL_CHUNKS) {
+        const batch = nonLast.slice(i, i + PARALLEL_CHUNKS);
+        const end = Math.min(i + PARALLEL_CHUNKS, nonLast.length);
+        statusEl.textContent = `Enviando ${file.name} (${i + 1}–${end} de ${totalChunks})...`;
+        const results = await Promise.all(batch.map(idx => _sendOneChunk(file, uploadId, totalChunks, idx, relPath)));
+        for (const r of results) { if (!r.ok) return r; }
       }
 
-      return { ok: true };
+      if (totalChunks > 1) statusEl.textContent = `Finalizando ${file.name}...`;
+      return await _sendOneChunk(file, uploadId, totalChunks, totalChunks - 1, relPath);
     }
 
     async function enviarArquivos(files, filesWithPaths) {
