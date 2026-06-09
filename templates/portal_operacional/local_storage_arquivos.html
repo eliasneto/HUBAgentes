@@ -206,8 +206,8 @@
       this.value = "";
     });
 
-    // Envia um arquivo em partes de 900 KB para contornar limite do proxy (1 MB)
-    const CHUNK_SIZE = 900 * 1024;
+    // Envia em partes de 400 KB — limite do proxy (NPM) corta conexao em ~512 KB
+    const CHUNK_SIZE = 400 * 1024;
 
     async function uploadFileChunked(file, relPath, statusEl) {
       const uploadId = "up_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
