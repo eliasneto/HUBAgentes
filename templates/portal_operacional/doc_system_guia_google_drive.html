@@ -1,0 +1,358 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Busca API Google Drive</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260610-doc-guia-google-drive-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_guia_google_drive" %}
+
+    <section class="portal-main" aria-label="Guia API Google Drive">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Busca API Google Drive</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia passo a passo</p>
+          <h2>Como criar uma Service Account no Google Cloud e conectar ao sistema.</h2>
+          <p>
+            O sistema acessa pastas do Google Drive usando uma conta tecnica (Service Account) — sem senha interativa.
+            Voce compartilha a pasta com o e-mail da conta tecnica e o sistema passa a ler os arquivos dela automaticamente.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>DOC</span>
+          <small>google drive</small>
+        </div>
+      </section>
+
+      <!-- VISÃO GERAL -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Visao geral</p>
+          <h2>Como o sistema acessa o Google Drive</h2>
+        </div>
+        <div class="doc-code-panel">
+          <pre><code>Google Cloud Console
+  └── Projeto
+        └── API Google Drive (ativada)
+              └── Service Account
+                    ├── E-mail  (ex: hub-agentes@meu-projeto.iam.gserviceaccount.com)
+                    └── Chave JSON (credencial privada)
+                          │
+                          ▼
+                    HUB Agentes
+                    └── Integracao Google Drive
+                          └── Fontes de Documento (pastas compartilhadas)</code></pre>
+        </div>
+      </section>
+
+      <!-- PASSO A PASSO -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo a passo</p>
+          <h2>Fluxo completo de configuracao</h2>
+        </div>
+        <ol class="doc-step-list">
+          <li>Criar (ou selecionar) um projeto no Google Cloud Console.</li>
+          <li>Ativar a <strong>Google Drive API</strong> no projeto.</li>
+          <li>Criar uma <strong>Service Account</strong> e copiar o e-mail gerado.</li>
+          <li>Gerar e baixar a <strong>chave JSON</strong> da service account.</li>
+          <li>Compartilhar cada pasta do Drive com o e-mail da service account.</li>
+          <li>Criar a integracao no sistema preenchendo e-mail e JSON.</li>
+          <li>Adicionar as pastas como fontes de documento.</li>
+        </ol>
+      </section>
+
+      <!-- PASSO 1 -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo 1</p>
+          <h2>Criar um projeto no Google Cloud</h2>
+        </div>
+        <ul class="doc-note-list">
+          <li>Acesse <strong>console.cloud.google.com</strong>.</li>
+          <li>No topo, clique no seletor de projeto e depois em <strong>Novo projeto</strong>.</li>
+          <li>Dê um nome ao projeto (ex: <code>hub-agentes</code>) e clique em <strong>Criar</strong>.</li>
+          <li>Aguarde e selecione o novo projeto no seletor.</li>
+        </ul>
+        <div class="doc-guide-grid" style="margin-top:12px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Dica</span>
+            <p>Se sua organizacao ja tem um projeto Google Cloud, voce pode reutiliza-lo. Basta seleciona-lo no seletor antes de continuar.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- PASSO 2 -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo 2</p>
+          <h2>Ativar a API do Google Drive</h2>
+        </div>
+        <ul class="doc-note-list">
+          <li>Com o projeto selecionado, acesse <strong>APIs e Servicos &gt; Biblioteca</strong>.</li>
+          <li>Pesquise por <code>Google Drive API</code>.</li>
+          <li>Clique no resultado e depois em <strong>Ativar</strong>.</li>
+          <li>Aguarde a ativacao — voce sera redirecionado para a pagina da API.</li>
+        </ul>
+      </section>
+
+      <!-- PASSO 3 -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo 3</p>
+          <h2>Criar a Service Account</h2>
+        </div>
+        <ul class="doc-note-list">
+          <li>Acesse <strong>APIs e Servicos &gt; Credenciais</strong>.</li>
+          <li>Clique em <strong>+ Criar credenciais</strong> e selecione <strong>Conta de servico</strong>.</li>
+          <li>Preencha o nome (ex: <code>hub-agentes</code>) e clique em <strong>Criar e continuar</strong>.</li>
+          <li>Nas etapas seguintes de permissoes, clique em <strong>Continuar</strong> e depois em <strong>Concluido</strong>.</li>
+          <li>A conta aparecera listada em <strong>Credenciais &gt; Contas de servico</strong>.</li>
+        </ul>
+        <div class="doc-guide-grid" style="margin-top:12px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Importante</span>
+            <p>Copie o e-mail da service account (ex: <code>hub-agentes@meu-projeto.iam.gserviceaccount.com</code>). Voce vai precisar dele para compartilhar as pastas e preencher o cadastro no sistema.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- PASSO 4 -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo 4</p>
+          <h2>Gerar a chave JSON</h2>
+        </div>
+        <ul class="doc-note-list">
+          <li>Na lista de contas de servico, clique no e-mail da conta criada.</li>
+          <li>Acesse a aba <strong>Chaves</strong>.</li>
+          <li>Clique em <strong>Adicionar chave &gt; Criar nova chave</strong>.</li>
+          <li>Selecione o tipo <strong>JSON</strong> e clique em <strong>Criar</strong>.</li>
+          <li>O arquivo <code>.json</code> sera baixado automaticamente para o seu computador.</li>
+        </ul>
+        <div class="doc-code-panel">
+          <strong>Estrutura do arquivo JSON (resumida)</strong>
+          <pre><code>{
+  "type": "service_account",
+  "project_id": "meu-projeto",
+  "private_key_id": "abc123...",
+  "private_key": "-----BEGIN RSA PRIVATE KEY-----\n...",
+  "client_email": "hub-agentes@meu-projeto.iam.gserviceaccount.com",
+  "client_id": "123456789",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  ...
+}</code></pre>
+        </div>
+        <div class="doc-guide-grid" style="margin-top:12px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Seguranca</span>
+            <p>Este arquivo contem a credencial privada. Guarde-o em local seguro e nunca publique em repositorios Git ou compartilhe por e-mail. O sistema armazena o conteudo criptografado.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- PASSO 5 -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo 5</p>
+          <h2>Compartilhar a pasta do Drive com a Service Account</h2>
+        </div>
+        <ul class="doc-note-list">
+          <li>Abra o <strong>Google Drive</strong> com sua conta pessoal ou corporativa.</li>
+          <li>Clique com o botao direito na pasta que os agentes vao usar e selecione <strong>Compartilhar</strong>.</li>
+          <li>No campo de pessoas, cole o <strong>e-mail da service account</strong>.</li>
+          <li>Defina a permissao como <strong>Leitor</strong> (somente leitura e suficiente).</li>
+          <li>Desmarque <strong>Notificar pessoas</strong> — a service account nao recebe e-mails.</li>
+          <li>Clique em <strong>Compartilhar</strong>.</li>
+        </ul>
+        <div class="doc-guide-grid" style="margin-top:12px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Multiplas pastas</span>
+            <p>Repita este passo para cada pasta que quiser adicionar como fonte de documento no sistema. Uma unica service account pode ser compartilhada em quantas pastas forem necessarias.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Acesso restrito</span>
+            <p>A service account so acessa pastas explicitamente compartilhadas com o e-mail dela. O restante do Drive permanece inacessivel.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- PASSO 6 -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo 6</p>
+          <h2>Criar a integracao no sistema</h2>
+        </div>
+        <ul class="doc-note-list">
+          <li>Acesse <strong>Administrador &gt; Integracoes</strong> e clique em <strong>Nova conexao</strong>.</li>
+          <li>Selecione o tipo <strong>Google Drive</strong>.</li>
+          <li>Preencha os campos conforme a tabela abaixo.</li>
+          <li>Salve e use o botao <strong>Validar conexao</strong> para confirmar a comunicacao.</li>
+        </ul>
+
+        <div class="doc-table" style="margin-top:16px">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que preencher</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Nome</strong></div>
+            <div>Nome descritivo (ex: <code>Google Drive - Licitacoes</code>)</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Status</strong></div>
+            <div><code>Ativa</code></div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>E-mail da Service Account</strong></div>
+            <div>O e-mail copiado no Passo 3 (ex: <code>hub-agentes@projeto.iam.gserviceaccount.com</code>)</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Credencial JSON</strong></div>
+            <div>Cole o conteudo completo do arquivo <code>.json</code> baixado no Passo 4 — incluindo as chaves <code>&#123;</code> e <code>&#125;</code></div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Extensoes permitidas</strong></div>
+            <div>Deixe em branco para usar o padrao (<code>pdf</code>), ou informe as extensoes desejadas</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PASSO 7 -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo 7</p>
+          <h2>Adicionar fontes de documento</h2>
+        </div>
+        <ul class="doc-note-list">
+          <li>Acesse <strong>Operacao &gt; Fontes de Documentos</strong> e clique em <strong>Nova fonte</strong>.</li>
+          <li>Selecione a integracao Google Drive criada no Passo 6.</li>
+          <li>Cole a <strong>URL da pasta</strong> do Google Drive.</li>
+          <li>O sistema extrai o ID da pasta automaticamente a partir da URL.</li>
+          <li>Dê um nome para a fonte e salve.</li>
+        </ul>
+        <div class="doc-code-panel">
+          <strong>Formato da URL da pasta</strong>
+          <pre><code>https://drive.google.com/drive/folders/1A2B3C4D5E6F7G8H9I0J
+                                              ↑ este trecho e o ID da pasta (extraido automaticamente)</code></pre>
+        </div>
+        <div class="doc-guide-grid" style="margin-top:12px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Proxima etapa</span>
+            <p>Apos criar a fonte, associe-a a um agente na tela <strong>Gerenciar Agentes</strong>, campo <strong>Origem padrao</strong>.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- VERIFICAÇÃO -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Verificacao rapida</p>
+          <h2>Checklist de confirmacao</h2>
+        </div>
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Etapa</div>
+            <div>Como confirmar</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>API ativada</strong></div>
+            <div>Console Google Cloud &gt; APIs e Servicos &gt; Painel → "Google Drive API" aparece com status ativo</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Service account criada</strong></div>
+            <div>Credenciais &gt; Contas de servico → e-mail listado</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Chave JSON baixada</strong></div>
+            <div>Arquivo <code>.json</code> presente no seu computador</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Pasta compartilhada</strong></div>
+            <div>Drive &gt; pasta &gt; botao de compartilhamento → e-mail da service account na lista</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Integracao criada</strong></div>
+            <div>Sistema &gt; Integracoes → integracao com status "Ativa"</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Fonte criada</strong></div>
+            <div>Fontes de Documentos → pasta aparece na lista</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ERROS COMUNS -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Erros comuns</p>
+          <h2>Problemas e solucoes conhecidas</h2>
+        </div>
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Erro</div>
+            <div>Causa provavel</div>
+            <div>Solucao</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>API not enabled</code></div>
+            <div>API do Drive nao foi ativada</div>
+            <div>Repetir Passo 2 no projeto correto</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>Invalid credentials</code></div>
+            <div>JSON colado incompleto ou corrompido</div>
+            <div>Abrir o arquivo <code>.json</code> em editor de texto, selecionar tudo e colar novamente</div>
+          </div>
+          <div class="doc-table-row">
+            <div>Pasta vazia / arquivo nao encontrado</div>
+            <div>Pasta nao compartilhada com a service account</div>
+            <div>Repetir Passo 5 com o e-mail correto</div>
+          </div>
+          <div class="doc-table-row">
+            <div>Validacao falha sem mensagem clara</div>
+            <div>Projeto Google Cloud sem faturamento ativo</div>
+            <div>Ativar faturamento no Console do Google (necessario mesmo para a API gratuita)</div>
+          </div>
+          <div class="doc-table-row">
+            <div><code>403 Forbidden</code></div>
+            <div>Permissao insuficiente na pasta</div>
+            <div>Verificar se a service account tem pelo menos permissao de <strong>Leitor</strong> na pasta</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PERGUNTAS FREQUENTES -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Perguntas frequentes</p>
+          <h2>Duvidas comuns</h2>
+        </div>
+        <ul class="doc-note-list">
+          <li><strong>Preciso criar uma service account por pasta?</strong> Nao. Uma unica service account pode ser compartilhada em quantas pastas quiser. Voce compartilha cada pasta com o mesmo e-mail e cadastra cada uma como uma fonte de documento separada.</li>
+          <li><strong>A service account tem acesso a todo o meu Drive?</strong> Nao. Ela acessa apenas as pastas e arquivos explicitamente compartilhados com o e-mail dela. O restante do Drive permanece inacessivel.</li>
+          <li><strong>Preciso renovar a chave JSON?</strong> Nao automaticamente. A chave JSON nao expira, mas voce pode revoga-la a qualquer momento no Google Cloud Console e gerar uma nova se necessario.</li>
+          <li><strong>O sistema modifica ou exclui arquivos do Drive?</strong> Nao. O sistema usa permissao de Leitor — ele le os arquivos para processamento mas nunca altera, move ou exclui nada no Drive.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_integracoes' %}">Abrir integracoes</a>
+        <a class="start-button" href="/doc-system/guia-google-drive-api/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

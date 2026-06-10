@@ -42,4 +42,8 @@ urlpatterns = [
         "configuracoes-gerais/",
         include("apps.doc_system.configuracoes_gerais.urls"),
     ),
+    path(
+        "guia-google-drive-api/",
+        include("apps.doc_system.guia_google_drive.urls"),
+    ),
 ]
