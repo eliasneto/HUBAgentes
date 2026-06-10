@@ -93,7 +93,7 @@
         </section>
       {% endif %}
 
-      <form class="agent-builder-form" method="post" data-agent-builder-form>
+      <form class="agent-builder-form" method="post" enctype="multipart/form-data" data-agent-builder-form>
         {% csrf_token %}
 
         {% if form.non_field_errors %}
