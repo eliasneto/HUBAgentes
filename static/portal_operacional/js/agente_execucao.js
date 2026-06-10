@@ -1,4 +1,9 @@
 (function () {
+  // NPM (OpenResty) rejeita corpos > ~8,8 KB. Usamos chunks de 7 KB (mesmo
+  // limite validado para upload local) para contornar o limite do proxy.
+  const EXEC_CHUNK_SIZE = 7 * 1024;
+  const EXEC_PARALLEL_CHUNKS = 4;
+
   const form = document.querySelector("[data-execution-form]");
   setupAgentCardUploads();
   if (!form) {
@@ -87,11 +92,6 @@
   updateRuntimeFields();
   updateSourceBlocks();
   updateFileName();
-
-  // NPM (OpenResty) rejeita corpos > ~8,8 KB. Usamos chunks de 7 KB (mesmo
-  // limite validado para upload local) para contornar o limite do proxy.
-  const EXEC_CHUNK_SIZE = 7 * 1024;
-  const EXEC_PARALLEL_CHUNKS = 4;
 
   async function _sendExecChunk(uploadUrl, csrf, file, uploadId, totalChunks, chunkIdx) {
     const start = chunkIdx * EXEC_CHUNK_SIZE;
