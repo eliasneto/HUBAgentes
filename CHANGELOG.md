@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.4.2] — 2026-06-10
+
+### Corrigido
+- **Botão hamburguer sobrepunha ícones do menu no mobile** — ao abrir o sidebar o botão ☰ agora se oculta (`display: none`) e volta a aparecer ao fechar o menu (backdrop, Escape ou navegação para nova página). Evita que o botão fique fixo sobre o conteúdo do drawer enquanto ele está aberto.
+- **Imagem do robô não aparecia na tela de login no servidor** — `robo-login-v2.png` foi redimensionada de 1004×1004 px para 640×640 px e recomprimida (871 KB → 295 KB, −66%). O arquivo acima de ~870 KB provocava `ERR_CONTENT_LENGTH_MISMATCH` no proxy reverso (Nginx Proxy Manager / OpenResty), que truncava a resposta antes de concluir a transferência; o browser recebia menos bytes do que o `Content-Length` informado e descartava a imagem. O tamanho de exibição máximo no CSS é 320 px (340 px no wrapper), portanto 640 px preserva qualidade 2× para telas de alta densidade sem overhead desnecessário. `robo-login.png.png` também foi recomprimida (493 KB → 355 KB, −27%) como medida preventiva.
+
+---
+
 ## [1.4.1] — 2026-06-08
 
 ### Adicionado
