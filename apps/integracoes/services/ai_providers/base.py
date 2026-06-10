@@ -15,11 +15,16 @@ _RETRYABLE_HTTP_STATUS = {408, 409, 425, 429, 500, 502, 503, 504, 529}
 
 
 class AIProviderServiceError(Exception):
-    def __init__(self, message, *, technical_message=""):
+    def __init__(self, message, *, technical_message="", usage_metadata=None):
         super().__init__(message)
         # Quando preenchido, a camada de normalizacao mostra `message` ao
         # usuario (amigavel) e guarda `technical_message` para o administrador.
         self.technical_message = technical_message
+        # Tokens efetivamente consumidos quando a chamada retornou com sucesso
+        # no HTTP mas o conteudo foi rejeitado (ex.: resposta truncada). O
+        # provedor cobra por esses tokens, entao precisamos registra-los mesmo
+        # no erro. None quando a falha nao consumiu tokens (ex.: timeout, 4xx).
+        self.usage_metadata = usage_metadata
 
 
 # Mensagem amigavel para quando o provedor esta temporariamente indisponivel

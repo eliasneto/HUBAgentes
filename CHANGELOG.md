@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.4.5] — 2026-06-10
+
+### Melhorado
+- **Tokens e custo de execuções com erro agora são contabilizados** — quando a chamada à IA retornava com sucesso no HTTP (o provedor gerava a resposta e **cobrava os tokens**), mas o sistema rejeitava o conteúdo (resposta truncada por limite de tokens ou JSON inválido), o processamento era marcado como erro com **0 tokens e R$ 0** — porque o registro de erro só copiava os totais anteriores do processamento (geralmente nulos) e nunca os tokens efetivamente consumidos naquela chamada. Resultado: a Anthropic descontava no painel dela, mas o nosso sistema não refletia esse consumo. Agora o `usage_metadata` (tokens de entrada/saída) "viaja" junto com a exceção desde o adapter até o registro de erro: as exceções `AIProviderServiceError` e `ProcessamentoExecutionError` carregam o `usage_metadata`; o adapter Anthropic o preenche ao detectar truncamento (`stop_reason=max_tokens`); e `_parse_structured_output` o repassa quando o JSON vem inválido. As funções `_mark_document_error` e `_mark_document_group_error` passam a gravar os tokens reais e o custo calculado (USD/BRL) no `ProcessamentoExecucaoIA` com status de erro, e o agregador de telemetria soma esses valores ao total do processamento. Assim o consumo registrado no sistema bate com o que o provedor efetivamente cobrou, mesmo quando a execução falha.
+
+---
+
 ## [1.4.4] — 2026-06-10
 
 ### Corrigido

@@ -54,9 +54,12 @@ from apps.processamentos.services.output_renderers import (
 
 
 class ProcessamentoExecutionError(Exception):
-    def __init__(self, message, *, technical_message=""):
+    def __init__(self, message, *, technical_message="", usage_metadata=None):
         super().__init__(message)
         self.technical_message = technical_message
+        # Tokens consumidos quando a IA respondeu mas o conteudo foi rejeitado
+        # (ex.: JSON invalido). O provedor cobra por eles; registramos no erro.
+        self.usage_metadata = usage_metadata
 
 
 AI_DEFINED_OUTPUT_INSTRUCTION_MARKER = "FORMATO DE SAIDA DEFINIDO PELA IA"
@@ -415,6 +418,7 @@ def _execute_documents_individually(
                 integration=integration,
                 model_name=model_name,
                 execution_started_at=execution_started_at,
+                usage_metadata=getattr(exc, "usage_metadata", None),
             )
             _log_execution_error(
                 actor=actor,
@@ -474,6 +478,7 @@ def _execute_documents_as_group(
             integration=integration,
             model_name=model_name,
             execution_started_at=execution_started_at,
+            usage_metadata=getattr(exc, "usage_metadata", None),
         )
         _log_group_execution_error(
             actor=actor,
@@ -563,6 +568,7 @@ def _execute_documents_by_folder(
                 integration=integration,
                 model_name=model_name,
                 execution_started_at=execution_started_at,
+                usage_metadata=getattr(exc, "usage_metadata", None),
             )
             _log_group_execution_error(
                 actor=actor,
@@ -652,6 +658,7 @@ def _execute_without_document(
     parsed_output = _parse_structured_output(
         execution_result.output_text,
         requested_output_format=processamento.output_format,
+        usage_metadata=execution_result.usage_metadata,
     )
     _ext = "" if processamento.output_format == ProcessingOutputFormat.LIVRE else f".{processamento.output_format}"
     output_filename, output_bytes, output_format, render_payload = _render_output_file(
@@ -792,6 +799,7 @@ def _execute_document(
     parsed_output = _parse_structured_output(
         execution_result.output_text,
         requested_output_format=processamento.output_format,
+        usage_metadata=execution_result.usage_metadata,
     )
     output_filename, output_bytes, output_format, render_payload = _render_output_file(
         parsed_output,
@@ -967,6 +975,7 @@ def _execute_document_group(
     parsed_output = _parse_structured_output(
         execution_result.output_text,
         requested_output_format=processamento.output_format,
+        usage_metadata=execution_result.usage_metadata,
     )
     output_filename, output_bytes, output_format, render_payload = _render_output_file(
         parsed_output,
@@ -1116,10 +1125,11 @@ _PLAIN_TEXT_FORMATS = {
 }
 
 
-def _parse_structured_output(output_text, requested_output_format=None):
+def _parse_structured_output(output_text, requested_output_format=None, usage_metadata=None):
     if not output_text:
         raise ProcessamentoExecutionError(
-            "A IA nao retornou conteudo util para compor a saida."
+            "A IA nao retornou conteudo util para compor a saida.",
+            usage_metadata=usage_metadata,
         )
 
     normalized_text = output_text.strip()
@@ -1163,6 +1173,7 @@ def _parse_structured_output(output_text, requested_output_format=None):
             "Falha ao interpretar JSON retornado pela IA. "
             f"Trecho da resposta: {raw_excerpt}"
         ),
+        usage_metadata=usage_metadata,
     )
 
 
@@ -1305,12 +1316,15 @@ def _mark_document_error(
     integration,
     model_name,
     execution_started_at,
+    usage_metadata=None,
 ):
     execution_finished_at = timezone.now()
     duration_ms = max(
         int((execution_finished_at - execution_started_at).total_seconds() * 1000),
         0,
     )
+    tokens = _tokens_from_usage(usage_metadata)
+    custo_usd_exec, custo_brl_exec = _custo_de_tokens(model_name, tokens)
 
     with transaction.atomic():
         documento.status = DocumentStatus.ERRO
@@ -1352,10 +1366,13 @@ def _mark_document_error(
             execucao_iniciada_em=execution_started_at,
             execucao_finalizada_em=execution_finished_at,
             duracao_ms=duration_ms,
-            input_tokens=processamento.input_tokens,
-            processing_tokens=processamento.processing_tokens,
-            output_tokens=processamento.output_tokens,
-            total_tokens=processamento.total_tokens,
+            input_tokens=tokens["input_tokens"],
+            processing_tokens=tokens["processing_tokens"],
+            output_tokens=tokens["output_tokens"],
+            total_tokens=tokens["total_tokens"],
+            custo_usd=custo_usd_exec,
+            custo_brl=custo_brl_exec,
+            usage_metadata=usage_metadata or {},
             error_message=message,
             scope_type=ExecutionScopeType.INDIVIDUAL,
         )
@@ -1381,12 +1398,15 @@ def _mark_document_group_error(
     integration,
     model_name,
     execution_started_at,
+    usage_metadata=None,
 ):
     execution_finished_at = timezone.now()
     duration_ms = max(
         int((execution_finished_at - execution_started_at).total_seconds() * 1000),
         0,
     )
+    tokens = _tokens_from_usage(usage_metadata)
+    custo_usd_exec, custo_brl_exec = _custo_de_tokens(model_name, tokens)
     with transaction.atomic():
         for documento in documentos:
             documento.status = DocumentStatus.ERRO
@@ -1428,10 +1448,13 @@ def _mark_document_group_error(
             execucao_iniciada_em=execution_started_at,
             execucao_finalizada_em=execution_finished_at,
             duracao_ms=duration_ms,
-            input_tokens=processamento.input_tokens,
-            processing_tokens=processamento.processing_tokens,
-            output_tokens=processamento.output_tokens,
-            total_tokens=processamento.total_tokens,
+            input_tokens=tokens["input_tokens"],
+            processing_tokens=tokens["processing_tokens"],
+            output_tokens=tokens["output_tokens"],
+            total_tokens=tokens["total_tokens"],
+            custo_usd=custo_usd_exec,
+            custo_brl=custo_brl_exec,
+            usage_metadata=usage_metadata or {},
             error_message=message,
             scope_type=ExecutionScopeType.GRUPO,
         )
@@ -1794,6 +1817,48 @@ def _normalize_token_value(value):
         return max(int(value), 0)
     except (TypeError, ValueError):
         return None
+
+
+def _tokens_from_usage(usage_metadata):
+    """Extrai contagem de tokens de um usage_metadata de chamada que falhou.
+
+    Usado para registrar o consumo real quando a IA respondeu mas o conteudo
+    foi rejeitado (truncamento/JSON invalido) — o provedor cobra por esses
+    tokens. Retorna None em cada campo quando nao ha dado de uso.
+    """
+    usage_metadata = usage_metadata or {}
+    input_tokens = _normalize_token_value(usage_metadata.get("promptTokenCount"))
+    output_tokens = _normalize_token_value(usage_metadata.get("candidatesTokenCount"))
+    total_tokens = _normalize_token_value(usage_metadata.get("totalTokenCount"))
+    processing_tokens = _normalize_token_value(usage_metadata.get("thoughtsTokenCount"))
+    if (
+        processing_tokens is None
+        and total_tokens is not None
+        and input_tokens is not None
+        and output_tokens is not None
+    ):
+        processing_tokens = max(total_tokens - input_tokens - output_tokens, 0)
+    if total_tokens is None and (input_tokens is not None or output_tokens is not None):
+        total_tokens = (input_tokens or 0) + (output_tokens or 0)
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "processing_tokens": processing_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
+def _custo_de_tokens(model_name, tokens):
+    """Calcula custo USD/BRL para tokens de uma execucao com erro; (None, None)
+    quando nao ha tokens registrados."""
+    if not tokens or tokens.get("total_tokens") in (None, 0):
+        return None, None
+    return calcular_custo_processamento(
+        nome_modelo=model_name,
+        input_tokens=tokens["input_tokens"],
+        output_tokens=tokens["output_tokens"],
+        processing_tokens=tokens["processing_tokens"],
+    )
 
 
 def _milliseconds_to_minutes(value):

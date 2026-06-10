@@ -245,6 +245,8 @@ class AnthropicProviderAdapter(BaseAIProviderAdapter):
         um erro confuso de parsing em vez da causa real."""
         if response_payload.get("stop_reason") == "max_tokens":
             usage = response_payload.get("usage", {})
+            input_tokens = usage.get("input_tokens") or 0
+            output_tokens = usage.get("output_tokens") or 0
             gerados = usage.get("output_tokens", "?")
             raise AIProviderServiceError(
                 "A resposta da IA foi truncada porque atingiu o limite de tokens "
@@ -255,6 +257,13 @@ class AnthropicProviderAdapter(BaseAIProviderAdapter):
                     f"Anthropic stop_reason=max_tokens (output_tokens={gerados}). "
                     "Resposta cortada antes de fechar o JSON."
                 ),
+                # A Anthropic cobra pelos tokens gerados mesmo na resposta
+                # truncada — registramos para o custo refletir o valor real.
+                usage_metadata={
+                    "promptTokenCount": input_tokens,
+                    "candidatesTokenCount": output_tokens,
+                    "totalTokenCount": input_tokens + output_tokens,
+                },
             )
 
     def _extract_output_text(self, response_payload):
