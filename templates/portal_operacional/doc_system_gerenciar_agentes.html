@@ -187,6 +187,23 @@ Slug gerado: pergunta_usuario
 Uso no prompt: {{pergunta_usuario}}{% endverbatim %}</code></pre>
             </div>
           </div>
+
+          <div class="doc-guide-grid" style="margin-top:16px">
+            <article class="doc-guide-card">
+              <span class="doc-chip">XLSX — Tabela agrupada</span>
+              <p>Quando a saida for XLSX e a primeira coluna representa um agrupamento (ex: <code>parte</code>, <code>categoria</code>, <code>secao</code>), adicione <code>"agrupar_primeira_coluna": true</code> na aba do JSON. O sistema exibira o valor do grupo apenas na primeira linha de cada grupo, deixando as demais em branco — padrao visual de tabela agrupada.</p>
+              <pre style="margin-top:8px"><code>{
+  "nome_aba": "Resultado",
+  "agrupar_primeira_coluna": true,
+  "dados": [
+    {"parte": "Secao 1", "item": "...", "valor": "..."},
+    {"parte": "Secao 1", "item": "...", "valor": "..."},
+    {"parte": "Secao 2", "item": "...", "valor": "..."}
+  ]
+}</code></pre>
+              <small>Sem essa flag, todos os valores da primeira coluna aparecem repetidos normalmente. Nao afeta CSV, PDF nem TXT.</small>
+            </article>
+          </div>
         </div>
       </section>
 

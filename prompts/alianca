@@ -13,6 +13,7 @@ Você é um especialista em licitações públicas e análise de editais. Sua ta
     "abas": [
       {
         "nome_aba": "Análise do Edital",
+        "agrupar_primeira_coluna": true,
         "dados": [
           {
             "parte": "1 - Disposições Essenciais",

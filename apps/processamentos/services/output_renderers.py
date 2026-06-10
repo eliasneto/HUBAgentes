@@ -107,9 +107,10 @@ def _render_xlsx_bytes(parsed_output):
         for sheet_index, sheet in enumerate(workbook_sheets, start=1):
             rows = sheet["rows"]
             headers = _collect_headers(rows)
-            table_rows = [headers]
-            for row in rows:
-                table_rows.append([row.get(header, "") for header in headers])
+            data_rows = [[row.get(header, "") for header in headers] for row in rows]
+            if len(headers) >= 2 and sheet.get("agrupar_primeira_coluna"):
+                data_rows = _dedup_first_col(data_rows)
+            table_rows = [headers] + data_rows
             archive.writestr(
                 f"xl/worksheets/sheet{sheet_index}.xml",
                 _worksheet_xml(table_rows),
@@ -272,6 +273,7 @@ def _extract_workbook_sheets(parsed_output):
             {
                 "name": sheet_name,
                 "rows": _rows_from_generic_output(sheet_data),
+                "agrupar_primeira_coluna": bool(sheet_payload.get("agrupar_primeira_coluna")),
             }
         )
     return workbook_sheets
@@ -383,6 +385,29 @@ def _excel_column_name(index):
         index, remainder = divmod(index - 1, 26)
         result.append(chr(65 + remainder))
     return "".join(reversed(result))
+
+
+def _dedup_first_col(data_rows):
+    """Substitui valores iguais consecutivos na primeira coluna por string vazia.
+
+    Cada valor de agrupamento aparece apenas na primeira linha do grupo,
+    deixando as linhas seguintes com a célula em branco — padrão de tabela
+    agrupada do Excel (ex.: parte/pergunta/resposta do prompt Aliança).
+    """
+    _sentinel = object()
+    last_val = _sentinel
+    result = []
+    for row in data_rows:
+        if not row:
+            result.append(row)
+            continue
+        new_row = list(row)
+        if new_row[0] == last_val:
+            new_row[0] = ""
+        else:
+            last_val = new_row[0]
+        result.append(new_row)
+    return result
 
 
 def _collect_headers(rows):
