@@ -30,7 +30,10 @@
 
         <!-- Robô -->
         <div class="robot-wrapper">
-          <img src="{% static 'portal_operacional/img/robo-login-v2.png' %}" alt="Robo HUB Agentes" class="robot-img">
+          <picture>
+            <source srcset="{% static 'portal_operacional/img/robo-login-v2.webp' %}" type="image/webp">
+            <img src="{% static 'portal_operacional/img/robo-login-v2.png' %}" alt="Robo HUB Agentes" class="robot-img">
+          </picture>
           <!-- Plataforma brilhante -->
           <div class="robot-platform">
             <div class="platform-ring ring-1"></div>
