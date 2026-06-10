@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.4.4] — 2026-06-10
+
+### Corrigido
+- **Exclusão de pasta local bloqueada por agente já excluído** — ao tentar excluir uma pasta local, o sistema exibia a mensagem "Ela está configurada como fonte padrão dos agentes: '...' " mesmo quando o agente já havia sido removido via soft delete. O `ProtectedError` do Django ocorria porque o registro `AgenteConfiguracaoOperacional` permanece no banco após o soft delete do agente (apenas `deleted_at` é preenchido, o registro não é apagado). A view agora verifica separadamente agentes ativos (que bloqueiam a exclusão) e agentes soft-deletados (cuja FK é nulificada antes do `hard_delete()`), permitindo excluir a pasta sem erro quando todos os vínculos são com agentes já removidos.
+
+---
+
 ## [1.4.3] — 2026-06-10
 
 ### Corrigido

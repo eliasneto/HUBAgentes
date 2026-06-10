@@ -1388,26 +1388,25 @@ class ExcluirPastaCompartilhadaView(PortalAdministradorRequiredMixin, View):
         base_path = integration.base_path
         eh_compartilhada = integration.compartilhada
         redirect_url = "portal_configuracao_geral" if eh_compartilhada else "portal_fontes_documentos"
+        from apps.agentes_ia.models import AgenteConfiguracaoOperacional
+        configs_vinculadas = AgenteConfiguracaoOperacional.objects.filter(
+            default_local_storage_integration=integration
+        )
+        configs_ativas = configs_vinculadas.filter(agente__deleted_at__isnull=True)
+        if configs_ativas.exists():
+            agentes_nomes = list(configs_ativas.values_list("agente__nome", flat=True))
+            lista = ", ".join(f"'{n}'" for n in agentes_nomes)
+            messages.error(
+                request,
+                f"Não foi possível excluir '{nome}'. Ela está configurada como fonte padrão "
+                f"dos agentes: {lista}. Reconfigure esses agentes antes de excluir a pasta.",
+            )
+            return redirect(redirect_url)
+        configs_vinculadas.filter(agente__deleted_at__isnull=False).update(
+            default_local_storage_integration=None
+        )
         try:
             integration.hard_delete()
-        except ProtectedError as exc:
-            agentes_nomes = []
-            for obj in exc.protected_objects:
-                if hasattr(obj, "agente"):
-                    agentes_nomes.append(obj.agente.nome)
-            if agentes_nomes:
-                lista = ", ".join(f"'{n}'" for n in agentes_nomes)
-                messages.error(
-                    request,
-                    f"Não foi possível excluir '{nome}'. Ela está configurada como fonte padrão "
-                    f"dos agentes: {lista}. Reconfigure esses agentes antes de excluir a pasta.",
-                )
-            else:
-                messages.error(
-                    request,
-                    f"Não foi possível excluir '{nome}'. Ela ainda está em uso por outros registros do sistema.",
-                )
-            return redirect(redirect_url)
         except Exception as exc:
             logger.exception("Erro inesperado ao excluir pasta id=%s", integracao_id)
             messages.error(request, f"Erro inesperado ao excluir '{nome}': {exc}")

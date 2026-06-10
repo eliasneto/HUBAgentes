@@ -29,7 +29,8 @@ GoogleDriveIntegration
     └── GoogleDriveFolderSourceItem  1-N
 
 LocalStorageIntegration
-└── Processamento            1-N (opcional)
+├── PastaCompartilhadaUsuario  1-N (membros autorizados)
+└── Processamento              1-N (opcional)
 
 AgenteConfiguracaoOperacional
 ├── GoogleDriveFolderSource  FK (default input)
@@ -66,6 +67,24 @@ ProcessamentoExecucaoIA
 |--------------|-----------------------------|------------------------------|
 | `created_by` | `FK → auth.User` (SET_NULL) | Quem criou                   |
 | `updated_by` | `FK → auth.User` (SET_NULL) | Quem atualizou por último    |
+
+### `SoftDeleteModel` — `apps/core/models.py`
+
+Mixin de soft delete. Usado por `AgenteIA` e `LocalStorageIntegration`.
+
+| Campo        | Tipo                                   | Descrição                              |
+|--------------|----------------------------------------|----------------------------------------|
+| `deleted_at` | `DateTimeField(null, blank, db_index)` | Preenchido no `delete()` lógico        |
+
+**Managers**:
+- `objects` → `SoftDeleteManager` — retorna apenas registros com `deleted_at__isnull=True`
+- `all_objects` → `models.Manager` padrão — inclui registros deletados
+
+**Métodos**:
+- `delete()` — preenche `deleted_at` (soft delete)
+- `hard_delete()` — remove fisicamente do banco
+- `restore()` — limpa `deleted_at`
+- `is_deleted` (property) → `bool`
 
 ---
 
@@ -111,26 +130,44 @@ Estende `TimestampedModel`.
 | Enum                     | Valores                                                   |
 |--------------------------|-----------------------------------------------------------|
 | `IntegrationStatus`      | `ATIVA`, `INATIVA`, `ERRO`                                |
-| `AIProviderType`         | `OPENAI`, `ANTHROPIC`, `GEMINI`                           |
+| `AIProviderType`         | `OPENAI`, `ANTHROPIC`, `GEMINI`, `GROQ`                   |
 | `FolderItemType`         | `PASTA`, `PDF`, `OUTRO`                                   |
+| `PermissaoPasta`         | `LEITURA`, `ESCRITA`                                      |
 
 ---
 
 ### `LocalStorageIntegration` — `apps/integracoes/models.py`
 
-Estende `UserStampedModel`.
+Estende `SoftDeleteModel, UserStampedModel`.
 
-| Campo                  | Tipo               | Descrição                               |
-|------------------------|--------------------|-----------------------------------------|
-| `nome`                 | `CharField(120, unique)` | Nome da integração                |
-| `status`               | `CharField(20)`    | `IntegrationStatus`                     |
-| `base_path`            | `CharField(500)`   | Caminho absoluto na máquina             |
-| `allowed_extensions`   | `JSONField`        | Padrão: `["pdf"]`                       |
-| `recursive_scan`       | `BooleanField`     | Varrer subpastas                        |
-| `last_validated_at`    | `DateTimeField` (nullable) | Última validação              |
-| `last_error`           | `TextField`        | Último erro                             |
+| Campo                   | Tipo               | Descrição                                                          |
+|-------------------------|--------------------|--------------------------------------------------------------------|
+| `nome`                  | `CharField(120, unique)` | Nome da integração                                           |
+| `status`                | `CharField(20)`    | `IntegrationStatus`                                                |
+| `base_path`             | `CharField(500)`   | Caminho absoluto na máquina                                        |
+| `compartilhada`         | `BooleanField`     | Pasta visível para todos os usuários (padrão: `False`)             |
+| `usuarios_autorizados`  | `M2M → auth.User` (through `PastaCompartilhadaUsuario`) | Usuários com acesso |
+| `allowed_extensions`    | `JSONField`        | Padrão: `["pdf"]`. Suportadas: `pdf`, `txt`, `csv`, `png`, `jpg`, `jpeg`, `xlsx` |
+| `recursive_scan`        | `BooleanField`     | Varrer subpastas                                                   |
+| `last_validated_at`     | `DateTimeField` (nullable) | Última validação                                         |
+| `last_error`            | `TextField`        | Último erro                                                        |
 
-**Validações**: somente extensões PDF; caminho absoluto obrigatório.
+**Validações**: extensões restritas ao conjunto suportado; caminho absoluto obrigatório.  
+**Soft delete**: `delete()` marca `deleted_at`; `hard_delete()` remove fisicamente.
+
+---
+
+### `PastaCompartilhadaUsuario` — `apps/integracoes/models.py`
+
+Tabela intermediária da M2M `LocalStorageIntegration ↔ auth.User`.
+
+| Campo        | Tipo                                          | Descrição                    |
+|--------------|-----------------------------------------------|------------------------------|
+| `integracao` | `FK → LocalStorageIntegration` (CASCADE)      | Pasta compartilhada          |
+| `usuario`    | `FK → auth.User` (CASCADE)                    | Usuário membro               |
+| `permissao`  | `CharField(10)` — `PermissaoPasta`            | `LEITURA` ou `ESCRITA`       |
+
+**Constraint**: `UniqueConstraint(integracao, usuario)`
 
 ---
 
@@ -235,7 +272,7 @@ Estende `UserStampedModel`. (`AIProviderIntegration` é alias de `OpenAIIntegrat
 | `AgentInputPolicy`             | `FIXA`, `ESCOLHIDA_NA_EXECUCAO`, `UPLOAD_NA_EXECUCAO`, `SEM_ENTRADA`, `MULTIPLA`        |
 | `AgentOutputPolicy`            | `FIXA`, `CONFIGURAVEL_NA_EXECUCAO`                                                       |
 | `AgentDefaultInputSourceType`  | `GOOGLE_DRIVE_FOLDER`, `LOCAL_FOLDER`, `LOCAL_FILE`, `UPLOAD_AT_EXECUTION`, `NONE`       |
-| `AgentDefaultOutputFormat`     | `AI_DEFINED`, `JSON`, `XLSX`, `CSV`, `PDF`, `TXT`                                        |
+| `AgentDefaultOutputFormat`     | `AI_DEFINED`, `LIVRE`, `JSON`, `XLSX`, `CSV`, `PDF`, `TXT`                               |
 | `AgentOutputDestination`       | `INTERNAL_MEDIA`                                                                         |
 | `AgentDocumentExecutionMode`   | `INDIVIDUAL`, `GRUPO_UNICO`, `LOTE_POR_PASTA`                                            |
 | `AgentOutputAssemblyMode`      | `UMA_POR_ENTRADA`, `UMA_POR_GRUPO`, `UMA_SAIDA_FINAL`                                    |
@@ -245,7 +282,7 @@ Estende `UserStampedModel`. (`AIProviderIntegration` é alias de `OpenAIIntegrat
 
 ### `AgenteIA` — `apps/agentes_ia/models.py`
 
-Estende `UserStampedModel`.
+Estende `SoftDeleteModel, UserStampedModel`. Suporta soft delete — `delete()` preenche `deleted_at`, o registro permanece no banco e fica oculto do manager padrão; `hard_delete()` remove fisicamente.
 
 | Campo                        | Tipo               | Descrição                                   |
 |------------------------------|--------------------|---------------------------------------------|
@@ -566,9 +603,9 @@ Subapps reservados: `agentes`, `processamentos`, `integracoes`, `gerenciar_agent
 **Problema**: O campo existe mas as permissões reais provavelmente são gerenciadas via `auth.Permission` ou `groups`. Há risco de divergência entre o papel declarado e as permissões efetivas.  
 **Melhoria**: Mapear `papel_principal` para grupos Django automaticamente via `post_save` signal, garantindo coerência.
 
-### M3 — Ausência de soft delete
-**Problema**: Modelos críticos como `AgenteIA`, `Processamento` e `GoogleDriveIntegration` usam hard delete. Exclusão acidental é irreversível.  
-**Melhoria**: Implementar soft delete com campo `deleted_at` e um manager customizado (`SoftDeleteManager`), especialmente para `AgenteIA` e `Processamento`.
+### M3 — Soft delete parcialmente implementado ✅
+**Situação**: `AgenteIA` e `LocalStorageIntegration` já têm soft delete via `SoftDeleteModel` (`deleted_at`, `SoftDeleteManager`, `hard_delete()`). `Processamento` e `GoogleDriveIntegration` ainda usam hard delete.  
+**Pendente**: Avaliar se `Processamento` precisa de soft delete — exclusão de histórico de processamentos é irreversível.
 
 ### M4 — `concurrency_policy` em JSON sem schema formal
 **Modelo**: `AgenteConfiguracaoOperacional.concurrency_policy`  
