@@ -23,6 +23,7 @@ from apps.auditoria.views import AuditoriaView
 from apps.core.views import (
     AdicionarUsuarioPastaView,
     AlterarPermissaoPastaView,
+    AgenteExecucaoUploadView,
     AgenteExecucaoView,
     AtivarTelaLoginView,
     ConfiguracaoGeralView,
@@ -74,6 +75,7 @@ urlpatterns = [
     path('agentes/<slug:slug>/excluir/', AgentePortalDeleteView.as_view(), name='portal_agente_excluir'),
     path('agentes-de-leitura/novo/', AgentePortalLegacyCreateRedirectView.as_view(), name='portal_agente_criar_legacy'),
     path('agentes-de-leitura/<slug:slug>/executar/', AgenteExecucaoView.as_view(), name='portal_agente_executar'),
+    path('agentes-de-leitura/<slug:slug>/upload-execucao/', AgenteExecucaoUploadView.as_view(), name='portal_agente_execucao_upload'),
     path('fontes-de-documentos/', FontesDocumentosView.as_view(), name='portal_fontes_documentos'),
     path('fontes-de-documentos/nova/', FonteDocumentoCreateView.as_view(), name='portal_fonte_documento_criar'),
     path('fontes-de-documentos/<str:tipo>/<int:fonte_id>/editar/', FonteDocumentoUpdateView.as_view(), name='portal_fonte_documento_editar'),

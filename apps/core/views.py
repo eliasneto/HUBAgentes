@@ -373,9 +373,21 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
         return redirect("portal_agentes_leitura")
 
     def post(self, request, *args, **kwargs):
+        token = request.POST.get("arquivo_execucao_token", "").strip()
+        if token:
+            files = self._carregar_arquivo_token(request, token)
+            if files is None:
+                messages.error(
+                    request,
+                    "Arquivo temporario nao encontrado ou expirado. Tente novamente.",
+                )
+                return redirect("portal_agentes_leitura")
+        else:
+            files = request.FILES
+
         form = AgenteExecucaoForm(
             request.POST,
-            request.FILES,
+            files,
             agente=self.agente,
             actor=request.user,
         )
@@ -386,6 +398,44 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
                 return redirect("portal_agentes_leitura")
             return self._executar_com_payload(form.cleaned_data)
         return self._executar_com_defaults()
+
+    def _carregar_arquivo_token(self, request, token):
+        import re
+        import shutil
+        import tempfile
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        if not re.match(r'^[a-zA-Z0-9_\-]+$', token):
+            return None
+
+        tmp_dir = Path(tempfile.gettempdir()) / "hub_exec_uploads" / token
+        assembled = tmp_dir / "assembled"
+        meta = tmp_dir / "meta.txt"
+
+        if not assembled.exists() or not meta.exists():
+            return None
+
+        try:
+            lines = meta.read_text().splitlines()
+            user_id = int(lines[0])
+            original_name = lines[1] if len(lines) > 1 else "arquivo.pdf"
+        except (ValueError, IndexError, OSError):
+            return None
+
+        if user_id != request.user.pk:
+            return None
+
+        try:
+            with open(assembled, "rb") as f:
+                content = f.read()
+        except OSError:
+            return None
+
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        return {"arquivo_execucao_upload": SimpleUploadedFile(
+            original_name, content, content_type="application/pdf"
+        )}
 
     def _executar_com_defaults(self):
         try:
@@ -423,6 +473,90 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
         if non_field_errors:
             return non_field_errors[0]
         return "Nao foi possivel executar este agente. Revise os dados enviados."
+
+
+class AgenteExecucaoUploadView(LoginRequiredMixin, View):
+    """Recebe chunks de arquivo para execução de agente e monta em temp dir."""
+
+    login_url = reverse_lazy("portal_login")
+    MAX_ARQUIVO_MB = 50
+
+    def dispatch(self, request, *args, **kwargs):
+        self.agente = get_object_or_404(
+            AgenteIA.objects.filter(
+                visibilidade=AgentVisibility.USUARIO,
+                modo_acionamento=AgentTriggerMode.PORTAL,
+            ),
+            slug=kwargs["slug"],
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        import re
+        import shutil
+        import tempfile
+
+        chunk_file = request.FILES.get("file_chunk")
+        if not chunk_file:
+            return JsonResponse({"erro": "Chunk nao encontrado."}, status=400)
+
+        upload_id = request.POST.get("upload_id", "")
+        if not re.match(r'^[a-zA-Z0-9_\-]+$', upload_id):
+            return JsonResponse({"erro": "upload_id invalido."}, status=400)
+
+        try:
+            chunk_index = int(request.POST.get("chunk_index", 0))
+            total_chunks = int(request.POST.get("total_chunks", 1))
+        except (ValueError, TypeError):
+            return JsonResponse({"erro": "Parametros invalidos."}, status=400)
+
+        original_name = request.POST.get("filename", chunk_file.name)
+
+        tmp_dir = Path(tempfile.gettempdir()) / "hub_exec_uploads" / upload_id
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        chunk_path = tmp_dir / f"chunk_{chunk_index:04d}"
+
+        try:
+            with open(chunk_path, "wb") as f:
+                for b in chunk_file.chunks():
+                    f.write(b)
+        except OSError as exc:
+            return JsonResponse({"erro": f"Erro ao salvar chunk: {exc}"}, status=500)
+
+        if chunk_index < total_chunks - 1:
+            return JsonResponse({"status": "received"})
+
+        received = list(tmp_dir.glob("chunk_*"))
+        if len(received) < total_chunks:
+            return JsonResponse(
+                {"erro": f"Partes incompletas ({len(received)}/{total_chunks})."},
+                status=400,
+            )
+
+        total_size = sum(p.stat().st_size for p in received)
+        if total_size > self.MAX_ARQUIVO_MB * 1024 * 1024:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return JsonResponse(
+                {"erro": f"Arquivo maior que {self.MAX_ARQUIVO_MB} MB."},
+                status=400,
+            )
+
+        assembled_path = tmp_dir / "assembled"
+        try:
+            with open(assembled_path, "wb") as out_f:
+                for i in range(total_chunks):
+                    cp = tmp_dir / f"chunk_{i:04d}"
+                    with open(cp, "rb") as cf:
+                        out_f.write(cf.read())
+        except OSError as exc:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return JsonResponse({"erro": f"Erro ao montar arquivo: {exc}"}, status=500)
+
+        meta_path = tmp_dir / "meta.txt"
+        with open(meta_path, "w") as mf:
+            mf.write(f"{request.user.pk}\n{original_name}")
+
+        return JsonResponse({"status": "complete", "token": upload_id})
 
 
 class FontesDocumentosView(LoginRequiredMixin, TemplateView):
@@ -843,6 +977,7 @@ class LocalStorageSubpastasView(LoginRequiredMixin, View):
     login_url = reverse_lazy("portal_login")
 
     def get(self, request, integration_id):
+        from pathlib import Path
         from apps.integracoes.models import LocalStorageIntegration
         from apps.integracoes.services.local_storage import (
             list_subfolders_from_relative_folder,
@@ -851,6 +986,16 @@ class LocalStorageSubpastasView(LoginRequiredMixin, View):
         try:
             integration = LocalStorageIntegration.objects.get(pk=integration_id)
             subpastas = list_subfolders_from_relative_folder(integration, "")
+
+            # Exclui subpastas que já são base_path de outras integrações
+            outras_bases = {
+                Path(bp).resolve()
+                for bp in LocalStorageIntegration.objects
+                    .exclude(pk=integration_id)
+                    .values_list("base_path", flat=True)
+            }
+            subpastas = [p for p in subpastas if p.resolve() not in outras_bases]
+
             return JsonResponse({
                 "subpastas": [p.name for p in subpastas],
                 "base_path": integration.base_path,
