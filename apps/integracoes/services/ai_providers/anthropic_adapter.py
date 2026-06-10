@@ -1,10 +1,17 @@
 import base64
 
-from .base import AIProviderExecutionResult, BaseAIProviderAdapter
+from .base import AIProviderExecutionResult, AIProviderServiceError, BaseAIProviderAdapter
 
 _IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 _TEXT_MIME_TYPES = {"text/plain", "text/html", "text/markdown", "text/csv", "application/csv"}
-_DEFAULT_MAX_TOKENS = 8192
+# A API da Anthropic EXIGE max_tokens (diferente do Gemini, que usa o default
+# alto do modelo quando o campo e omitido). Um teto baixo trunca saidas grandes
+# no meio do JSON. 32000 cabe nas saidas estruturadas grandes (ex.: analise de
+# edital com dezenas de itens) e e suportado pelos modelos Claude atuais.
+_DEFAULT_MAX_TOKENS = 32000
+# Teto seguro para modelos antigos (ex.: Claude 3.5 Sonnet) caso a API rejeite
+# o valor alto com HTTP 400. Usado no retry automatico de clamp.
+_FALLBACK_MAX_TOKENS = 8192
 
 
 class AnthropicProviderAdapter(BaseAIProviderAdapter):
@@ -174,13 +181,8 @@ class AnthropicProviderAdapter(BaseAIProviderAdapter):
         return prompt
 
     def _call(self, url, payload, execution_params):
-        response_payload, _ = self._post_json_request(
-            url,
-            payload,
-            http_error_prefix="Anthropic HTTP {code}: {body}",
-            connection_error_prefix="Falha de conexao com Anthropic: {reason}",
-            invalid_json_message="Anthropic retornou resposta invalida.",
-        )
+        response_payload = self._post_with_max_tokens_fallback(url, payload)
+        self._raise_if_truncated(response_payload)
         output_text = self._extract_output_text(response_payload)
         usage = response_payload.get("usage", {})
         input_tokens = usage.get("input_tokens") or 0
@@ -202,6 +204,58 @@ class AnthropicProviderAdapter(BaseAIProviderAdapter):
             response_mime_type=response_mime_type,
             summary=self.extract_summary(response_payload),
         )
+
+    def _post_with_max_tokens_fallback(self, url, payload):
+        """Envia o request; se o modelo rejeitar max_tokens por ser alto demais
+        (HTTP 400 — modelos antigos como Claude 3.5 tem teto menor), repete uma
+        vez com o teto seguro. Assim a saida grande funciona nos modelos atuais
+        sem quebrar nos antigos."""
+        try:
+            response_payload, _ = self._post_json_request(
+                url,
+                payload,
+                http_error_prefix="Anthropic HTTP {code}: {body}",
+                connection_error_prefix="Falha de conexao com Anthropic: {reason}",
+                invalid_json_message="Anthropic retornou resposta invalida.",
+            )
+            return response_payload
+        except AIProviderServiceError as exc:
+            mensagem = str(exc).lower()
+            pediu_demais = (
+                "max_tokens" in mensagem
+                and "400" in mensagem
+                and payload.get("max_tokens", 0) > _FALLBACK_MAX_TOKENS
+            )
+            if not pediu_demais:
+                raise
+            payload = {**payload, "max_tokens": _FALLBACK_MAX_TOKENS}
+            response_payload, _ = self._post_json_request(
+                url,
+                payload,
+                http_error_prefix="Anthropic HTTP {code}: {body}",
+                connection_error_prefix="Falha de conexao com Anthropic: {reason}",
+                invalid_json_message="Anthropic retornou resposta invalida.",
+            )
+            return response_payload
+
+    @staticmethod
+    def _raise_if_truncated(response_payload):
+        """A Anthropic sinaliza corte por limite de tokens em stop_reason.
+        Sem isso, a saida truncada chega como JSON invalido e o usuario recebe
+        um erro confuso de parsing em vez da causa real."""
+        if response_payload.get("stop_reason") == "max_tokens":
+            usage = response_payload.get("usage", {})
+            gerados = usage.get("output_tokens", "?")
+            raise AIProviderServiceError(
+                "A resposta da IA foi truncada porque atingiu o limite de tokens "
+                "de saida do modelo. O conteudo solicitado e muito grande. Reduza "
+                "o escopo do prompt, divida em partes menores ou utilize um modelo "
+                "com limite de saida maior.",
+                technical_message=(
+                    f"Anthropic stop_reason=max_tokens (output_tokens={gerados}). "
+                    "Resposta cortada antes de fechar o JSON."
+                ),
+            )
 
     def _extract_output_text(self, response_payload):
         texts = []
