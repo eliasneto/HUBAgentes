@@ -136,6 +136,7 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     local_relative_input_path = models.CharField(max_length=500, blank=True)
     arquivo_execucao_upload = models.FileField(
         upload_to=processamento_input_upload_path,
+        max_length=255,
         null=True,
         blank=True,
     )
@@ -177,6 +178,7 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     total_processados = models.PositiveIntegerField(default=0)
     arquivo_saida = models.FileField(
         upload_to=processamento_output_path,
+        max_length=255,
         null=True,
         blank=True,
     )
@@ -401,6 +403,7 @@ class DocumentoEntrada(TimestampedModel):
     pasta_grupo = models.CharField(max_length=500, blank=True, default="")
     uploaded_file = models.FileField(
         upload_to=documento_entrada_upload_path,
+        max_length=255,
         null=True,
         blank=True,
     )
@@ -587,6 +590,7 @@ class DocumentoSaidaProcessamento(TimestampedModel):
     )
     arquivo = models.FileField(
         upload_to=documento_saida_output_path,
+        max_length=255,
         null=True,
         blank=True,
     )

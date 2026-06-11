@@ -34,6 +34,30 @@ _PROVIDER_TEMPORARIAMENTE_INDISPONIVEL = (
     "Aguarde alguns instantes e execute o agente novamente."
 )
 
+# Mensagem amigavel para quando o documento+prompt excede a janela de contexto
+# do modelo (HTTP 400/413 com erro de "prompt too long" / context length).
+_DOCUMENTO_GRANDE_DEMAIS = (
+    "O documento e muito grande para este modelo de IA: o conteudo ultrapassa "
+    "o limite de contexto suportado pelo modelo. Use um modelo com janela de "
+    "contexto maior ou divida o documento em partes menores."
+)
+
+# Trechos que identificam erro de contexto/tamanho excedido no corpo de um 400.
+# Cobre as variacoes dos provedores: Anthropic ("prompt is too long"),
+# OpenAI ("context_length_exceeded"/"maximum context length") e Gemini
+# ("input token count ... exceeds the maximum").
+_CONTEXT_LENGTH_ERROR_PATTERNS = (
+    "prompt is too long",
+    "maximum context length",
+    "context length",
+    "context_length_exceeded",
+    "input token count",
+    "exceeds the maximum number of tokens",
+    "too many tokens",
+    "input is too long",
+    "request entity too large",
+)
+
 
 @dataclass
 class AIProviderValidationResult:
@@ -196,6 +220,13 @@ class BaseAIProviderAdapter:
                         _PROVIDER_TEMPORARIAMENTE_INDISPONIVEL,
                         technical_message=detalhe_tecnico,
                     ) from exc
+                if self._eh_erro_contexto_excedido(exc.code, error_body):
+                    # Documento+prompt maior que a janela do modelo: erro claro
+                    # e acionavel em vez do tecnico generico mascarado.
+                    raise AIProviderServiceError(
+                        _DOCUMENTO_GRANDE_DEMAIS,
+                        technical_message=detalhe_tecnico,
+                    ) from exc
                 raise AIProviderServiceError(detalhe_tecnico) from exc
             except (error.URLError, TimeoutError) as exc:
                 # URLError cobre falhas de conexao/DNS; TimeoutError cobre
@@ -243,6 +274,14 @@ class BaseAIProviderAdapter:
             # Retry-After pode vir como data HTTP; nesse caso ignoramos e
             # usamos o backoff exponencial padrao.
             return None
+
+    @staticmethod
+    def _eh_erro_contexto_excedido(code, body):
+        """True quando o 400/413 indica documento+prompt acima do contexto."""
+        if code not in (400, 413):
+            return False
+        normalized = (body or "").lower()
+        return any(pattern in normalized for pattern in _CONTEXT_LENGTH_ERROR_PATTERNS)
 
     def _log_retry(self, request_url, attempt, reason, delay):
         logger.warning(
