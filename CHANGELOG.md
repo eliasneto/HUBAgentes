@@ -5,6 +5,22 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.0] — 2026-06-15
+
+> Versão de funcionalidades e melhorias estruturais (não apenas correções), abrangendo itens do backlog de qualidade e do modelo de dados.
+
+### Adicionado
+- **Limites de execuções simultâneas (V142-1 e V142-2)** — dois novos controles de concorrência configuráveis em **Configuração Geral** (`ConfiguracaoGeral`): **"Máximo de execuções simultâneas no sistema"** (`max_execucoes_simultaneas`, padrão **5**) e **"Máximo de execuções simultâneas por usuário"** (`max_execucoes_por_usuario`, padrão **2**); `0 = sem limite` em ambos. As contagens somam processamentos em fila + em processamento. A verificação foi adicionada em `calcular_disponibilidade_agente()`: o **limite por usuário (V142-2) tem prioridade** sobre o global na mensagem exibida — ao atingi-lo, o usuário vê *"Você já atingiu o limite de agentes rodando ao mesmo tempo. Tente novamente assim que um terminar o processamento."*; ao atingir o limite global (V142-1), vê *"O sistema já tem muitos agentes rodando no momento. Tente novamente em alguns minutos."* O limite é aplicado tanto no momento do clique em **Executar** (gate em `operational_execution`) quanto refletido no estado dos cards na listagem de agentes. Para evitar N+1 na listagem, os dois contadores (globais para a lista inteira) são calculados uma única vez e repassados à função.
+- **Limite de tentativas de execução por documento (DB-U2)** — novo campo **"Máximo de tentativas por documento"** na configuração do agente (`AgenteConfiguracaoOperacional.max_tentativas`, padrão **3**, `0 = sem limite`). O campo já existia no modelo mas **nunca era lido** — agora o worker o respeita. Como documentos em erro voltam para `PENDENTE` a cada reprocessamento (e são re-executados), um documento que falha repetidamente acumulava uma execução — e o custo de tokens — a cada re-run, sem teto. Agora, antes de executar cada documento (modo individual), o sistema conta quantos registros `ProcessamentoExecucaoIA` ele já possui no processamento; ao atingir o limite, o documento é marcado como erro com a mensagem *"O documento atingiu o limite de N tentativa(s) de execução e não será reprocessado."* e **nenhuma nova chamada à IA é feita** (sem consumir tokens nem inflar a contagem). O campo é exposto no formulário de criação/edição do agente e preservado na clonagem.
+
+### Melhorado
+- **Contadores de documentos do processamento recalculados de forma atômica (DB-A1)** — `Processamento.total_documentos` e `total_processados` eram recalculados em pontos espalhados usando **duas queries separadas** (`documentos.count()` e `documentos.filter(status=PROCESSADO).count()`), abrindo uma janela em que os dois valores podiam ficar incoerentes entre si. O helper `Processamento.recalcular_totais()` (uma única query `aggregate` com `Count`/`Q`) já existia mas **nunca era chamado**. Agora ele é usado nos dois pontos de finalização autoritativos — o bloco final de `execute_processing` e o reconciliador de processamentos órfãos (`stalled_processing`) —, garantindo que ambos os totais venham do mesmo snapshot do banco. Os campos físicos foram mantidos (o dashboard depende de `Sum("total_processados")` em SQL, que exige a coluna). Cobertura: `apps/processamentos/tests_recalcular_totais.py`.
+
+### Segurança
+- **Credenciais sensíveis re-criptografadas em repouso (DB-U1)** — os campos `GoogleDriveIntegration.credentials_json` (JSON da service account) e `OpenAIIntegration.api_key` já haviam sido convertidos para campos criptografados (`EncryptedTextField`/`EncryptedCharField`) na versão anterior, mas a alteração foi apenas de schema: os registros que já existiam no banco permaneciam em **texto puro**, sendo criptografados somente quando re-salvos manualmente. Um dump do banco ainda exporia essas credenciais antigas. A migração de dados `integracoes/0012_encrypt_existing_credentials` percorre todos os registros — **incluindo os soft-deletados**, que um dump também exporia — e os re-salva forçando a criptografia Fernet em repouso. A migração é idempotente (o `EncryptedFieldMixin` detecta valores já cifrados e não os re-encripta) e exige a `FIELD_ENCRYPTION_KEY` configurada (garantida pelo system check `core.E001`, que bloqueia o `migrate` se a chave estiver ausente).
+
+---
+
 ## [1.4.5] — 2026-06-10
 
 ### Corrigido

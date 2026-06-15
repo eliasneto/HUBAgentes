@@ -172,10 +172,9 @@ def execute_processing(processamento, actor):
     telemetry = _aggregate_processing_telemetry(processamento)
 
     with transaction.atomic():
-        processamento.total_documentos = processamento.documentos.count()
-        processamento.total_processados = processamento.documentos.filter(
-            status=DocumentStatus.PROCESSADO
-        ).count()
+        # DB-A1: recalcula ambos os totais em uma unica query agregada, evitando
+        # a janela de inconsistencia entre duas contagens separadas.
+        processamento.recalcular_totais()
         processamento.execucao_iniciada_em = batch_started_at
         processamento.execucao_finalizada_em = finished_at
         processamento.duracao_processamento_ms = max(
@@ -386,7 +385,26 @@ def _execute_documents_individually(
     last_technical_error_message = ""
     _custo_cache: dict = {}  # cache de precificacao/cotacao para o batch
 
+    # DB-U2: limite de tentativas de execucao por documento (0 = sem limite).
+    max_tentativas = obter_ou_criar_configuracao_operacional(
+        processamento.agente
+    ).max_tentativas
+
     for documento in documentos:
+        if _documento_excedeu_tentativas(processamento, documento, max_tentativas):
+            total_errors += 1
+            mensagem = (
+                f"O documento atingiu o limite de {max_tentativas} tentativa(s) de "
+                "execucao e nao sera reprocessado."
+            )
+            last_error_message = mensagem
+            _mark_document_max_tentativas(
+                processamento=processamento,
+                documento=documento,
+                message=mensagem,
+            )
+            continue
+
         execution_started_at = timezone.now()
         try:
             execution_result = _execute_document(
@@ -1306,6 +1324,50 @@ def _next_execution_attempt_number(processamento):
         max_tentativa=Max("tentativa_numero")
     )["max_tentativa"]
     return (current_max or 0) + 1
+
+
+def _documento_excedeu_tentativas(processamento, documento, max_tentativas):
+    """DB-U2: True se o documento ja atingiu o limite de execucoes configurado.
+
+    Conta os registros de execucao ja existentes para o documento neste
+    processamento. Como documentos em ERRO voltam para PENDENTE a cada re-run
+    (ver document_sources._update_documento_if_needed), um documento que falha
+    repetidamente acumularia uma execucao por re-run; este limite o interrompe.
+    max_tentativas == 0 significa sem limite.
+    """
+    if not max_tentativas:
+        return False
+    tentativas_realizadas = processamento.execucoes_ia.filter(
+        documento=documento
+    ).count()
+    return tentativas_realizadas >= max_tentativas
+
+
+def _mark_document_max_tentativas(*, processamento, documento, message):
+    """DB-U2: marca o documento como erro por limite de tentativas atingido.
+
+    Nao cria um novo ProcessamentoExecucaoIA de proposito: o objetivo do limite
+    e justamente parar de consumir recursos: nenhuma chamada a IA e feita e a
+    contagem de tentativas nao e inflada.
+    """
+    with transaction.atomic():
+        documento.status = DocumentStatus.ERRO
+        documento.mensagem_erro = message
+        documento.save(update_fields=["status", "mensagem_erro", "updated_at"])
+
+        _registrar_atividade_processamento(
+            processamento,
+            etapa_atual="Documento ignorado: limite de tentativas atingido",
+            documento_atual_nome=documento.nome_arquivo,
+        )
+        processamento.save(
+            update_fields=[
+                "etapa_atual",
+                "documento_atual_nome",
+                "ultima_atividade_em",
+                "updated_at",
+            ]
+        )
 
 
 def _mark_document_error(

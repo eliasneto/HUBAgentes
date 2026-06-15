@@ -111,6 +111,16 @@ class AgentePortalCreateForm(forms.Form):
         choices=AgentOutputPackagingMode.choices,
         initial=AgentOutputPackagingMode.ZIP_SE_MULTIPLOS,
     )
+    max_tentativas = forms.IntegerField(
+        label="Maximo de tentativas por documento",
+        min_value=0,
+        initial=3,
+        required=False,
+        help_text=(
+            "Numero maximo de execucoes por documento. Ao reprocessar, documentos "
+            "que ja atingiram o limite sao ignorados. Use 0 para sem limite."
+        ),
+    )
 
     def __init__(self, *args, **kwargs):
         self.actor = kwargs.pop("actor", None)
@@ -191,6 +201,7 @@ class AgentePortalCreateForm(forms.Form):
                     ),
                     "output_assembly_mode": configuracao.output_assembly_mode,
                     "output_packaging_mode": configuracao.output_packaging_mode,
+                    "max_tentativas": configuracao.max_tentativas,
                     "prompt_parameters": json.dumps(
                         configuracao.prompt_parameters or [],
                         ensure_ascii=False,
@@ -199,6 +210,12 @@ class AgentePortalCreateForm(forms.Form):
             )
 
         self.initial.update(initial_data)
+
+    def clean_max_tentativas(self):
+        value = self.cleaned_data.get("max_tentativas")
+        if value is None:
+            return 3
+        return value
 
     def clean_prompt_parameters(self):
         raw_value = self.cleaned_data.get("prompt_parameters") or "[]"
@@ -294,6 +311,7 @@ class AgentePortalCreateForm(forms.Form):
             "document_execution_mode": self.cleaned_data["document_execution_mode"],
             "output_assembly_mode": self.cleaned_data["output_assembly_mode"],
             "output_packaging_mode": self.cleaned_data["output_packaging_mode"],
+            "max_tentativas": self.cleaned_data["max_tentativas"],
             "prompt_parameters": self.cleaned_data["prompt_parameters"],
         }
 

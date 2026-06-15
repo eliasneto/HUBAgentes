@@ -228,6 +228,13 @@
               <div id="empacotamento-hint" style="margin-top:8px;padding:12px 14px;border-radius:10px;border:1px solid rgba(51,244,255,0.2);background:rgba(0,216,255,0.05);font-size:13px;line-height:1.6;color:var(--muted,#7ca5b8);display:none"></div>
               {% for error in form.output_packaging_mode.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
+
+            <div class="execution-field">
+              <label for="{{ form.max_tentativas.id_for_label }}">{{ form.max_tentativas.label }}</label>
+              {{ form.max_tentativas }}
+              {% if form.max_tentativas.help_text %}<small>{{ form.max_tentativas.help_text }}</small>{% endif %}
+              {% for error in form.max_tentativas.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
           </div>
 
           <div class="combination-hint" data-combination-hint data-builder-doc-config hidden>
