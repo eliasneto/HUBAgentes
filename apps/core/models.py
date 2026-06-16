@@ -33,6 +33,16 @@ class ConfiguracaoGeral(models.Model):
         default=30,
         help_text="Arquivos com mais de N dias serao deletados na execucao.",
     )
+    # V142-1: limite global de execucoes simultaneas (em fila + em processamento).
+    max_execucoes_simultaneas = models.PositiveSmallIntegerField(
+        default=5,
+        help_text="Maximo de execucoes simultaneas no sistema inteiro. 0 = sem limite.",
+    )
+    # V142-2: limite de execucoes simultaneas por usuario.
+    max_execucoes_por_usuario = models.PositiveSmallIntegerField(
+        default=2,
+        help_text="Maximo de execucoes simultaneas por usuario. 0 = sem limite.",
+    )
     atualizado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

@@ -1495,9 +1495,19 @@ class SalvarConfiguracaoGeralView(PortalAdministradorRequiredMixin, View):
             dias = max(1, min(365, int(request.POST.get("dias_retencao_arquivos", 30))))
         except (ValueError, TypeError):
             dias = 30
+        try:
+            max_global = max(0, min(1000, int(request.POST.get("max_execucoes_simultaneas", 5))))
+        except (ValueError, TypeError):
+            max_global = 5
+        try:
+            max_usuario = max(0, min(1000, int(request.POST.get("max_execucoes_por_usuario", 2))))
+        except (ValueError, TypeError):
+            max_usuario = 2
         config = ConfiguracaoGeral.obter()
         config.visibilidade_dashboard = valor
         config.limpeza_automatica_ativa = "limpeza_automatica_ativa" in request.POST
+        config.max_execucoes_simultaneas = max_global
+        config.max_execucoes_por_usuario = max_usuario
         config.atualizado_por = request.user
         config.save()
         messages.success(request, "Configurações gerais salvas com sucesso.")

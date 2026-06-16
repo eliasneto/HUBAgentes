@@ -30,7 +30,7 @@ class OperationalExecutionError(Exception):
 
 
 def criar_e_iniciar_processamento_para_agente(*, agente, actor, cleaned_data):
-    disponibilidade = calcular_disponibilidade_agente(agente)
+    disponibilidade = calcular_disponibilidade_agente(agente, actor)
     if not disponibilidade.pode_executar:
         raise OperationalExecutionError(disponibilidade.motivo)
 

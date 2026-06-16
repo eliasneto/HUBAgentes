@@ -40,8 +40,20 @@ EXECUTION_BLOCKING_STATUSES = {
 PROMPT_VARIABLE_PATTERN = re.compile(r"{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}")
 
 
-def calcular_disponibilidade_agente(agente) -> AgenteDisponibilidade:
-    """Calcula a disponibilidade operacional do agente para o portal."""
+def calcular_disponibilidade_agente(
+    agente,
+    usuario=None,
+    *,
+    execucoes_no_sistema=None,
+    execucoes_do_usuario=None,
+) -> AgenteDisponibilidade:
+    """Calcula a disponibilidade operacional do agente para o portal.
+
+    `usuario` habilita o limite por usuario (V142-2). Os contadores
+    `execucoes_no_sistema`/`execucoes_do_usuario` podem ser pre-computados pelo
+    chamador (ex.: listagem de agentes) para evitar N+1: quando passados, a
+    funcao nao refaz as queries de contagem.
+    """
     if agente.visibilidade != AgentVisibility.USUARIO:
         return AgenteDisponibilidade(
             estado="indisponivel",
@@ -100,6 +112,47 @@ def calcular_disponibilidade_agente(agente) -> AgenteDisponibilidade:
             pode_executar=False,
             motivo=bloqueio_configuracao,
         )
+
+    from apps.core.models import ConfiguracaoGeral
+
+    config_geral = ConfiguracaoGeral.obter()
+
+    # V142-2: limite por usuario (tem prioridade sobre o limite global).
+    max_por_usuario = config_geral.max_execucoes_por_usuario
+    if usuario is not None and max_por_usuario:
+        if execucoes_do_usuario is None:
+            execucoes_do_usuario = Processamento.objects.filter(
+                iniciado_por=usuario,
+                status__in=EXECUTION_BLOCKING_STATUSES,
+            ).count()
+        if execucoes_do_usuario >= max_por_usuario:
+            return AgenteDisponibilidade(
+                estado="em_execucao",
+                cor="amarelo",
+                pode_executar=False,
+                motivo=(
+                    "Voce ja atingiu o limite de agentes rodando ao mesmo tempo. "
+                    "Tente novamente assim que um terminar o processamento."
+                ),
+            )
+
+    # V142-1: limite global de execucoes simultaneas no sistema.
+    max_global = config_geral.max_execucoes_simultaneas
+    if max_global:
+        if execucoes_no_sistema is None:
+            execucoes_no_sistema = Processamento.objects.filter(
+                status__in=EXECUTION_BLOCKING_STATUSES,
+            ).count()
+        if execucoes_no_sistema >= max_global:
+            return AgenteDisponibilidade(
+                estado="em_execucao",
+                cor="amarelo",
+                pode_executar=False,
+                motivo=(
+                    "O sistema ja tem muitos agentes rodando no momento. "
+                    "Tente novamente em alguns minutos."
+                ),
+            )
 
     em_execucao = Processamento.objects.filter(
         agente=agente,
@@ -282,6 +335,7 @@ def criar_agente_portal(
     output_assembly_mode,
     output_packaging_mode,
     prompt_parameters,
+    max_tentativas=3,
 ):
     with transaction.atomic():
         agente = AgenteIA(
@@ -330,6 +384,7 @@ def criar_agente_portal(
             document_execution_mode=document_execution_mode,
             output_assembly_mode=output_assembly_mode,
             output_packaging_mode=output_packaging_mode,
+            max_tentativas=max_tentativas,
             prompt_parameters=normalizar_parametros_prompt(prompt_parameters),
             concurrency_policy=AgenteConfiguracaoOperacional._meta.get_field(
                 "concurrency_policy"
@@ -363,6 +418,7 @@ def atualizar_agente_portal(
     output_assembly_mode,
     output_packaging_mode,
     prompt_parameters,
+    max_tentativas=3,
 ):
     with transaction.atomic():
         agente.nome = nome
@@ -404,6 +460,7 @@ def atualizar_agente_portal(
         configuracao.document_execution_mode = document_execution_mode
         configuracao.output_assembly_mode = output_assembly_mode
         configuracao.output_packaging_mode = output_packaging_mode
+        configuracao.max_tentativas = max_tentativas
         configuracao.prompt_parameters = normalizar_parametros_prompt(
             prompt_parameters
         )
@@ -478,6 +535,7 @@ def clonar_agente(*, agente, actor, novo_nome=None):
             document_execution_mode=configuracao_origem.document_execution_mode,
             output_assembly_mode=configuracao_origem.output_assembly_mode,
             output_packaging_mode=configuracao_origem.output_packaging_mode,
+            max_tentativas=configuracao_origem.max_tentativas,
             prompt_parameters=configuracao_origem.prompt_parameters,
             concurrency_policy=configuracao_origem.concurrency_policy,
             created_by=actor,
