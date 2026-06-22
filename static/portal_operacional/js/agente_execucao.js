@@ -3,9 +3,16 @@
   // limite validado para upload local) para contornar o limite do proxy.
   const EXEC_CHUNK_SIZE = 7 * 1024;
   const EXEC_PARALLEL_CHUNKS = 4;
+  const POLL_INTERVAL_MS = 8000;
+  const IN_PROGRESS_STATUSES = new Set(["criado", "em_fila", "em_processamento"]);
 
   const form = document.querySelector("[data-execution-form]");
+
+  let _modalPendingForm = null;
+
   setupAgentCardUploads();
+  setupExecModal();
+
   if (!form) {
     return;
   }
@@ -93,6 +100,8 @@
   updateSourceBlocks();
   updateFileName();
 
+  // ─── Chunked upload helpers ──────────────────────────────────────────────
+
   async function _sendExecChunk(uploadUrl, csrf, file, uploadId, totalChunks, chunkIdx) {
     const start = chunkIdx * EXEC_CHUNK_SIZE;
     const chunk = file.slice(start, Math.min(start + EXEC_CHUNK_SIZE, file.size));
@@ -137,41 +146,311 @@
     return lastResult;
   }
 
+  // ─── AJAX form submission ────────────────────────────────────────────────
+
+  async function _submitFormAsAjax(cardForm) {
+    const csrfInput = cardForm.querySelector("[name='csrfmiddlewaretoken']");
+    const csrf = csrfInput ? csrfInput.value : "";
+    try {
+      const resp = await fetch(cardForm.action, {
+        method: "POST",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRFToken": csrf,
+        },
+        body: new FormData(cardForm),
+        credentials: "same-origin",
+      });
+      let data;
+      try {
+        data = await resp.json();
+      } catch (_) {
+        data = { erro: "Resposta inesperada do servidor." };
+      }
+      if (data.erro) {
+        _restoreCardButton(cardForm);
+        alert("Erro ao iniciar execução: " + data.erro);
+        return;
+      }
+      _startProgressTracking(cardForm, data.status_endpoint);
+    } catch (err) {
+      _restoreCardButton(cardForm);
+      alert("Erro ao iniciar execução: " + err.message);
+    }
+  }
+
+  function _restoreCardButton(cardForm) {
+    const submitBtn = cardForm.querySelector("button[type='submit']");
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Executar";
+      submitBtn.classList.remove("disabled");
+    }
+  }
+
+  // ─── Progress panel ──────────────────────────────────────────────────────
+
+  function _createProgressPanel() {
+    const div = document.createElement("div");
+    div.className = "agent-exec-progress";
+    div.setAttribute("data-agent-progress-panel", "");
+    div.dataset.statusCode = "em_processamento";
+    div.innerHTML = `
+      <div class="processing-live-panel">
+        <div class="processing-live-header">
+          <strong data-progress-value>0%</strong>
+          <span data-status-label style="margin-left:.6rem;font-size:.78rem;color:var(--muted,#7ca5b8);font-weight:400;vertical-align:middle;"></span>
+        </div>
+        <div class="processing-progress-track" aria-hidden="true">
+          <span class="processing-progress-fill" data-progress-fill style="width:0%"></span>
+        </div>
+        <div class="processing-live-meta">
+          <small>Etapa: <span data-stage-label>Iniciando...</span></small>
+          <small data-current-document-wrap hidden>
+            Documento: <span data-current-document></span>
+          </small>
+          <small data-stall-warning hidden>
+            Sem atividade recente. Verifique se o processamento travou.
+          </small>
+        </div>
+      </div>
+      <details class="processing-error-panel" data-error-panel hidden>
+        <summary>&#9888; Ver erro</summary>
+        <div>
+          <span>Detalhes do erro</span>
+          <p data-error-message></p>
+        </div>
+      </details>
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+        <small data-output-unavailable style="font-size:.75rem;color:var(--muted,#7ca5b8);">Arquivo de saída ainda não disponível.</small>
+        <a data-output-download href="#" class="agent-exec-download-btn" hidden>
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="13" height="13">
+            <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 12h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          Baixar resultado
+        </a>
+      </div>
+    `;
+    return div;
+  }
+
+  function _applyProgressStatus(panel, payload) {
+    panel.dataset.statusCode = payload.status_codigo || "";
+
+    const q = (sel) => panel.querySelector(sel);
+
+    const progressValue = q("[data-progress-value]");
+    if (progressValue) progressValue.textContent = (payload.percentual || 0) + "%";
+
+    const progressFill = q("[data-progress-fill]");
+    if (progressFill) progressFill.style.width = (payload.percentual || 0) + "%";
+
+    const statusLabel = q("[data-status-label]");
+    if (statusLabel) statusLabel.textContent = payload.status || "";
+
+    const stageLabel = q("[data-stage-label]");
+    if (stageLabel) stageLabel.textContent = payload.etapa_atual || "Aguardando atualizacao";
+
+    const currentDoc = q("[data-current-document]");
+    const currentDocWrap = q("[data-current-document-wrap]");
+    if (currentDoc && currentDocWrap) {
+      const name = payload.documento_atual_nome || "";
+      currentDoc.textContent = name;
+      currentDocWrap.hidden = !name;
+    }
+
+    const livePanel = q(".processing-live-panel");
+    const stallWarning = q("[data-stall-warning]");
+    const stalled = Boolean(payload.possivel_travamento);
+    if (livePanel) livePanel.classList.toggle("is-stalled", stalled);
+    if (stallWarning) stallWarning.hidden = !stalled;
+
+    const errorPanel = q("[data-error-panel]");
+    const errorMessage = q("[data-error-message]");
+    if (errorPanel && errorMessage) {
+      const msg = payload.mensagem_erro || "";
+      errorPanel.hidden = !msg;
+      errorMessage.textContent = msg;
+      const isAtencao = payload.status_codigo === "concluido_atencao";
+      const summary = errorPanel.querySelector("summary");
+      if (summary) summary.textContent = isAtencao ? "⚠ Ver atenção" : "⚠ Ver erro";
+      const span = errorPanel.querySelector("span");
+      if (span) span.textContent = isAtencao ? "Atenção" : "Detalhes do erro";
+    }
+
+    const downloadLink = q("[data-output-download]");
+    const unavailableEl = q("[data-output-unavailable]");
+    if (downloadLink) {
+      downloadLink.hidden = !payload.tem_arquivo_saida;
+      if (payload.tem_arquivo_saida && payload.download_saida_url) {
+        downloadLink.href = payload.download_saida_url;
+      }
+    }
+    if (unavailableEl) {
+      unavailableEl.hidden = Boolean(payload.tem_arquivo_saida);
+    }
+  }
+
+  async function _pollProgress(panel) {
+    const endpoint = panel.dataset.statusEndpoint;
+    if (!endpoint) return;
+    try {
+      const resp = await fetch(endpoint, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
+      });
+      if (!resp.ok) return;
+      const payload = await resp.json();
+      _applyProgressStatus(panel, payload);
+    } catch (_) {}
+  }
+
+  function _startProgressTracking(cardForm, statusEndpoint) {
+    const card = cardForm.closest(".agent-card");
+    if (!card) return;
+
+    // Replace any existing progress panel
+    const existing = card.querySelector("[data-agent-progress-panel]");
+    if (existing) existing.remove();
+
+    const panel = _createProgressPanel();
+    panel.dataset.statusEndpoint = statusEndpoint;
+    card.appendChild(panel);
+
+    // Save original availability state to restore on finish
+    const availability = card.querySelector(".agent-availability");
+    const submitBtn = cardForm.querySelector("button[type='submit']");
+    let origAvailClass = null;
+    let origAvailText = null;
+
+    if (availability) {
+      const colorClasses = ["availability-verde", "availability-vermelho", "availability-cinza", "availability-amarelo"];
+      origAvailClass = colorClasses.find((c) => availability.classList.contains(c)) || null;
+      const availText = availability.querySelector("span:last-child");
+      origAvailText = availText ? availText.textContent : null;
+      availability.classList.remove(...colorClasses);
+      availability.classList.add("availability-amarelo");
+      if (availText) availText.textContent = "Executando. Acompanhe o progresso abaixo.";
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Em execução";
+      submitBtn.classList.add("disabled");
+    }
+
+    function onFinish() {
+      if (availability && origAvailClass) {
+        const colorClasses = ["availability-verde", "availability-vermelho", "availability-cinza", "availability-amarelo"];
+        availability.classList.remove(...colorClasses);
+        availability.classList.add(origAvailClass);
+        const availText = availability.querySelector("span:last-child");
+        if (availText && origAvailText !== null) availText.textContent = origAvailText;
+      }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Executar";
+        submitBtn.classList.remove("disabled");
+      }
+    }
+
+    // Initial poll
+    _pollProgress(panel);
+
+    const intervalId = setInterval(() => {
+      if (!IN_PROGRESS_STATUSES.has(panel.dataset.statusCode)) {
+        clearInterval(intervalId);
+        onFinish();
+        return;
+      }
+      _pollProgress(panel);
+    }, POLL_INTERVAL_MS);
+  }
+
+  // ─── Confirmation modal ──────────────────────────────────────────────────
+
+  function _openExecModal(cardForm) {
+    const modal = document.getElementById("modal-confirmar-execucao");
+    if (!modal) {
+      cardForm.requestSubmit();
+      return;
+    }
+    const setText = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val || "—";
+    };
+    setText("modal-exec-nome-agente", cardForm.dataset.agentNome);
+    setText("modal-exec-integracao-ia", cardForm.dataset.agentIntegracaoIa);
+    const tipoEntrada = cardForm.dataset.agentTipoEntrada || "";
+    const nomeInteg = cardForm.dataset.agentNomeIntegracao || "";
+    setText("modal-exec-origem", nomeInteg ? tipoEntrada + " · " + nomeInteg : tipoEntrada);
+    setText("modal-exec-formato-saida", cardForm.dataset.agentFormatoSaida);
+    _modalPendingForm = cardForm;
+    modal.style.display = "flex";
+    const confirmBtn = document.getElementById("modal-exec-confirmar");
+    if (confirmBtn) confirmBtn.focus();
+  }
+
+  function _closeExecModal() {
+    const modal = document.getElementById("modal-confirmar-execucao");
+    if (modal) modal.style.display = "none";
+    _modalPendingForm = null;
+  }
+
+  function setupExecModal() {
+    const modal = document.getElementById("modal-confirmar-execucao");
+    if (!modal) return;
+    const confirmBtn = document.getElementById("modal-exec-confirmar");
+    const cancelBtn = document.getElementById("modal-exec-cancelar");
+    if (confirmBtn) {
+      confirmBtn.addEventListener("click", () => {
+        const pendingForm = _modalPendingForm;
+        _closeExecModal();
+        if (pendingForm) pendingForm.requestSubmit();
+      });
+    }
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", _closeExecModal);
+    }
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) _closeExecModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && modal.style.display !== "none") _closeExecModal();
+    });
+  }
+
+  // ─── Agent card forms ────────────────────────────────────────────────────
+
   function setupAgentCardUploads() {
     document.querySelectorAll("[data-agent-card-form]").forEach((cardForm) => {
       const cardFileInput = cardForm.querySelector("[data-agent-card-file]");
       const submitButton = cardForm.querySelector("button[type='submit']");
 
-      function markCardExecuting() {
-        const card = cardForm.closest(".agent-card");
-        if (!card) {
-          return;
-        }
-        const availability = card.querySelector(".agent-availability");
-        if (availability) {
-          availability.classList.remove(
-            "availability-verde",
-            "availability-vermelho",
-            "availability-cinza"
-          );
-          availability.classList.add("availability-amarelo");
-          const availabilityText = availability.querySelector("span:last-child");
-          if (availabilityText) {
-            availabilityText.textContent = "Agente em execucao. Aguarde atualizacao.";
-          }
-        }
-        if (submitButton) {
-          submitButton.disabled = true;
-          submitButton.textContent = "Executando...";
-          submitButton.classList.add("disabled");
-        }
+      // Intercept the Executar button to open the confirmation modal
+      if (submitButton) {
+        submitButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          _openExecModal(cardForm);
+        });
       }
 
       if (!cardFileInput) {
-        cardForm.addEventListener("submit", markCardExecuting);
+        // Simple form: submit via AJAX on confirm
+        cardForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent = "Iniciando...";
+            submitButton.classList.add("disabled");
+          }
+          await _submitFormAsAjax(cardForm);
+        });
         return;
       }
 
+      // Upload form
       cardFileInput.addEventListener("change", () => {
         const selectedFile = cardFileInput.files && cardFileInput.files[0];
         cardForm.classList.toggle("has-file", Boolean(selectedFile));
@@ -205,11 +484,7 @@
           });
 
           if (!result.ok) {
-            if (submitButton) {
-              submitButton.disabled = false;
-              submitButton.textContent = "Executar";
-              submitButton.classList.remove("disabled");
-            }
+            _restoreCardButton(cardForm);
             alert("Erro ao enviar arquivo: " + result.error);
             return;
           }
@@ -222,14 +497,12 @@
 
           cardFileInput.disabled = true;
 
-          markCardExecuting();
-          cardForm.submit();
-        } catch (err) {
           if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.textContent = "Executar";
-            submitButton.classList.remove("disabled");
+            submitButton.textContent = "Iniciando...";
           }
+          await _submitFormAsAjax(cardForm);
+        } catch (err) {
+          _restoreCardButton(cardForm);
           alert("Erro ao enviar arquivo: " + err.message);
         }
       });

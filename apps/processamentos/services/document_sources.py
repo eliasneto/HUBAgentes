@@ -99,7 +99,23 @@ def _prepare_google_drive_documents(processamento):
             "Selecione a pasta do Google Drive antes de materializar os documentos."
         )
     try:
-        files = list_pdf_files_from_folder_source(processamento.folder_source)
+        subfolder_drive_id = None
+        agente = getattr(processamento, "agente", None)
+        if agente is not None:
+            try:
+                path = agente.configuracao_operacional.default_gdrive_subfolder_path or []
+                if path:
+                    subfolder_drive_id = path[-1]["id"]
+            except Exception:
+                pass
+
+        if subfolder_drive_id:
+            files = list_pdf_files_from_drive_folder_id(
+                processamento.folder_source.google_drive_integration,
+                subfolder_drive_id,
+            )
+        else:
+            files = list_pdf_files_from_folder_source(processamento.folder_source)
     except GoogleDriveServiceError as exc:
         raise DocumentSourcePreparationError(str(exc)) from exc
 
@@ -420,10 +436,16 @@ def _update_documento_if_needed(documento, defaults):
             if field in {"nome_arquivo", "drive_path", "source_reference", "checksum"}:
                 requires_reprocessing = True
     if documento.status == DocumentStatus.ERRO:
-        documento.status = DocumentStatus.PENDENTE
-        documento.mensagem_erro = ""
-        documento.processado_em = None
-        changed = True
+        # Só erros transitórios (provedor indisponível, timeout) são reprocessados
+        # automaticamente. Erros que exigem intervenção manual (chave inválida,
+        # documento grande demais, saída inválida) permanecem em ERRO — repetir
+        # não resolveria. Exceção: se o arquivo de origem mudou (conteúdo novo),
+        # o erro anterior pode não valer mais, então reprocessa mesmo assim.
+        if documento.erro_reprocessavel or requires_reprocessing:
+            documento.status = DocumentStatus.PENDENTE
+            documento.mensagem_erro = ""
+            documento.processado_em = None
+            changed = True
     elif requires_reprocessing and documento.status == DocumentStatus.PROCESSADO:
         documento.status = DocumentStatus.PENDENTE
         documento.mensagem_erro = ""

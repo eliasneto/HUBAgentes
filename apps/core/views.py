@@ -164,7 +164,38 @@ class PortalLogoutView(LogoutView):
     next_page = reverse_lazy("portal_login")
 
 
-def _obter_dados_dashboard():
+def _meses_disponiveis_dashboard():
+    """Lista de meses com processamentos, mais recente primeiro, para o filtro."""
+    from apps.processamentos.models import Processamento
+
+    MESES_PT = [
+        "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+    ]
+    meses = []
+    for data in Processamento.objects.dates("iniciado_em", "month", order="DESC"):
+        meses.append(
+            {
+                "valor": f"{data.year}-{data.month:02d}",
+                "label": f"{MESES_PT[data.month]} {data.year}",
+            }
+        )
+    return meses
+
+
+def _parse_mes_dashboard(valor):
+    """Converte 'AAAA-MM' em (ano, mes); retorna None se inválido."""
+    try:
+        ano_str, mes_str = str(valor).split("-")
+        ano, mes = int(ano_str), int(mes_str)
+        if 1 <= mes <= 12:
+            return (ano, mes)
+    except (ValueError, AttributeError):
+        pass
+    return None
+
+
+def _obter_dados_dashboard(mes=None):
     from django.db.models import Count, Sum, Q
     from apps.processamentos.models import Processamento, ProcessingStatus, DocumentStatus
 
@@ -173,9 +204,14 @@ def _obter_dados_dashboard():
         ProcessingStatus.CONCLUIDO_ERRO,
     }
 
+    # Queryset base: filtra por mês quando informado (ano, mês).
+    base = Processamento.objects.all()
+    if mes:
+        base = base.filter(iniciado_em__year=mes[0], iniciado_em__month=mes[1])
+
     # 1. Processamentos por agente
     proc_por_agente = (
-        Processamento.objects
+        base
         .filter(agente__isnull=False)
         .values("agente__nome")
         .annotate(total=Count("id"))
@@ -184,7 +220,7 @@ def _obter_dados_dashboard():
 
     # 2. Tokens totais por integração de IA
     tokens_por_integracao = (
-        Processamento.objects
+        base
         .filter(ai_provider_integration_snapshot__isnull=False, total_tokens__isnull=False)
         .values("ai_provider_integration_snapshot__nome")
         .annotate(total=Sum("total_tokens"))
@@ -193,7 +229,7 @@ def _obter_dados_dashboard():
 
     # 3. Custo em BRL por integração de IA
     custo_por_integracao = (
-        Processamento.objects
+        base
         .filter(ai_provider_integration_snapshot__isnull=False, custo_brl__isnull=False)
         .values("ai_provider_integration_snapshot__nome")
         .annotate(total=Sum("custo_brl"))
@@ -202,10 +238,19 @@ def _obter_dados_dashboard():
 
     # 4. Documentos processados por agente
     docs_por_agente = (
-        Processamento.objects
+        base
         .filter(agente__isnull=False)
         .values("agente__nome")
         .annotate(total=Sum("total_processados"))
+        .order_by("-total")[:10]
+    )
+
+    # 5. Custo em BRL por agente
+    custo_por_agente = (
+        base
+        .filter(agente__isnull=False, custo_brl__isnull=False)
+        .values("agente__nome")
+        .annotate(total=Sum("custo_brl"))
         .order_by("-total")[:10]
     )
 
@@ -214,6 +259,7 @@ def _obter_dados_dashboard():
         "tokens_por_integracao": list(tokens_por_integracao),
         "custo_por_integracao": list(custo_por_integracao),
         "docs_por_agente": list(docs_por_agente),
+        "custo_por_agente": list(custo_por_agente),
     }
 
 
@@ -244,7 +290,11 @@ class PortalPainelView(LoginRequiredMixin, TemplateView):
 
         context["exibir_dashboard"] = pode_ver
         if pode_ver:
-            context["dashboard"] = _obter_dados_dashboard()
+            mes_param = self.request.GET.get("mes", "")
+            mes = _parse_mes_dashboard(mes_param)
+            context["dashboard"] = _obter_dados_dashboard(mes=mes)
+            context["meses_disponiveis"] = _meses_disponiveis_dashboard()
+            context["mes_selecionado"] = mes_param if mes else ""
         return context
 
 
@@ -373,14 +423,15 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
         return redirect("portal_agentes_leitura")
 
     def post(self, request, *args, **kwargs):
+        is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
         token = request.POST.get("arquivo_execucao_token", "").strip()
         if token:
             files = self._carregar_arquivo_token(request, token)
             if files is None:
-                messages.error(
-                    request,
-                    "Arquivo temporario nao encontrado ou expirado. Tente novamente.",
-                )
+                erro = "Arquivo temporario nao encontrado ou expirado. Tente novamente."
+                if is_ajax:
+                    return JsonResponse({"erro": erro}, status=400)
+                messages.error(request, erro)
                 return redirect("portal_agentes_leitura")
         else:
             files = request.FILES
@@ -394,10 +445,13 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
         show_upload = form.runtime_fields_schema.get("show_file_upload")
         if show_upload:
             if not form.is_valid():
-                messages.error(self.request, self._first_form_error(form))
+                erro = self._first_form_error(form)
+                if is_ajax:
+                    return JsonResponse({"erro": erro}, status=400)
+                messages.error(self.request, erro)
                 return redirect("portal_agentes_leitura")
-            return self._executar_com_payload(form.cleaned_data)
-        return self._executar_com_defaults()
+            return self._executar_com_payload(form.cleaned_data, is_ajax=is_ajax)
+        return self._executar_com_defaults(is_ajax=is_ajax)
 
     def _carregar_arquivo_token(self, request, token):
         import re
@@ -437,15 +491,17 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
             original_name, content, content_type="application/pdf"
         )}
 
-    def _executar_com_defaults(self):
+    def _executar_com_defaults(self, is_ajax=False):
         try:
             cleaned_data = montar_payload_execucao_padrao(self.agente)
-            return self._executar_com_payload(cleaned_data)
+            return self._executar_com_payload(cleaned_data, is_ajax=is_ajax)
         except (OperationalExecutionError, ValueError) as exc:
+            if is_ajax:
+                return JsonResponse({"erro": str(exc)}, status=400)
             messages.error(self.request, str(exc))
             return redirect("portal_agentes_leitura")
 
-    def _executar_com_payload(self, cleaned_data):
+    def _executar_com_payload(self, cleaned_data, is_ajax=False):
         try:
             processamento = criar_e_iniciar_processamento_para_agente(
                 agente=self.agente,
@@ -453,8 +509,19 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
                 cleaned_data=cleaned_data,
             )
         except (OperationalExecutionError, ValueError) as exc:
+            if is_ajax:
+                return JsonResponse({"erro": str(exc)}, status=400)
             messages.error(self.request, str(exc))
             return redirect("portal_agentes_leitura")
+
+        if is_ajax:
+            return JsonResponse({
+                "codigo": processamento.codigo,
+                "status_endpoint": reverse(
+                    "portal_processamento_status",
+                    kwargs={"codigo": processamento.codigo},
+                ),
+            })
 
         messages.success(
             self.request,
@@ -656,6 +723,77 @@ class FonteDocumentoUpdateView(FonteDocumentoPortalFormMixin, FormView):
         context = super().get_context_data(**kwargs)
         context["source_edicao"] = self.source
         return context
+
+
+class FonteDocumentoGDriveFolderNameView(LoginRequiredMixin, View):
+    login_url = reverse_lazy("portal_login")
+
+    def get(self, request, *args, **kwargs):
+        from apps.integracoes.services.google_drive import (
+            extract_folder_id_from_url,
+            get_folder_name,
+            GoogleDriveServiceError,
+        )
+
+        integration_id = request.GET.get("integration_id")
+        folder_url = request.GET.get("folder_url", "").strip()
+
+        if not integration_id or not folder_url:
+            return JsonResponse({"nome": ""})
+
+        try:
+            integration = get_object_or_404(GoogleDriveIntegration, pk=integration_id)
+            folder_id = extract_folder_id_from_url(folder_url)
+            nome = get_folder_name(integration, folder_id)
+            return JsonResponse({"nome": nome})
+        except GoogleDriveServiceError as exc:
+            return JsonResponse({"erro": str(exc)}, status=400)
+        except Exception:
+            return JsonResponse({"erro": "Não foi possível buscar o nome da pasta."}, status=400)
+
+
+class GoogleDriveSubpastasView(LoginRequiredMixin, View):
+    login_url = reverse_lazy("portal_login")
+
+    def get(self, request, folder_source_id):
+        from apps.integracoes.models import GoogleDriveFolderSource
+        from apps.integracoes.services.google_drive import (
+            list_subfolders_from_drive_folder_id,
+            GoogleDriveServiceError,
+        )
+        try:
+            folder_source = get_object_or_404(GoogleDriveFolderSource, pk=folder_source_id)
+            subpastas = list_subfolders_from_drive_folder_id(
+                folder_source.google_drive_integration,
+                folder_source.folder_id,
+            )
+            return JsonResponse({"subpastas": subpastas})
+        except GoogleDriveServiceError as exc:
+            return JsonResponse({"subpastas": [], "erro": str(exc)})
+        except Exception:
+            return JsonResponse({"subpastas": [], "erro": "Erro ao buscar subpastas."})
+
+
+class GoogleDriveSubpastasFilhasView(LoginRequiredMixin, View):
+    login_url = reverse_lazy("portal_login")
+
+    def get(self, request, folder_source_id, drive_folder_id):
+        from apps.integracoes.models import GoogleDriveFolderSource
+        from apps.integracoes.services.google_drive import (
+            list_subfolders_from_drive_folder_id,
+            GoogleDriveServiceError,
+        )
+        try:
+            folder_source = get_object_or_404(GoogleDriveFolderSource, pk=folder_source_id)
+            subpastas = list_subfolders_from_drive_folder_id(
+                folder_source.google_drive_integration,
+                drive_folder_id,
+            )
+            return JsonResponse({"subpastas": subpastas})
+        except GoogleDriveServiceError as exc:
+            return JsonResponse({"subpastas": [], "erro": str(exc)})
+        except Exception:
+            return JsonResponse({"subpastas": [], "erro": "Erro ao buscar subpastas."})
 
 
 class IntegracoesView(LoginRequiredMixin, TemplateView):
@@ -1420,6 +1558,37 @@ class ExcluirPastaCompartilhadaView(PortalAdministradorRequiredMixin, View):
         return redirect(redirect_url)
 
 
+class ExcluirGoogleDriveFolderSourceView(PortalAdministradorRequiredMixin, View):
+    def post(self, request, fonte_id):
+        from django.db.models import ProtectedError
+        source = get_object_or_404(GoogleDriveFolderSource, pk=fonte_id)
+        nome = source.nome
+        configs_ativas = source.agentes_configuracao_padrao.filter(agente__deleted_at__isnull=True)
+        if configs_ativas.exists():
+            agentes_nomes = list(configs_ativas.values_list("agente__nome", flat=True))
+            lista = ", ".join(f"'{n}'" for n in agentes_nomes)
+            messages.error(
+                request,
+                f"Não foi possível excluir '{nome}'. Ela está configurada como fonte padrão "
+                f"dos agentes: {lista}. Reconfigure esses agentes antes de excluir.",
+            )
+            return redirect("portal_fontes_documentos")
+        source.agentes_configuracao_padrao.filter(agente__deleted_at__isnull=False).update(
+            default_folder_source=None
+        )
+        try:
+            source.delete()
+        except ProtectedError:
+            messages.error(request, f"Não foi possível excluir '{nome}': ela ainda está em uso.")
+            return redirect("portal_fontes_documentos")
+        except Exception as exc:
+            logger.exception("Erro inesperado ao excluir GoogleDriveFolderSource id=%s", fonte_id)
+            messages.error(request, f"Erro inesperado ao excluir '{nome}': {exc}")
+            return redirect("portal_fontes_documentos")
+        messages.success(request, f"Fonte '{nome}' removida do sistema com sucesso.")
+        return redirect("portal_fontes_documentos")
+
+
 class AdicionarUsuarioPastaView(PortalAdministradorRequiredMixin, View):
     def post(self, request, integracao_id):
         from apps.integracoes.models import PastaCompartilhadaUsuario, PermissaoPasta
@@ -1495,9 +1664,19 @@ class SalvarConfiguracaoGeralView(PortalAdministradorRequiredMixin, View):
             dias = max(1, min(365, int(request.POST.get("dias_retencao_arquivos", 30))))
         except (ValueError, TypeError):
             dias = 30
+        try:
+            max_global = max(0, min(1000, int(request.POST.get("max_execucoes_simultaneas", 5))))
+        except (ValueError, TypeError):
+            max_global = 5
+        try:
+            max_usuario = max(0, min(1000, int(request.POST.get("max_execucoes_por_usuario", 2))))
+        except (ValueError, TypeError):
+            max_usuario = 2
         config = ConfiguracaoGeral.obter()
         config.visibilidade_dashboard = valor
         config.limpeza_automatica_ativa = "limpeza_automatica_ativa" in request.POST
+        config.max_execucoes_simultaneas = max_global
+        config.max_execucoes_por_usuario = max_usuario
         config.atualizado_por = request.user
         config.save()
         messages.success(request, "Configurações gerais salvas com sucesso.")

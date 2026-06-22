@@ -54,12 +54,15 @@ from apps.processamentos.services.output_renderers import (
 
 
 class ProcessamentoExecutionError(Exception):
-    def __init__(self, message, *, technical_message="", usage_metadata=None):
+    def __init__(self, message, *, technical_message="", usage_metadata=None, retryable=False):
         super().__init__(message)
         self.technical_message = technical_message
         # Tokens consumidos quando a IA respondeu mas o conteudo foi rejeitado
         # (ex.: JSON invalido). O provedor cobra por eles; registramos no erro.
         self.usage_metadata = usage_metadata
+        # JSON invalido / saida truncada nao se resolvem sozinhos (mesmo
+        # doc+prompt tende a repetir): padrao False = nao reprocessa.
+        self.retryable = retryable
 
 
 AI_DEFINED_OUTPUT_INSTRUCTION_MARKER = "FORMATO DE SAIDA DEFINIDO PELA IA"
@@ -172,10 +175,9 @@ def execute_processing(processamento, actor):
     telemetry = _aggregate_processing_telemetry(processamento)
 
     with transaction.atomic():
-        processamento.total_documentos = processamento.documentos.count()
-        processamento.total_processados = processamento.documentos.filter(
-            status=DocumentStatus.PROCESSADO
-        ).count()
+        # DB-A1: recalcula ambos os totais em uma unica query agregada, evitando
+        # a janela de inconsistencia entre duas contagens separadas.
+        processamento.recalcular_totais()
         processamento.execucao_iniciada_em = batch_started_at
         processamento.execucao_finalizada_em = finished_at
         processamento.duracao_processamento_ms = max(
@@ -336,37 +338,23 @@ def _adicionar_instrucao_formato_definido_pela_ia(prompt):
     return (
         f"{prompt.rstrip()}\n\n"
         f"## {AI_DEFINED_OUTPUT_INSTRUCTION_MARKER}\n\n"
-        "Antes de responder, escolha o formato de saida mais adequado ao conteudo "
-        "que voce vai gerar, seguindo os criterios abaixo:\n\n"
-        "| Formato | Use quando a resposta for... |\n"
-        "|---------|------------------------------|\n"
-        "| xlsx    | Dados tabulares: listas, comparativos, rankings, planilhas de custo, cronogramas |\n"
-        "| csv     | Dados tabulares simples que precisam ser importados em outros sistemas |\n"
-        "| pdf     | Relatorio narrativo, analise, laudo, parecer ou documento formal com texto corrido |\n"
-        "| json    | Dados estruturados destinados a integracao com outros sistemas ou APIs |\n"
-        "| txt     | Texto corrido simples, sem formatacao especial |\n\n"
-        "Responda OBRIGATORIAMENTE com um JSON valido neste formato exato:\n"
-        "{\n"
-        '  "formato_saida": "<xlsx|csv|pdf|json|txt>",\n'
-        '  "justificativa": "<uma linha explicando por que escolheu este formato>",\n'
-        '  "dados": <conteudo completo da resposta no formato escolhido>\n'
-        "}\n\n"
-        "Regras:\n"
-        '- "dados" deve conter o conteudo completo e final — nao resuma nem trunque.\n'
-        '- Para xlsx e csv: "dados" deve ser uma lista de listas (primeira linha = cabecalhos).\n'
-        '- Para pdf: "dados" deve ser HTML completo com CSS interno.\n'
-        '- Para json: "dados" deve ser um objeto ou lista JSON.\n'
-        '- Para txt: "dados" deve ser uma string de texto puro.\n'
-        "- Nao gere arquivos diretamente. O sistema converte automaticamente."
+        "Escolha o formato mais adequado: xlsx (tabelas/listas), csv (dados simples), "
+        "pdf (relatorios — use HTML com CSS), json (integracao com sistemas), txt (texto puro).\n\n"
+        'Responda EXCLUSIVAMENTE com JSON valido: {"formato_saida": "<xlsx|csv|pdf|json|txt>", '
+        '"justificativa": "<motivo em uma linha>", "dados": <conteudo completo>}\n\n'
+        'Regra: "dados" deve ser completo, sem truncar. '
+        "xlsx/csv: lista de listas com cabecalhos na 1a linha. "
+        "O sistema converte automaticamente — nao gere arquivos diretamente."
     )
 
 
 def _build_execution_params(processamento):
     execution_params = dict(processamento.agente.parametros_execucao or {})
-    # O sistema sempre precisa de JSON para renderizar JSON/Excel/CSV/PDF/TXT
-    # com rastreabilidade; provedores que suportam esse parametro tendem a
-    # obedecer melhor do que apenas com instrucao no prompt.
-    execution_params.setdefault("response_mime_type", "application/json")
+    # Para formato LIVRE a IA deve retornar exatamente o que o prompt pede,
+    # sem coerção de tipo. Para todos os outros formatos forçamos JSON para
+    # garantir rastreabilidade e conversão estruturada.
+    if processamento.output_format != ProcessingOutputFormat.LIVRE:
+        execution_params.setdefault("response_mime_type", "application/json")
     return execution_params
 
 
@@ -386,7 +374,26 @@ def _execute_documents_individually(
     last_technical_error_message = ""
     _custo_cache: dict = {}  # cache de precificacao/cotacao para o batch
 
+    # DB-U2: limite de tentativas de execucao por documento (0 = sem limite).
+    max_tentativas = obter_ou_criar_configuracao_operacional(
+        processamento.agente
+    ).max_tentativas
+
     for documento in documentos:
+        if _documento_excedeu_tentativas(processamento, documento, max_tentativas):
+            total_errors += 1
+            mensagem = (
+                f"O documento atingiu o limite de {max_tentativas} tentativa(s) de "
+                "execucao e nao sera reprocessado."
+            )
+            last_error_message = mensagem
+            _mark_document_max_tentativas(
+                processamento=processamento,
+                documento=documento,
+                message=mensagem,
+            )
+            continue
+
         execution_started_at = timezone.now()
         try:
             execution_result = _execute_document(
@@ -419,6 +426,7 @@ def _execute_documents_individually(
                 model_name=model_name,
                 execution_started_at=execution_started_at,
                 usage_metadata=getattr(exc, "usage_metadata", None),
+                retryable=getattr(exc, "retryable", False),
             )
             _log_execution_error(
                 actor=actor,
@@ -479,6 +487,7 @@ def _execute_documents_as_group(
             model_name=model_name,
             execution_started_at=execution_started_at,
             usage_metadata=getattr(exc, "usage_metadata", None),
+            retryable=getattr(exc, "retryable", False),
         )
         _log_group_execution_error(
             actor=actor,
@@ -569,6 +578,7 @@ def _execute_documents_by_folder(
                 model_name=model_name,
                 execution_started_at=execution_started_at,
                 usage_metadata=getattr(exc, "usage_metadata", None),
+                retryable=getattr(exc, "retryable", False),
             )
             _log_group_execution_error(
                 actor=actor,
@@ -1194,7 +1204,24 @@ def _detectar_extensao_livre(texto: str) -> str:
 
 def _render_output_file(parsed_output, requested_output_format, output_basename):
     if requested_output_format == ProcessingOutputFormat.LIVRE:
-        texto = str(parsed_output)
+        # Dados tabulares (lista de dicts ou lista de listas) → Excel, sem precisar
+        # selecionar o formato manualmente. Cobre o caso "peça Excel no prompt → receba Excel".
+        if (
+            isinstance(parsed_output, list)
+            and parsed_output
+            and isinstance(parsed_output[0], (list, dict))
+        ):
+            output_filename, output_bytes = render_output_file(
+                parsed_output, ProcessingOutputFormat.XLSX, output_basename
+            )
+            return output_filename, output_bytes, ProcessingOutputFormat.XLSX, parsed_output
+
+        # Objetos não-string → serializa como JSON válido (evita repr Python)
+        if not isinstance(parsed_output, str):
+            texto = json.dumps(parsed_output, ensure_ascii=False, indent=2)
+        else:
+            texto = parsed_output
+
         ext = _detectar_extensao_livre(texto)
         filename = f"{output_basename}.{ext}"
         return filename, texto.encode("utf-8"), ProcessingOutputFormat.LIVRE, texto
@@ -1308,6 +1335,59 @@ def _next_execution_attempt_number(processamento):
     return (current_max or 0) + 1
 
 
+def _documento_excedeu_tentativas(processamento, documento, max_tentativas):
+    """DB-U2: True se o documento ja atingiu o limite de execucoes configurado.
+
+    Conta os registros de execucao ja existentes para o documento neste
+    processamento. Como documentos em ERRO voltam para PENDENTE a cada re-run
+    (ver document_sources._update_documento_if_needed), um documento que falha
+    repetidamente acumularia uma execucao por re-run; este limite o interrompe.
+    max_tentativas == 0 significa sem limite.
+    """
+    if not max_tentativas:
+        return False
+    tentativas_realizadas = processamento.execucoes_ia.filter(
+        documento=documento
+    ).count()
+    return tentativas_realizadas >= max_tentativas
+
+
+def _mark_document_max_tentativas(*, processamento, documento, message):
+    """DB-U2: marca o documento como erro por limite de tentativas atingido.
+
+    Nao cria um novo ProcessamentoExecucaoIA de proposito: o objetivo do limite
+    e justamente parar de consumir recursos: nenhuma chamada a IA e feita e a
+    contagem de tentativas nao e inflada.
+    """
+    with transaction.atomic():
+        documento.status = DocumentStatus.ERRO
+        documento.mensagem_erro = message
+        # Limite atingido: nao deve ser reprocessado novamente.
+        documento.erro_reprocessavel = False
+        documento.save(
+            update_fields=[
+                "status",
+                "mensagem_erro",
+                "erro_reprocessavel",
+                "updated_at",
+            ]
+        )
+
+        _registrar_atividade_processamento(
+            processamento,
+            etapa_atual="Documento ignorado: limite de tentativas atingido",
+            documento_atual_nome=documento.nome_arquivo,
+        )
+        processamento.save(
+            update_fields=[
+                "etapa_atual",
+                "documento_atual_nome",
+                "ultima_atividade_em",
+                "updated_at",
+            ]
+        )
+
+
 def _mark_document_error(
     *,
     processamento,
@@ -1317,6 +1397,7 @@ def _mark_document_error(
     model_name,
     execution_started_at,
     usage_metadata=None,
+    retryable=False,
 ):
     execution_finished_at = timezone.now()
     duration_ms = max(
@@ -1329,7 +1410,16 @@ def _mark_document_error(
     with transaction.atomic():
         documento.status = DocumentStatus.ERRO
         documento.mensagem_erro = message
-        documento.save(update_fields=["status", "mensagem_erro", "updated_at"])
+        # DB-U2/reprocesso seletivo: so erros transitorios sao reprocessados.
+        documento.erro_reprocessavel = retryable
+        documento.save(
+            update_fields=[
+                "status",
+                "mensagem_erro",
+                "erro_reprocessavel",
+                "updated_at",
+            ]
+        )
 
         tentativa_numero = _next_execution_attempt_number(processamento)
         processamento.execucao_finalizada_em = execution_finished_at
@@ -1399,6 +1489,7 @@ def _mark_document_group_error(
     model_name,
     execution_started_at,
     usage_metadata=None,
+    retryable=False,
 ):
     execution_finished_at = timezone.now()
     duration_ms = max(
@@ -1411,7 +1502,16 @@ def _mark_document_group_error(
         for documento in documentos:
             documento.status = DocumentStatus.ERRO
             documento.mensagem_erro = message
-            documento.save(update_fields=["status", "mensagem_erro", "updated_at"])
+            # Reprocesso seletivo: so erros transitorios voltam para PENDENTE.
+            documento.erro_reprocessavel = retryable
+            documento.save(
+                update_fields=[
+                    "status",
+                    "mensagem_erro",
+                    "erro_reprocessavel",
+                    "updated_at",
+                ]
+            )
 
         tentativa_numero = _next_execution_attempt_number(processamento)
         processamento.execucao_finalizada_em = execution_finished_at

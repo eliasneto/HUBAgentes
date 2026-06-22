@@ -144,6 +144,11 @@
                 method="post"
                 enctype="multipart/form-data"
                 data-agent-card-form
+                data-agent-nome="{{ agente.nome|escapejs }}"
+                data-agent-integracao-ia="{{ agente.integracao_ia|escapejs }}"
+                data-agent-tipo-entrada="{{ agente.tipo_entrada|escapejs }}"
+                data-agent-nome-integracao="{{ agente.nome_integracao_local|escapejs }}"
+                data-agent-formato-saida="{{ agente.formato_saida|escapejs }}"
               >
                 {% csrf_token %}
                 {% if agente.pode_executar and agente.usuario_tem_acesso %}
@@ -183,5 +188,50 @@
       </section>
     </section>
   </main>
+
+<div id="modal-confirmar-execucao"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-exec-titulo"
+  style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;"
+>
+  <div style="background:linear-gradient(135deg,#07131e 0%,#0c1f2e 100%);border:1.5px solid rgba(0,216,255,0.3);border-radius:18px;padding:2rem 2.2rem;max-width:440px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,0.6),0 0 0 1px rgba(0,216,255,0.08);">
+    <h2 id="modal-exec-titulo" style="font-size:1.05rem;font-weight:700;color:#e8f4fa;margin:0 0 1.4rem;letter-spacing:.01em;">Confirmar execução do agente</h2>
+    <dl style="display:grid;gap:.8rem;margin:0 0 1.8rem;padding:0;">
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:.3rem .8rem;align-items:baseline;">
+        <dt style="font-size:.72rem;color:#7ca5b8;text-transform:uppercase;letter-spacing:.07em;margin:0;">Agente</dt>
+        <dd id="modal-exec-nome-agente" style="font-size:.9rem;color:#e8f4fa;font-weight:600;margin:0;">—</dd>
+      </div>
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:.3rem .8rem;align-items:baseline;">
+        <dt style="font-size:.72rem;color:#7ca5b8;text-transform:uppercase;letter-spacing:.07em;margin:0;">Integração IA</dt>
+        <dd id="modal-exec-integracao-ia" style="font-size:.9rem;color:#e8f4fa;margin:0;">—</dd>
+      </div>
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:.3rem .8rem;align-items:baseline;">
+        <dt style="font-size:.72rem;color:#7ca5b8;text-transform:uppercase;letter-spacing:.07em;margin:0;">Origem dos docs</dt>
+        <dd id="modal-exec-origem" style="font-size:.9rem;color:#e8f4fa;margin:0;">—</dd>
+      </div>
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:.3rem .8rem;align-items:baseline;">
+        <dt style="font-size:.72rem;color:#7ca5b8;text-transform:uppercase;letter-spacing:.07em;margin:0;">Formato de saída</dt>
+        <dd id="modal-exec-formato-saida" style="font-size:.9rem;color:#e8f4fa;margin:0;">—</dd>
+      </div>
+    </dl>
+    <div style="display:flex;gap:.75rem;justify-content:flex-end;">
+      <button
+        id="modal-exec-cancelar"
+        type="button"
+        style="background:transparent;border:1px solid rgba(0,216,255,0.28);color:#7ca5b8;border-radius:8px;padding:.55rem 1.1rem;font-size:.88rem;cursor:pointer;transition:border-color .2s,color .2s;"
+        onmouseover="this.style.borderColor='rgba(0,216,255,0.6)';this.style.color='#b8d8e8';"
+        onmouseout="this.style.borderColor='rgba(0,216,255,0.28)';this.style.color='#7ca5b8';"
+      >Desistir</button>
+      <button
+        id="modal-exec-confirmar"
+        type="button"
+        style="background:linear-gradient(90deg,#00d8ff,#33f4ff);color:#04111e;border:none;border-radius:8px;padding:.55rem 1.3rem;font-size:.88rem;font-weight:700;cursor:pointer;box-shadow:0 0 14px rgba(0,216,255,0.35);transition:box-shadow .2s,opacity .2s;"
+        onmouseover="this.style.boxShadow='0 0 22px rgba(0,216,255,0.6)';"
+        onmouseout="this.style.boxShadow='0 0 14px rgba(0,216,255,0.35)';"
+      >Confirmar execução</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

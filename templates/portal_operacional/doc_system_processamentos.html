@@ -237,6 +237,64 @@
 
       <section class="builder-card">
         <div class="form-section-heading">
+          <p class="eyebrow">Reprocessamento e tentativas</p>
+          <h2>Quais erros sao re-tentados automaticamente</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          Ao reprocessar um agente, o sistema so re-tenta documentos cujo erro e <strong>transitorio</strong>
+          (se resolve sozinho). Erros que exigem <strong>intervencao manual</strong> nao sao re-tentados, porque
+          repetir nao resolveria — o documento permanece em erro ate a causa ser corrigida. Documentos que ja
+          foram processados com sucesso nunca sao re-executados.
+        </p>
+
+        <div class="doc-two-columns">
+          <div class="doc-code-panel">
+            <strong>Reprocessa (erro transitorio)</strong>
+            <pre><code>- Provedor de IA indisponivel ou sobrecarregado
+  (HTTP 429 / 503 / 529, apos esgotar as
+  retentativas automaticas)
+- Falha de conexao com o provedor
+- Timeout da requisicao</code></pre>
+          </div>
+
+          <div class="doc-code-panel">
+            <strong>Nao reprocessa (precisa de acao manual)</strong>
+            <pre><code>- Chave de API invalida / nao autorizado (401/403)
+- Requisicao malformada (400 / 404)
+- Documento maior que o contexto do modelo
+  (trocar o modelo ou dividir o documento)
+- Saida invalida ou truncada da IA
+  (ajustar prompt / limite de tokens)
+- Limite de tentativas por documento atingido</code></pre>
+          </div>
+        </div>
+
+        <div class="doc-guide-grid" style="margin-top:16px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Maximo de tentativas</span>
+            <p>Mesmo um erro transitorio so e re-tentado ate o limite configurado no agente
+            (campo "Maximo de tentativas por documento"). Ao atingi-lo, o documento para de ser
+            reprocessado, sem consumir mais tokens.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Arquivo de origem alterado</span>
+            <p>Se o arquivo de origem mudar (nome, caminho ou conteudo), o documento e reprocessado
+            mesmo que o erro anterior fosse permanente — o conteudo novo pode nao apresentar o
+            mesmo problema.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Indisponibilidade do provedor</span>
+            <p>Esse caso aparece como <strong>atencao</strong> (amarelo), nao como erro tecnico (vermelho):
+            e so aguardar alguns instantes e executar novamente.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
           <p class="eyebrow">Download do arquivo de saida</p>
           <h2>Como funciona o botao Baixar</h2>
         </div>

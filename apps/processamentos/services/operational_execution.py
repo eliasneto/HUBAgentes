@@ -30,7 +30,7 @@ class OperationalExecutionError(Exception):
 
 
 def criar_e_iniciar_processamento_para_agente(*, agente, actor, cleaned_data):
-    disponibilidade = calcular_disponibilidade_agente(agente)
+    disponibilidade = calcular_disponibilidade_agente(agente, actor)
     if not disponibilidade.pode_executar:
         raise OperationalExecutionError(disponibilidade.motivo)
 
@@ -97,6 +97,10 @@ _MENSAGENS_ATENCAO = (
     "caminho nao encontrado",
     "nenhum documento encontrado",
     "nenhum item encontrado",
+    # Indisponibilidade temporaria do provedor de IA: condicao transitoria,
+    # o usuario apenas precisa tentar novamente — atencao (amarelo), nao erro.
+    "temporariamente indisponivel",
+    "sobrecarregado",
 )
 
 

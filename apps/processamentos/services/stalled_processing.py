@@ -44,9 +44,8 @@ def reconciliar_processamento_orfao(processamento: Processamento) -> Processamen
         processamento.etapa_atual = "Processamento interrompido"
         processamento.documento_atual_nome = ""
         processamento.ultima_atividade_em = timezone.now()
-        processamento.total_processados = processamento.documentos.filter(
-            status=DocumentStatus.PROCESSADO
-        ).count()
+        # DB-A1: recalcula ambos os totais em uma unica query agregada.
+        processamento.recalcular_totais()
         processamento.save(
             update_fields=[
                 "status",
@@ -57,6 +56,7 @@ def reconciliar_processamento_orfao(processamento: Processamento) -> Processamen
                 "etapa_atual",
                 "documento_atual_nome",
                 "ultima_atividade_em",
+                "total_documentos",
                 "total_processados",
                 "updated_at",
             ]

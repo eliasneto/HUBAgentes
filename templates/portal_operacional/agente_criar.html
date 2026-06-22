@@ -162,6 +162,13 @@
               {% for error in form.default_folder_source.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
 
+            <div class="execution-field builder-wide" data-builder-source="google_drive_folder" id="gdrive-subfolder-field">
+              <label>Subpasta do Google Drive</label>
+              {{ form.default_gdrive_subfolder_path }}
+              <div id="gdrive-cascade-container"></div>
+              <small id="gdrive-cascade-hint" style="margin-top:4px;display:block"></small>
+            </div>
+
             <div class="execution-field" data-builder-source="local_folder">
               <label for="{{ form.default_local_storage_integration.id_for_label }}">{{ form.default_local_storage_integration.label }}</label>
               {{ form.default_local_storage_integration }}
@@ -228,6 +235,13 @@
               <div id="empacotamento-hint" style="margin-top:8px;padding:12px 14px;border-radius:10px;border:1px solid rgba(51,244,255,0.2);background:rgba(0,216,255,0.05);font-size:13px;line-height:1.6;color:var(--muted,#7ca5b8);display:none"></div>
               {% for error in form.output_packaging_mode.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
+
+            <div class="execution-field">
+              <label for="{{ form.max_tentativas.id_for_label }}">{{ form.max_tentativas.label }}</label>
+              {{ form.max_tentativas }}
+              {% if form.max_tentativas.help_text %}<small>{{ form.max_tentativas.help_text }}</small>{% endif %}
+              {% for error in form.max_tentativas.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
           </div>
 
           <div class="combination-hint" data-combination-hint data-builder-doc-config hidden>
@@ -241,6 +255,25 @@
             {{ form.prompt_base }}
             <small>Use as variaveis no prompt com chaves duplas. Exemplo: {% verbatim %}{{pergunta_1}}{% endverbatim %}.</small>
             {% for error in form.prompt_base.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+
+            <div id="prompt-formats-guide" style="margin-top:14px;padding:14px 16px;border-radius:10px;border:1px solid rgba(51,244,255,0.15);background:rgba(0,216,255,0.04);font-size:13px;line-height:1.6;color:var(--muted,#7ca5b8);display:none">
+              <p style="margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#7ca5b8)">Formatos que a IA pode gerar neste modo</p>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ Excel (.xlsx)</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ CSV</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ PDF</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ TXT</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ JSON</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ HTML</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);color:#f87171;font-size:12px;font-weight:500">✗ PowerPoint</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);color:#f87171;font-size:12px;font-weight:500">✗ Word (.docx)</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);color:#f87171;font-size:12px;font-weight:500">✗ Imagens</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);color:#f87171;font-size:12px;font-weight:500">✗ ZIP</span>
+              </div>
+              <p style="margin:0;font-size:12px">Formatos não suportados não serão gerados mesmo que pedidos no prompt. Para Excel e CSV o sistema converte automaticamente dados tabulares; PDF e TXT a partir de texto; HTML a partir de código HTML retornado pela IA.</p>
+            </div>
           </div>
 
           <div class="prompt-parameters-panel builder-wide" data-prompt-parameters>
@@ -397,20 +430,154 @@
 }());
 
 (function () {
+  var folderSourceSelect = document.getElementById('{{ form.default_folder_source.id_for_label }}');
+  var pathInput          = document.getElementById('{{ form.default_gdrive_subfolder_path.id_for_label }}');
+  var cascadeContainer   = document.getElementById('gdrive-cascade-container');
+  var cascadeHint        = document.getElementById('gdrive-cascade-hint');
+
+  if (!folderSourceSelect || !cascadeContainer) return;
+
+  // levels: [{el, select, driveId}] — driveId = ID do Drive desta pasta (pai dos filhos neste nível)
+  var levels = [];
+
+  function getStoredPath() {
+    try { return JSON.parse(pathInput ? pathInput.value : '[]') || []; }
+    catch (e) { return []; }
+  }
+
+  function savePath() {
+    // Monta o caminho a partir das seleções actuais
+    var path = [];
+    for (var i = 0; i < levels.length; i++) {
+      var sel = levels[i].select;
+      if (!sel.value) break;
+      var opt = sel.options[sel.selectedIndex];
+      path.push({ id: sel.value, nome: opt.textContent });
+    }
+    if (pathInput) pathInput.value = JSON.stringify(path);
+    if (cascadeHint) {
+      cascadeHint.textContent = path.length
+        ? '📁 ' + path.map(function(p){ return p.nome; }).join(' › ')
+        : '';
+    }
+  }
+
+  function clearLevelsFrom(index) {
+    while (levels.length > index) {
+      levels.pop().el.remove();
+    }
+    savePath();
+  }
+
+  function buildSelect(placeholder) {
+    var sel = document.createElement('select');
+    sel.className = 'portal-input';
+    sel.style.marginTop = '6px';
+    sel.innerHTML = '<option value="">' + placeholder + '</option>';
+    return sel;
+  }
+
+  function addLevel(folderSourceId, parentDriveId, preSelectId) {
+    var levelIndex = levels.length;
+    var isRoot = (levelIndex === 0);
+    var placeholder = isRoot ? '— Pasta raiz (sem subpasta) —' : '— Usar esta pasta —';
+
+    var el  = document.createElement('div');
+    var sel = buildSelect(placeholder);
+    var hint = document.createElement('small');
+    hint.style.display = 'block';
+    hint.textContent = 'Carregando...';
+    el.appendChild(sel);
+    el.appendChild(hint);
+    cascadeContainer.appendChild(el);
+    levels.push({ el: el, select: sel, driveId: parentDriveId });
+
+    var url = isRoot
+      ? '/agentes/api/subpastas-gdrive/' + folderSourceId + '/'
+      : '/agentes/api/subpastas-gdrive/' + folderSourceId + '/filhas/' + parentDriveId + '/';
+
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.erro) { hint.textContent = 'Erro: ' + data.erro; return; }
+
+        var items = data.subpastas || [];
+        hint.textContent = '';
+
+        if (items.length === 0) {
+          // Sem subpastas neste nível — remove o select se não for raiz
+          if (!isRoot) { el.remove(); levels.pop(); }
+          else { hint.textContent = 'Nenhuma subpasta encontrada.'; }
+          savePath();
+          return;
+        }
+
+        items.forEach(function (item) {
+          var opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = item.nome;
+          if (String(preSelectId) === String(item.id)) opt.selected = true;
+          sel.appendChild(opt);
+        });
+
+        // Se há pré-seleção, carrega o próximo nível automaticamente
+        if (preSelectId && sel.value) {
+          savePath();
+          addLevel(folderSourceId, sel.value, '');
+        } else {
+          savePath();
+        }
+      })
+      .catch(function () { hint.textContent = 'Erro ao carregar subpastas.'; });
+
+    sel.addEventListener('change', function () {
+      clearLevelsFrom(levelIndex + 1);
+      savePath();
+      if (sel.value) {
+        addLevel(folderSourceId, sel.value, '');
+      }
+    });
+  }
+
+  function initCascade(folderSourceId) {
+    clearLevelsFrom(0);
+    if (!folderSourceId) return;
+    // Restaura a partir do caminho salvo (para modo edição)
+    var path = getStoredPath();
+    var preSelectId = path.length > 0 ? path[0].id : '';
+    addLevel(folderSourceId, null, preSelectId);
+  }
+
+  // Quando a fonte de documentos muda, reinicia o cascade
+  folderSourceSelect.addEventListener('change', function () {
+    if (pathInput) pathInput.value = '[]';
+    if (cascadeHint) cascadeHint.textContent = '';
+    initCascade(this.value);
+  });
+
+  // Inicializa na abertura da página
+  if (folderSourceSelect.value) {
+    initCascade(folderSourceSelect.value);
+  }
+}());
+
+(function () {
   const FORMAT_HINTS = {
-    'ai_defined': 'A IA decide o formato de saída retornando um campo <code>formato_saida</code> no JSON. O sistema converte automaticamente para JSON, Excel, CSV, PDF ou TXT.',
-    'livre':      'A resposta da IA é salva exatamente como veio, sem conversão. O sistema detecta a extensão automaticamente pelo conteúdo. Use quando o prompt define o formato completo.',
+    'ai_defined': 'A IA analisa o conteúdo e escolhe automaticamente o melhor formato de saída (Excel, CSV, PDF, JSON ou TXT). Você <strong>não precisa mencionar o formato no prompt</strong> — o sistema instrui a IA internamente e converte o arquivo.',
+    'livre':      'Você instrui o formato diretamente no prompt (ex.: <em>"retorne uma planilha Excel"</em>, <em>"escreva um resumo em texto"</em>). O sistema não adiciona instruções extras e respeita o que a IA retornar: dados em tabela viram Excel, código HTML vira página, texto puro vira TXT.',
     'json':       'A saída é salva como arquivo <strong>.json</strong>. A IA deve retornar um objeto JSON válido.',
-    'xlsx':       'A saída é convertida para <strong>Excel (.xlsx)</strong>. Requer que a IA retorne dados estruturados em formato de tabela.',
-    'csv':        'A saída é salva como <strong>CSV</strong>. Ideal para dados tabulares simples que serão importados em planilhas.',
+    'xlsx':       'A saída é convertida para <strong>Excel (.xlsx)</strong>. A IA deve retornar dados estruturados em formato de tabela — não é necessário pedir Excel no prompt.',
+    'csv':        'A saída é salva como <strong>CSV</strong>. Ideal para dados tabulares simples que serão importados em outras planilhas ou sistemas.',
     'pdf':        'A saída é gerada como <strong>PDF</strong> a partir do texto retornado pela IA.',
     'txt':        'A resposta da IA é salva como <strong>texto puro (.txt)</strong>, sem nenhuma conversão de formato.',
   };
-  const sel  = document.getElementById('{{ form.default_output_format.id_for_label }}');
-  const hint = document.getElementById('output-format-hint');
+  const sel   = document.getElementById('{{ form.default_output_format.id_for_label }}');
+  const hint  = document.getElementById('output-format-hint');
+  const guide = document.getElementById('prompt-formats-guide');
   if (!sel || !hint) return;
   function updateHint() {
     hint.innerHTML = FORMAT_HINTS[sel.value] || '';
+    if (guide) guide.style.display = sel.value === 'livre' ? 'block' : 'none';
   }
   sel.addEventListener('change', updateHint);
   updateHint();

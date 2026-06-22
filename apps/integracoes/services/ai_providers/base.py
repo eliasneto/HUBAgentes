@@ -15,7 +15,7 @@ _RETRYABLE_HTTP_STATUS = {408, 409, 425, 429, 500, 502, 503, 504, 529}
 
 
 class AIProviderServiceError(Exception):
-    def __init__(self, message, *, technical_message="", usage_metadata=None):
+    def __init__(self, message, *, technical_message="", usage_metadata=None, retryable=False):
         super().__init__(message)
         # Quando preenchido, a camada de normalizacao mostra `message` ao
         # usuario (amigavel) e guarda `technical_message` para o administrador.
@@ -25,6 +25,11 @@ class AIProviderServiceError(Exception):
         # provedor cobra por esses tokens, entao precisamos registra-los mesmo
         # no erro. None quando a falha nao consumiu tokens (ex.: timeout, 4xx).
         self.usage_metadata = usage_metadata
+        # True apenas para falhas transitorias que se resolvem sozinhas
+        # (provedor indisponivel/sobrecarregado, timeout, conexao). Erros que
+        # exigem intervencao manual (4xx, documento grande demais, saida
+        # invalida) mantem o padrao False e nao sao reprocessados.
+        self.retryable = retryable
 
 
 # Mensagem amigavel para quando o provedor esta temporariamente indisponivel
@@ -216,9 +221,11 @@ class BaseAIProviderAdapter:
                     # Esgotou as retentativas e o erro era transitorio: o
                     # provedor segue indisponivel. Mostra mensagem amigavel
                     # de "tente novamente" em vez do erro tecnico cru.
+                    # retryable=True: condicao transitoria, pode reprocessar.
                     raise AIProviderServiceError(
                         _PROVIDER_TEMPORARIAMENTE_INDISPONIVEL,
                         technical_message=detalhe_tecnico,
+                        retryable=True,
                     ) from exc
                 if self._eh_erro_contexto_excedido(exc.code, error_body):
                     # Documento+prompt maior que a janela do modelo: erro claro
@@ -238,9 +245,11 @@ class BaseAIProviderAdapter:
                     time.sleep(delay)
                     attempt += 1
                     continue
+                # retryable=True: falha de conexao/timeout e transitoria.
                 raise AIProviderServiceError(
                     _PROVIDER_TEMPORARIAMENTE_INDISPONIVEL,
                     technical_message=connection_error_prefix.format(reason=reason),
+                    retryable=True,
                 ) from exc
 
         try:

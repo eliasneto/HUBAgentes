@@ -37,6 +37,13 @@ class AgenteLeituraResumo:
     tipo_entrada: str = ""
     nome_integracao_local: str = ""
     usuario_tem_acesso: bool = True
+    formato_saida: str = ""
+
+
+def _label_formato_saida(config) -> str:
+    if not config:
+        return ""
+    return config.get_default_output_format_display() or ""
 
 
 def _label_tipo_entrada(config) -> tuple[str, str]:
@@ -82,13 +89,36 @@ def _usuario_pode_usar_entrada(agente, usuario) -> bool:
 
 
 def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]:
+    # V142-1/V142-2: contadores de concorrencia sao globais para a lista inteira;
+    # calculados uma unica vez aqui para evitar N+1 dentro do loop.
+    from apps.agentes_ia.services import EXECUTION_BLOCKING_STATUSES
+    from apps.processamentos.models import Processamento
+
+    execucoes_no_sistema = Processamento.objects.filter(
+        status__in=EXECUTION_BLOCKING_STATUSES
+    ).count()
+    execucoes_do_usuario = (
+        Processamento.objects.filter(
+            iniciado_por=usuario,
+            status__in=EXECUTION_BLOCKING_STATUSES,
+        ).count()
+        if usuario is not None
+        else 0
+    )
+
     agentes_resumo = []
     for agente in queryset:
-        disponibilidade = calcular_disponibilidade_agente(agente)
+        disponibilidade = calcular_disponibilidade_agente(
+            agente,
+            usuario,
+            execucoes_no_sistema=execucoes_no_sistema,
+            execucoes_do_usuario=execucoes_do_usuario,
+        )
         permite_upload_execucao = _permite_upload_na_execucao(agente)
         config = getattr(agente, "configuracao_operacional", None)
         tipo_entrada, nome_integ = _label_tipo_entrada(config)
         tem_acesso = _usuario_pode_usar_entrada(agente, usuario)
+        formato_saida = _label_formato_saida(config)
         agentes_resumo.append(
             AgenteLeituraResumo(
                 id=agente.id,
@@ -112,6 +142,7 @@ def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]
                 tipo_entrada=tipo_entrada,
                 nome_integracao_local=nome_integ,
                 usuario_tem_acesso=tem_acesso,
+                formato_saida=formato_saida,
             )
         )
     return agentes_resumo

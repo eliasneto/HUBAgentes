@@ -181,6 +181,32 @@
 
         </section>
 
+        <!-- Limites de execução -->
+        <section class="builder-card" style="margin-top:0">
+          <div class="form-section-heading">
+            <p class="eyebrow">Execução</p>
+            <h2>Limites de execuções simultâneas</h2>
+          </div>
+          <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:24px;line-height:1.6">
+            Controle quantos agentes podem rodar ao mesmo tempo. As contagens consideram
+            execuções em fila e em processamento. Use <strong>0</strong> para não aplicar limite.
+          </p>
+
+          <div class="execution-field" style="max-width:420px">
+            <label for="id_max_execucoes_simultaneas">Máximo de execuções simultâneas no sistema</label>
+            <input type="number" id="id_max_execucoes_simultaneas" name="max_execucoes_simultaneas"
+              min="0" max="1000" value="{{ config.max_execucoes_simultaneas }}">
+            <small>Limite global somando todos os usuários. Padrão: 5.</small>
+          </div>
+
+          <div class="execution-field" style="max-width:420px;margin-top:18px">
+            <label for="id_max_execucoes_por_usuario">Máximo de execuções simultâneas por usuário</label>
+            <input type="number" id="id_max_execucoes_por_usuario" name="max_execucoes_por_usuario"
+              min="0" max="1000" value="{{ config.max_execucoes_por_usuario }}">
+            <small>Limite individual por usuário. Padrão: 2. Tem prioridade sobre o limite global na mensagem exibida.</small>
+          </div>
+        </section>
+
         <div class="execution-actions builder-actions">
           <button type="submit" class="start-button">Salvar configurações</button>
         </div>

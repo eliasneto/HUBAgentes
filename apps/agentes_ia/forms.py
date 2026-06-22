@@ -83,6 +83,10 @@ class AgentePortalCreateForm(forms.Form):
         max_length=500,
         required=False,
     )
+    default_gdrive_subfolder_path = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
     permitir_upload_na_execucao = forms.BooleanField(
         label="Permitir documento na execucao",
         required=False,
@@ -110,6 +114,16 @@ class AgentePortalCreateForm(forms.Form):
         label="Empacotamento da saida",
         choices=AgentOutputPackagingMode.choices,
         initial=AgentOutputPackagingMode.ZIP_SE_MULTIPLOS,
+    )
+    max_tentativas = forms.IntegerField(
+        label="Maximo de tentativas por documento",
+        min_value=0,
+        initial=3,
+        required=False,
+        help_text=(
+            "Numero maximo de execucoes por documento. Ao reprocessar, documentos "
+            "que ja atingiram o limite sao ignorados. Use 0 para sem limite."
+        ),
     )
 
     def __init__(self, *args, **kwargs):
@@ -184,6 +198,10 @@ class AgentePortalCreateForm(forms.Form):
                     "default_local_relative_input_path": (
                         configuracao.default_local_relative_input_path
                     ),
+                    "default_gdrive_subfolder_path": json.dumps(
+                        configuracao.default_gdrive_subfolder_path or [],
+                        ensure_ascii=False,
+                    ),
                     "permitir_upload_na_execucao": permitir_upload_na_execucao,
                     "default_output_format": configuracao.default_output_format,
                     "document_execution_mode": (
@@ -191,6 +209,7 @@ class AgentePortalCreateForm(forms.Form):
                     ),
                     "output_assembly_mode": configuracao.output_assembly_mode,
                     "output_packaging_mode": configuracao.output_packaging_mode,
+                    "max_tentativas": configuracao.max_tentativas,
                     "prompt_parameters": json.dumps(
                         configuracao.prompt_parameters or [],
                         ensure_ascii=False,
@@ -199,6 +218,28 @@ class AgentePortalCreateForm(forms.Form):
             )
 
         self.initial.update(initial_data)
+
+    def clean_default_gdrive_subfolder_path(self):
+        raw = self.cleaned_data.get("default_gdrive_subfolder_path") or "[]"
+        if not raw or raw == "[]":
+            return []
+        try:
+            parsed = json.loads(raw)
+            if not isinstance(parsed, list):
+                return []
+            return [
+                {"id": str(item["id"]), "nome": str(item["nome"])}
+                for item in parsed
+                if isinstance(item, dict) and "id" in item and "nome" in item
+            ]
+        except (json.JSONDecodeError, KeyError):
+            return []
+
+    def clean_max_tentativas(self):
+        value = self.cleaned_data.get("max_tentativas")
+        if value is None:
+            return 3
+        return value
 
     def clean_prompt_parameters(self):
         raw_value = self.cleaned_data.get("prompt_parameters") or "[]"
@@ -280,6 +321,7 @@ class AgentePortalCreateForm(forms.Form):
             "modelo_preferencial": self.cleaned_data["modelo_preferencial"],
             "default_input_source_type": self.cleaned_data["default_input_source_type"],
             "default_folder_source": self.cleaned_data.get("default_folder_source"),
+            "default_gdrive_subfolder_path": self.cleaned_data.get("default_gdrive_subfolder_path") or [],
             "default_local_storage_integration": self.cleaned_data.get(
                 "default_local_storage_integration"
             ),
@@ -294,6 +336,7 @@ class AgentePortalCreateForm(forms.Form):
             "document_execution_mode": self.cleaned_data["document_execution_mode"],
             "output_assembly_mode": self.cleaned_data["output_assembly_mode"],
             "output_packaging_mode": self.cleaned_data["output_packaging_mode"],
+            "max_tentativas": self.cleaned_data["max_tentativas"],
             "prompt_parameters": self.cleaned_data["prompt_parameters"],
         }
 

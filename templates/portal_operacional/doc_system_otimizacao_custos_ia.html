@@ -1,0 +1,361 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Otimização de Custos IA</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260621-doc-otimizacao-custos-ia-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_otimizacao_custos_ia" %}
+
+    <section class="portal-main" aria-label="Documentacao de Otimizacao de Custos de IA">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Otimizacao de Custos de IA</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Eficiencia operacional</p>
+          <h2>Como o sistema reduz o consumo de tokens e o que voce pode fazer para economizar ainda mais creditos de IA.</h2>
+          <p>
+            Cada chamada para um provedor de IA consome tokens — a unidade de cobranca da maioria das APIs.
+            Tokens entram (prompt + documentos) e saem (resposta gerada). Esta pagina descreve as otimizacoes
+            implementadas no HUB Agentes e como elas funcionam em cada provedor.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>$</span>
+          <small>tokens</small>
+        </div>
+      </section>
+
+      <!-- ── O que sao tokens ───────────────────────────────────────── -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Conceito basico</p>
+          <h2>O que sao tokens e por que importam</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          Um <strong>token</strong> equivale aproximadamente a 3–4 caracteres de texto. Cada execucao de agente consome
+          tokens de entrada (o que voce envia: prompt + documento) e tokens de saida (o que a IA responde).
+          Os provedores cobram por milhao de tokens — quanto mais tokens, maior o custo.
+        </p>
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Tokens de entrada</span>
+            <p>Incluem o prompt do agente, instrucoes de formato e o conteudo dos documentos enviados. Sao a maior fonte de custo em lotes grandes.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Tokens de saida</span>
+            <p>O texto gerado pela IA como resposta. Geralmente mais caro por token do que a entrada, mas representa uma parcela menor do total.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Tokens em cache</span>
+            <p>Alguns provedores (Anthropic) oferecem desconto de ate 90% em tokens que nao mudaram desde a ultima chamada — o prompt cacheado.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Como acompanhar</span>
+            <p>Cada card de processamento exibe o total de tokens consumidos. Acesse <strong>Configuracao de Custos</strong> para ver o historico detalhado por execucao.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ── Otimizacao 1: Prompt Caching ───────────────────────────── -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Otimizacao 1 — Maior impacto</p>
+          <h2>Prompt Caching (cache de instrucoes)</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          Quando o mesmo agente processa varios documentos, o <strong>prompt base nao muda</strong> entre as chamadas —
+          so o documento e diferente. O prompt caching permite que o provedor reutilize o processamento ja feito
+          do prompt, cobrando muito menos pelos tokens repetidos.
+        </p>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Provedor</div>
+            <div>Mecanismo</div>
+            <div>Desconto em tokens cacheados</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Anthropic</strong></div>
+            <div>Explicito — o sistema envia o prompt no campo <code>system</code> com <code>cache_control: ephemeral</code>. O prompt e cacheado por 5 minutos.</div>
+            <div>~90% de desconto no preco de entrada</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>OpenAI</strong></div>
+            <div>Automatico — prompts com mais de 1.024 tokens sao cacheados sem nenhuma configuracao extra.</div>
+            <div>~50% de desconto automatico</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Gemini</strong></div>
+            <div>Implicito — o Google aplica cache internamente para contextos repetidos acima de 32k tokens.</div>
+            <div>Variavel, transparente ao sistema</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Groq</strong></div>
+            <div>Nao suporta prompt caching. Cada chamada e cobrada integralmente.</div>
+            <div>Sem desconto de cache</div>
+          </div>
+        </div>
+
+        <div class="doc-two-columns" style="margin-top:16px">
+          <div class="doc-code-panel">
+            <strong>Como o sistema usa o cache (Anthropic)</strong>
+            <pre><code>Chamada 1 — processa documento A:
+  system: [prompt do agente] → MISS (cobra 100%)
+  user:   [conteudo do documento A]
+
+Chamada 2 — processa documento B:
+  system: [prompt do agente] → HIT (cobra ~10%)
+  user:   [conteudo do documento B]
+
+Chamada N — mesmo agente, novo documento:
+  system: [prompt do agente] → HIT (cobra ~10%)
+  user:   [conteudo do documento N]</code></pre>
+          </div>
+          <div class="doc-code-panel">
+            <strong>Para maximizar o cache</strong>
+            <pre><code>- Execute lotes grandes em sequencia rapida
+  (o cache expira em 5 min sem uso — Anthropic)
+- Mantenha o prompt base estavél entre execucoes
+- Evite alterar o prompt entre documentos do lote
+- Use modelos maiores: prompts mais longos
+  geram maior economia proporcional em cache</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Otimizacao 2: Remocao de redundancias ──────────────────── -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Otimizacao 2</p>
+          <h2>Remocao de nome de arquivo duplicado</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          Versoes anteriores do sistema incluiam o nome do arquivo duas vezes em cada chamada — uma vez dentro
+          do bloco do documento e novamente como sufixo no prompt (<code>Arquivo analisado: nome.pdf</code>).
+          Em lotes com dezenas de arquivos, essa redundancia acumulava centenas de tokens desperdicados.
+        </p>
+        <div class="doc-two-columns">
+          <div class="doc-code-panel">
+            <strong>Antes (redundante)</strong>
+            <pre><code>[Arquivo: relatorio.pdf]
+&lt;conteudo do documento&gt;
+
+[prompt do agente]
+
+Arquivo analisado: relatorio.pdf  ← repetido</code></pre>
+          </div>
+          <div class="doc-code-panel">
+            <strong>Depois (otimizado)</strong>
+            <pre><code>[Arquivo: relatorio.pdf]
+&lt;conteudo do documento&gt;
+
+[prompt do agente]  ← nome aparece so uma vez</code></pre>
+          </div>
+        </div>
+        <ul class="doc-note-list" style="margin-top:16px">
+          <li>Provedores afetados: Anthropic, OpenAI, Gemini. O Groq ja nao tinha essa duplicacao.</li>
+          <li>Economia estimada: 50–150 tokens por documento, dependendo do tamanho do nome do arquivo.</li>
+          <li>Em um lote de 100 documentos: ~5.000–15.000 tokens economizados por execucao.</li>
+        </ul>
+      </section>
+
+      <!-- ── Otimizacao 3: Bloco AI_DEFINED ────────────────────────── -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Otimizacao 3</p>
+          <h2>Instrucao de formato AI_DEFINED enxuta</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          Quando um agente usa o formato de saida <strong>Definido pela IA</strong>, o sistema adiciona
+          automaticamente instrucoes explicando os formatos disponiveis e o schema JSON esperado.
+          Esse bloco foi reduzido de ~500 tokens para ~100 tokens sem perda de clareza.
+        </p>
+        <div class="doc-two-columns">
+          <div class="doc-code-panel">
+            <strong>Antes (~500 tokens)</strong>
+            <pre><code>Antes de responder, escolha o formato de saida mais
+adequado ao conteudo que voce vai gerar, seguindo
+os criterios abaixo:
+
+| Formato | Use quando a resposta for...         |
+|---------|--------------------------------------|
+| xlsx    | Dados tabulares: listas, comparativos|
+| csv     | Dados tabulares simples...           |
+| pdf     | Relatorio narrativo, analise...      |
+| json    | Dados estruturados para APIs...      |
+| txt     | Texto corrido simples...             |
+
+Responda OBRIGATORIAMENTE com um JSON valido...
+{
+  "formato_saida": "...",
+  "justificativa": "...",
+  "dados": ...
+}
+Regras:
+- "dados" deve conter o conteudo completo...
+[+ 4 regras adicionais]</code></pre>
+          </div>
+          <div class="doc-code-panel">
+            <strong>Depois (~100 tokens)</strong>
+            <pre><code>Escolha o formato mais adequado: xlsx (tabelas),
+csv (dados simples), pdf (HTML com CSS),
+json (integracao), txt (texto puro).
+
+Responda EXCLUSIVAMENTE com JSON valido:
+{"formato_saida": "...", "justificativa": "...",
+ "dados": &lt;conteudo completo&gt;}
+
+Regra: dados completo, sem truncar. xlsx/csv:
+lista de listas com cabecalhos na 1a linha.</code></pre>
+          </div>
+        </div>
+        <ul class="doc-note-list" style="margin-top:16px">
+          <li>Economia: ~400 tokens por execucao que usa formato AI_DEFINED.</li>
+          <li>Aplicado a todos os 4 provedores (a instrucao vai no prompt, nao na API).</li>
+          <li>O comportamento da IA permanece identico — os formatos e o schema JSON nao mudaram.</li>
+        </ul>
+      </section>
+
+      <!-- ── Tabela comparativa ─────────────────────────────────────── -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Resumo</p>
+          <h2>Impacto estimado das otimizacoes</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Otimizacao</div>
+            <div>Tokens economizados / execucao</div>
+            <div>Provedores</div>
+            <div>Efeito</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Prompt Caching</strong></div>
+            <div>50–90% dos tokens de entrada (prompt)</div>
+            <div>Anthropic (explicit), OpenAI (auto), Gemini (implicit)</div>
+            <div>Maior impacto em lotes grandes com o mesmo agente</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Remocao de nome duplicado</strong></div>
+            <div>50–150 tokens por documento</div>
+            <div>Anthropic, OpenAI, Gemini</div>
+            <div>Impacto cumulativo em lotes grandes</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Bloco AI_DEFINED enxuto</strong></div>
+            <div>~400 tokens quando formato = AI_DEFINED</div>
+            <div>Todos os 4 provedores</div>
+            <div>Impacto direto sempre que o formato nao e fixo</div>
+          </div>
+        </div>
+
+        <p style="font-size:12px;color:var(--muted,#7ca5b8);margin-top:12px;line-height:1.6">
+          Exemplo combinado: agente Anthropic processando 100 documentos com formato AI_DEFINED.
+          Prompt de 2.000 tokens + nome do arquivo (80 tokens) + bloco AI_DEFINED (500 tokens) = 2.580 tokens de entrada por documento.
+          Com as otimizacoes: caching reduz o prompt para ~200 tokens (90%), nome removido economiza 80 tokens, AI_DEFINED cai para 100 tokens.
+          Novo custo: ~380 tokens de entrada por documento — reducao de <strong>~85%</strong> nos tokens de entrada.
+        </p>
+      </section>
+
+      <!-- ── Boas praticas do usuario ───────────────────────────────── -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Boas praticas</p>
+          <h2>Como voce pode economizar ainda mais</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Prompts concisos</span>
+            <p>Cada palavra no prompt e um token. Instrucoes claras e diretas economizam mais do que prompts longos com exemplos redundantes.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Lotes grandes, nao pequenos</span>
+            <p>Processar 100 documentos de uma vez aproveita o cache do prompt por mais tempo do que 10 lotes de 10 — o prompt so e cobrado integralmente na primeira chamada.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Escolha o modelo certo</span>
+            <p>Modelos menores (ex.: Haiku, Flash) custam 10–20x menos que os maiores. Para tarefas simples de extracao ou classificacao, eles produzem resultados equivalentes.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Limite de tentativas</span>
+            <p>Configure o campo <strong>Maximo de tentativas por documento</strong> no agente. Sem limite, um documento com erro permanente seria re-executado indefinidamente, consumindo tokens a cada tentativa.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Formato fixo vs AI_DEFINED</span>
+            <p>Se voce ja sabe o formato de saida esperado, configure-o diretamente no agente (JSON, Excel, etc.). O formato AI_DEFINED adiciona tokens de instrucao extras a cada chamada.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Documentos grandes</span>
+            <p>Documentos acima do contexto do modelo falham e cobram pelo processamento parcial. Divida documentos muito grandes antes de enviar, ou use um modelo com contexto mais amplo.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ── Provedores e seus modelos ──────────────────────────────── -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Referencia</p>
+          <h2>Caracteristicas de custo por provedor</h2>
+        </div>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Provedor</div>
+            <div>Modelos tipicos</div>
+            <div>Cache</div>
+            <div>Suporta documentos (PDF/imagem)</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Anthropic</strong></div>
+            <div>Claude Haiku 4.5, Sonnet 4.6, Opus 4.8</div>
+            <div>Explicito (5 min TTL)</div>
+            <div>Sim — PDF, imagens, texto</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>OpenAI</strong></div>
+            <div>GPT-4o, GPT-4o mini, o3-mini</div>
+            <div>Automatico (&gt;1.024 tokens)</div>
+            <div>Sim — PDF, imagens, texto</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Gemini</strong></div>
+            <div>Gemini 2.5 Flash, 2.5 Pro</div>
+            <div>Implicito (&gt;32k tokens)</div>
+            <div>Sim — PDF, imagens, texto, audio, video</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Groq</strong></div>
+            <div>Llama 3.3 70B, Llama 3.1 8B</div>
+            <div>Nao suportado</div>
+            <div>Apenas texto (TXT, CSV)</div>
+          </div>
+        </div>
+
+        <ul class="doc-note-list" style="margin-top:16px">
+          <li>Precos exatos variam por modelo e regiao — consulte a pagina de precos de cada provedor.</li>
+          <li>Tokens de cache escritos (write) tem um pequeno custo adicional na Anthropic (~25% do preco normal de entrada).</li>
+          <li>O consumo de tokens e registrado por execucao e pode ser consultado em <strong>Configuracao de Custos</strong>.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_configuracao_custos' %}">Ver configuracao de custos</a>
+        <a class="start-button" href="/doc-system/otimizacao-custos-ia/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
