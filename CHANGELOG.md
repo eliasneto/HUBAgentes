@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.7] — 2026-06-22
+
+### Corrigido
+- **Sidebar desaparecendo ao desativar o Biel** — quando o administrador desativava o mascote Biel pelo toggle do admin, todo o menu lateral do portal sumia, deixando a tela quebrada. A causa era o bloco `{% if mascote_ativo %}` no template `_portal_sidebar.html` que, por engano, envolvia **todo** o conteúdo do arquivo — incluindo o botão hamburguer (mobile), o `<aside>` de navegação e os scripts do menu. Corrigido dividindo o bloco em dois condicionais separados: o primeiro cobre apenas o HTML e CSS do mascote/chat (linhas 3–289); o segundo cobre apenas o script JavaScript do Biel (ao final do arquivo). O sidebar, hamburguer e scripts do menu agora são sempre renderizados, independente do estado do Biel.
+
+---
+
 ## [1.5.6] — 2026-06-22
 
 ### Adicionado
