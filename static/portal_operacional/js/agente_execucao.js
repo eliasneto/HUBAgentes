@@ -196,23 +196,12 @@
     div.setAttribute("data-agent-progress-panel", "");
     div.dataset.statusCode = "em_processamento";
     div.innerHTML = `
-      <div class="processing-live-panel">
-        <div class="processing-live-header">
-          <strong data-progress-value>0%</strong>
-          <span data-status-label style="margin-left:.6rem;font-size:.78rem;color:var(--muted,#7ca5b8);font-weight:400;vertical-align:middle;"></span>
+      <div class="agent-exec-progress-row">
+        <span data-progress-value class="agent-exec-progress-pct">0%</span>
+        <div class="agent-exec-progress-track" aria-hidden="true">
+          <span class="agent-exec-progress-fill" data-progress-fill style="width:0%"></span>
         </div>
-        <div class="processing-progress-track" aria-hidden="true">
-          <span class="processing-progress-fill" data-progress-fill style="width:0%"></span>
-        </div>
-        <div class="processing-live-meta">
-          <small>Etapa: <span data-stage-label>Iniciando...</span></small>
-          <small data-current-document-wrap hidden>
-            Documento: <span data-current-document></span>
-          </small>
-          <small data-stall-warning hidden>
-            Sem atividade recente. Verifique se o processamento travou.
-          </small>
-        </div>
+        <span data-status-label class="agent-exec-progress-status"></span>
       </div>
       <details class="processing-error-panel" data-error-panel hidden>
         <summary>&#9888; Ver erro</summary>
@@ -221,16 +210,6 @@
           <p data-error-message></p>
         </div>
       </details>
-      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
-        <small data-output-unavailable style="font-size:.75rem;color:var(--muted,#7ca5b8);">Arquivo de saída ainda não disponível.</small>
-        <a data-output-download href="#" class="agent-exec-download-btn" hidden>
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="13" height="13">
-            <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M3 12h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-          </svg>
-          Baixar resultado
-        </a>
-      </div>
     `;
     return div;
   }
@@ -279,16 +258,12 @@
       if (span) span.textContent = isAtencao ? "Atenção" : "Detalhes do erro";
     }
 
-    const downloadLink = q("[data-output-download]");
-    const unavailableEl = q("[data-output-unavailable]");
+    const downloadLink = panel._downloadBtn || null;
     if (downloadLink) {
       downloadLink.hidden = !payload.tem_arquivo_saida;
       if (payload.tem_arquivo_saida && payload.download_saida_url) {
         downloadLink.href = payload.download_saida_url;
       }
-    }
-    if (unavailableEl) {
-      unavailableEl.hidden = Boolean(payload.tem_arquivo_saida);
     }
   }
 
@@ -316,6 +291,7 @@
 
     const panel = _createProgressPanel();
     panel.dataset.statusEndpoint = statusEndpoint;
+    panel._downloadBtn = card.querySelector("[data-agent-exec-download]") || null;
     card.appendChild(panel);
 
     // Save original availability state to restore on finish
@@ -331,7 +307,7 @@
       origAvailText = availText ? availText.textContent : null;
       availability.classList.remove(...colorClasses);
       availability.classList.add("availability-amarelo");
-      if (availText) availText.textContent = "Executando. Acompanhe o progresso abaixo.";
+      if (availText) availText.textContent = "Executando...";
     }
 
     if (submitBtn) {

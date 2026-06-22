@@ -144,11 +144,11 @@
                 method="post"
                 enctype="multipart/form-data"
                 data-agent-card-form
-                data-agent-nome="{{ agente.nome|escapejs }}"
-                data-agent-integracao-ia="{{ agente.integracao_ia|escapejs }}"
-                data-agent-tipo-entrada="{{ agente.tipo_entrada|escapejs }}"
-                data-agent-nome-integracao="{{ agente.nome_integracao_local|escapejs }}"
-                data-agent-formato-saida="{{ agente.formato_saida|escapejs }}"
+                data-agent-nome="{{ agente.nome }}"
+                data-agent-integracao-ia="{{ agente.integracao_ia }}"
+                data-agent-tipo-entrada="{{ agente.tipo_entrada }}"
+                data-agent-nome-integracao="{{ agente.nome_integracao_local }}"
+                data-agent-formato-saida="{{ agente.formato_saida }}"
               >
                 {% csrf_token %}
                 {% if agente.pode_executar and agente.usuario_tem_acesso %}
@@ -159,6 +159,9 @@
                     </label>
                     <input type="hidden" name="input_source_type" value="upload_at_execution">
                   {% endif %}
+                  <a data-agent-exec-download href="#" class="agent-run-download-btn" hidden aria-label="Baixar resultado" title="Baixar resultado">
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="15" height="15"><path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 12h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                  </a>
                   <button class="agent-run-button" type="submit">Executar</button>
                 {% elif not agente.usuario_tem_acesso %}
                   <span class="agent-run-button disabled" aria-disabled="true" title="Sem acesso à pasta configurada">Sem acesso</span>

@@ -5,6 +5,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.5] — 2026-06-22
+
+### Melhorado
+- **Painel de progresso compacto no card do agente** — o painel de acompanhamento de execução foi redesenhado para caber dentro do card sem esticá-lo. Antes exibia um bloco grande com cabeçalho destacado, etapa atual, documento em processamento, aviso de travamento e botão "Baixar resultado" com texto — tudo adicionado abaixo do formulário do card. Agora é uma barra fina de `4 px` com percentual e status em `0.68 rem` em linha única, mais o `<details>` de erro recolhível quando houver falha. O botão de download foi substituído por um ícone circular (`40×40 px`, mesmo tamanho do botão "Executar", gradiente neon) exibido ao lado do botão "Executar" no próprio rodapé do card — sem nenhum texto. O ícone fica oculto e é revelado apenas quando o arquivo de saída fica disponível, via o atributo `data-agent-exec-download` adicionado ao template (`templates/portal_operacional/agentes_leitura.html`), com referência armazenada em `panel._downloadBtn` pelo JS (`static/portal_operacional/js/agente_execucao.js`). Novos seletores CSS: `.agent-exec-progress-row`, `.agent-exec-progress-track`, `.agent-exec-progress-fill`, `.agent-exec-progress-pct`, `.agent-exec-progress-status`, `.agent-run-download-btn` (`static/portal_operacional/css/menu_inicial.css`).
+
+### Corrigido
+- **Nome do agente exibido com `-` no modal de confirmação de execução** — ao clicar em **Executar** em um agente cujo nome continha hífen (`-`), o modal de confirmação exibia o caractere como a sequência literal `-` (ex.: `Aliança - Licitação` em vez de `Aliança - Licitação`). A causa era o uso do filtro `|escapejs` do Django nos atributos `data-agent-*` do `<form>` do card (`templates/portal_operacional/agentes_leitura.html`). O `escapejs` é destinado a contextos de string JavaScript e converte o hífen para `-` como medida de segurança; num atributo HTML `data-*`, a sequência fica gravada literalmente no DOM e o `dataset` a retorna como texto puro, que o `textContent` exibe sem interpretação. Corrigido removendo `|escapejs` dos cinco atributos — a auto-escape padrão do Django já protege atributos HTML (escapa `<`, `>`, `&`, `"`, `'`) sem converter o hífen.
+
+---
+
 ## [1.5.4] — 2026-06-22
 
 ### Adicionado

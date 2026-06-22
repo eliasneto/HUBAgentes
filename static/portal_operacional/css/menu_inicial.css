@@ -975,36 +975,69 @@ button.danger-action:hover {
 
 .agent-exec-progress {
   display: grid;
-  gap: 8px;
-  padding-top: 12px;
+  gap: 5px;
+  padding-top: 8px;
   border-top: 1px solid rgba(0, 216, 255, 0.14);
 }
 
-.agent-exec-download-btn {
-  display: inline-flex;
+.agent-exec-progress-row {
+  display: flex;
   align-items: center;
   gap: 6px;
-  padding: .42rem .9rem;
+}
+
+.agent-exec-progress-pct {
+  font-size: .68rem;
+  font-weight: 700;
+  color: var(--neon, #00d8ff);
+  min-width: 2.4em;
+  flex-shrink: 0;
+}
+
+.agent-exec-progress-track {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.agent-exec-progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--neon), var(--neon-2));
+  border-radius: 2px;
+  transition: width .5s ease;
+}
+
+.agent-exec-progress-status {
+  font-size: .68rem;
+  color: var(--muted, #7ca5b8);
+  flex-shrink: 0;
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-run-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
   background: linear-gradient(90deg, var(--neon), var(--neon-2));
   color: #04111e;
-  font-weight: 700;
-  font-size: .8rem;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  border-radius: 999px;
   text-decoration: none;
-  box-shadow: 0 0 12px rgba(0, 216, 255, 0.3);
-  align-self: flex-start;
-  transition: box-shadow .2s;
+  box-shadow: 0 0 14px rgba(0, 216, 255, 0.38);
+  transition: box-shadow .2s, transform .15s;
 }
 
-.agent-exec-download-btn:hover {
-  box-shadow: 0 0 20px rgba(0, 216, 255, 0.55);
-}
-
-.agent-exec-progress [data-output-unavailable] {
-  font-size: .75rem;
-  color: var(--muted, #7ca5b8);
+.agent-run-download-btn:hover {
+  box-shadow: 0 0 22px rgba(0, 216, 255, 0.65);
+  transform: translateY(-1px);
 }
 
 .empty-agents {

@@ -48,7 +48,7 @@
           <li>Se o agente exigir envio de documento, anexe o arquivo pelo icone de pasta (PDF, TXT, CSV, imagens ou XLSX — limite 50 MB).</li>
           <li>Clique em <strong>Executar</strong>.</li>
           <li>No modal de confirmacao, revise o resumo da operacao (nome do agente, integracao de IA, origem dos documentos e formato de saida). Clique em <strong>Confirmar execucao</strong> para prosseguir ou em <strong>Desistir</strong> para cancelar.</li>
-          <li>O progresso aparece diretamente no card do agente: barra de andamento, etapa atual e documento em processamento sao atualizados em tempo real. Ao concluir, o botao <strong>Baixar resultado</strong> aparece no proprio card.</li>
+          <li>O progresso aparece diretamente no card do agente: uma barra compacta com percentual e status e atualizada em tempo real sem esticar o card. Ao concluir, o icone de download aparece ao lado do botao <strong>Executar</strong> — sem precisar abrir a tela de Processamentos.</li>
         </ol>
       </section>
 
@@ -131,7 +131,7 @@
           <div class="doc-table-row">
             <div><strong>Progresso de execucao</strong></div>
             <div>Atualizado em tempo real via polling (a cada 8 s)</div>
-            <div>Aparece no proprio card logo apos confirmar a execucao: barra de andamento com percentual, etapa atual, documento em processamento, aviso de travamento e, ao finalizar, botao de download. Some ao recarregar a pagina ou ao iniciar uma nova execucao.</div>
+            <div>Aparece no proprio card logo apos confirmar a execucao: barra fina com percentual e status em uma unica linha compacta. Em caso de erro ou atencao, um painel recolhivel exibe os detalhes. Ao finalizar com arquivo de saida, o icone de download aparece ao lado do botao Executar. Some ao recarregar a pagina ou ao iniciar uma nova execucao.</div>
           </div>
         </div>
       </section>
@@ -239,13 +239,8 @@ Conexao de IA: OpenAI Producao</code></pre>
           </article>
 
           <article class="doc-guide-card">
-            <span class="doc-chip">Aviso de travamento</span>
-            <p>Se o processamento ficar sem atividade por mais de 3 minutos, o painel exibe um aviso de possivel travamento para que o usuario tome providencias.</p>
-          </article>
-
-          <article class="doc-guide-card">
             <span class="doc-chip">Download no card</span>
-            <p>Quando a execucao conclui com arquivo de saida, o botao <strong>Baixar resultado</strong> aparece diretamente no card — sem precisar abrir a tela de Processamentos.</p>
+            <p>Quando a execucao conclui com arquivo de saida, um icone de download aparece ao lado do botao <strong>Executar</strong> — sem texto, sem abrir outra tela. O historico completo continua disponivel em <strong>Processamentos</strong>.</p>
           </article>
 
           <article class="doc-guide-card">
@@ -255,7 +250,7 @@ Conexao de IA: OpenAI Producao</code></pre>
 
           <article class="doc-guide-card">
             <span class="doc-chip">Indicador de disponibilidade</span>
-            <p>Durante a execucao, o indicador do card muda para <strong>amarelo</strong> com o texto "Executando". Ao concluir, o indicador e restaurado automaticamente para o estado anterior.</p>
+            <p>Durante a execucao, o indicador do card muda para <strong>amarelo</strong> com o texto "Executando...". Ao concluir, o indicador e restaurado automaticamente para o estado anterior.</p>
           </article>
         </div>
       </section>
