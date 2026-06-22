@@ -260,9 +260,12 @@
 
     const downloadLink = panel._downloadBtn || null;
     if (downloadLink) {
-      downloadLink.hidden = !payload.tem_arquivo_saida;
       if (payload.tem_arquivo_saida && payload.download_saida_url) {
         downloadLink.href = payload.download_saida_url;
+        downloadLink.classList.add("is-ready");
+      } else {
+        downloadLink.classList.remove("is-ready");
+        downloadLink.removeAttribute("href");
       }
     }
   }
@@ -291,7 +294,13 @@
 
     const panel = _createProgressPanel();
     panel.dataset.statusEndpoint = statusEndpoint;
-    panel._downloadBtn = card.querySelector("[data-agent-exec-download]") || null;
+    const downloadBtn = card.querySelector("[data-agent-exec-download]") || null;
+    panel._downloadBtn = downloadBtn;
+    if (downloadBtn) {
+      downloadBtn.hidden = false;
+      downloadBtn.classList.remove("is-ready");
+      downloadBtn.removeAttribute("href");
+    }
     card.appendChild(panel);
 
     // Save original availability state to restore on finish
