@@ -286,6 +286,7 @@
 #biel-chat-send:hover { background: rgba(0,216,255,0.3); }
 #biel-chat-send:disabled { opacity: 0.4; cursor: default; }
 </style>
+{% endif %}
 
 <!-- Botão hamburguer (mobile) -->
 <button class="sidebar-toggle" data-sidebar-toggle aria-label="Abrir menu" aria-expanded="false">
@@ -399,6 +400,7 @@
 }());
 </script>
 
+{% if mascote_ativo %}
 <script>
 (function () {
   var el       = document.getElementById('biel-mascot');
