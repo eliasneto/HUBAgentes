@@ -31,6 +31,7 @@ class GoogleDriveFonteResumo:
     total_pdfs: int
     total_disponiveis_ia: int
     ultima_validacao: datetime | None
+    pode_excluir: bool = False
 
 
 @dataclass(frozen=True)
@@ -184,6 +185,7 @@ def listar_fontes_documentos_para_portal(usuario=None) -> FontesDocumentosResumo
                 total_pdfs=fonte.total_pdfs,
                 total_disponiveis_ia=fonte.total_disponiveis_ia,
                 ultima_validacao=fonte.last_validated_at,
+                pode_excluir=is_admin,
             )
             for fonte in fontes_google_drive
         ],

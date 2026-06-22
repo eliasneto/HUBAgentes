@@ -97,6 +97,13 @@
               {% if fonte.id %}
                 <div class="integration-actions">
                   <a class="secondary-action" href="{% url 'portal_fonte_documento_editar' 'google-drive-folder' fonte.id %}">Editar</a>
+                  {% if fonte.pode_excluir %}
+                    <form method="post" action="{% url 'portal_fonte_gdrive_excluir' fonte.id %}"
+                      onsubmit="return confirm('Excluir a fonte \'{{ fonte.nome|escapejs }}\' do sistema? Esta ação não pode ser desfeita.')">
+                      {% csrf_token %}
+                      <button type="submit" class="secondary-action danger-action">Excluir fonte</button>
+                    </form>
+                  {% endif %}
                 </div>
               {% endif %}
             </article>

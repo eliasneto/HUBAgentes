@@ -114,6 +114,32 @@ def list_pdf_files_from_folder_source(folder_source) -> list[dict[str, Any]]:
     return response.get("files", [])
 
 
+def list_subfolders_from_drive_folder_id(
+    google_drive_integration, folder_id: str
+) -> list[dict[str, Any]]:
+    service = build_drive_service(google_drive_integration)
+    query = f"'{folder_id}' in parents and trashed = false and mimeType = '{GOOGLE_DRIVE_FOLDER_MIME}'"
+    try:
+        response = (
+            service.files()
+            .list(
+                q=query,
+                fields="files(id,name)",
+                pageSize=1000,
+            )
+            .execute()
+        )
+    except Exception as exc:
+        raise GoogleDriveServiceError(
+            f"Falha ao listar subpastas no Google Drive: {exc}"
+        ) from exc
+
+    return sorted(
+        [{"id": f["id"], "nome": f["name"]} for f in response.get("files", [])],
+        key=lambda x: x["nome"].lower(),
+    )
+
+
 def list_folder_contents_from_folder_source(folder_source) -> list[dict[str, Any]]:
     service = build_drive_service(folder_source.google_drive_integration)
     query = (

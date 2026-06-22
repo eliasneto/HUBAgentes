@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.3] — 2026-06-22
+
+### Adicionado
+- **Botão "Excluir fonte" no card Google Drive da listagem de fontes de documentos** — o card de cada fonte Google Drive na tela de listagem ganhou o botão **"Excluir fonte"** (visível apenas para administradores), equivalente ao que já existia nos cards de pastas locais. Ao clicar, o sistema exibe uma confirmação com o nome da fonte antes de submeter o formulário. A exclusão é tratada pela view `ExcluirGoogleDriveFolderSourceView` já existente (`apps/core/views.py`). Alterações em `GoogleDriveFonteResumo` (novo campo `pode_excluir`) e em `listar_fontes_documentos_para_portal` (`apps/integracoes/selectors.py`) para expor a permissão ao template `fontes_documentos.html`.
+- **Navegação em cascata de subpastas do Google Drive ao configurar agente** — ao criar ou editar um agente com origem Google Drive, agora é possível **navegar por todos os níveis de subpastas** (PAI → FILHO → SUB-FILHO → ...) sem sair do formulário. Ao selecionar uma fonte de documentos, um dropdown aparece automaticamente com as subpastas diretas; ao selecionar uma delas, um novo dropdown surge com suas subpastas, e assim por diante até o nível desejado. A lista é consultada em tempo real diretamente do Google Drive via dois novos endpoints (`GoogleDriveSubpastasView` e `GoogleDriveSubpastasFilhasView`, `apps/core/views.py`), sem necessidade de sincronização manual — novas pastas criadas no Drive aparecem imediatamente. O caminho completo de seleção (ex: `[{id, nome}, ...]`) é exibido como trilha de navegação (📁 FILHO › SUB-FILHO) e salvo no campo `default_gdrive_subfolder_path` (JSONField, migração `agentes_ia/0014`). Ao editar um agente, o cascade é reconstruído automaticamente para restaurar a seleção anterior. Quando configurada, o processamento usa o ID Drive da pasta mais profunda selecionada para buscar os PDFs. **Permissões:** basta compartilhar apenas a pasta raiz (PAI) com a service account — o Google Drive herda o acesso para todas as subpastas automaticamente.
+
+---
+
 ## [1.5.2] — 2026-06-21
 
 ### Adicionado
