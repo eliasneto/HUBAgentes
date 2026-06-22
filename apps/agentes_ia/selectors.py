@@ -37,6 +37,13 @@ class AgenteLeituraResumo:
     tipo_entrada: str = ""
     nome_integracao_local: str = ""
     usuario_tem_acesso: bool = True
+    formato_saida: str = ""
+
+
+def _label_formato_saida(config) -> str:
+    if not config:
+        return ""
+    return config.get_default_output_format_display() or ""
 
 
 def _label_tipo_entrada(config) -> tuple[str, str]:
@@ -111,6 +118,7 @@ def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]
         config = getattr(agente, "configuracao_operacional", None)
         tipo_entrada, nome_integ = _label_tipo_entrada(config)
         tem_acesso = _usuario_pode_usar_entrada(agente, usuario)
+        formato_saida = _label_formato_saida(config)
         agentes_resumo.append(
             AgenteLeituraResumo(
                 id=agente.id,
@@ -134,6 +142,7 @@ def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]
                 tipo_entrada=tipo_entrada,
                 nome_integracao_local=nome_integ,
                 usuario_tem_acesso=tem_acesso,
+                formato_saida=formato_saida,
             )
         )
     return agentes_resumo

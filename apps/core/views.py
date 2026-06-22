@@ -423,14 +423,15 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
         return redirect("portal_agentes_leitura")
 
     def post(self, request, *args, **kwargs):
+        is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
         token = request.POST.get("arquivo_execucao_token", "").strip()
         if token:
             files = self._carregar_arquivo_token(request, token)
             if files is None:
-                messages.error(
-                    request,
-                    "Arquivo temporario nao encontrado ou expirado. Tente novamente.",
-                )
+                erro = "Arquivo temporario nao encontrado ou expirado. Tente novamente."
+                if is_ajax:
+                    return JsonResponse({"erro": erro}, status=400)
+                messages.error(request, erro)
                 return redirect("portal_agentes_leitura")
         else:
             files = request.FILES
@@ -444,10 +445,13 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
         show_upload = form.runtime_fields_schema.get("show_file_upload")
         if show_upload:
             if not form.is_valid():
-                messages.error(self.request, self._first_form_error(form))
+                erro = self._first_form_error(form)
+                if is_ajax:
+                    return JsonResponse({"erro": erro}, status=400)
+                messages.error(self.request, erro)
                 return redirect("portal_agentes_leitura")
-            return self._executar_com_payload(form.cleaned_data)
-        return self._executar_com_defaults()
+            return self._executar_com_payload(form.cleaned_data, is_ajax=is_ajax)
+        return self._executar_com_defaults(is_ajax=is_ajax)
 
     def _carregar_arquivo_token(self, request, token):
         import re
@@ -487,15 +491,17 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
             original_name, content, content_type="application/pdf"
         )}
 
-    def _executar_com_defaults(self):
+    def _executar_com_defaults(self, is_ajax=False):
         try:
             cleaned_data = montar_payload_execucao_padrao(self.agente)
-            return self._executar_com_payload(cleaned_data)
+            return self._executar_com_payload(cleaned_data, is_ajax=is_ajax)
         except (OperationalExecutionError, ValueError) as exc:
+            if is_ajax:
+                return JsonResponse({"erro": str(exc)}, status=400)
             messages.error(self.request, str(exc))
             return redirect("portal_agentes_leitura")
 
-    def _executar_com_payload(self, cleaned_data):
+    def _executar_com_payload(self, cleaned_data, is_ajax=False):
         try:
             processamento = criar_e_iniciar_processamento_para_agente(
                 agente=self.agente,
@@ -503,8 +509,19 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
                 cleaned_data=cleaned_data,
             )
         except (OperationalExecutionError, ValueError) as exc:
+            if is_ajax:
+                return JsonResponse({"erro": str(exc)}, status=400)
             messages.error(self.request, str(exc))
             return redirect("portal_agentes_leitura")
+
+        if is_ajax:
+            return JsonResponse({
+                "codigo": processamento.codigo,
+                "status_endpoint": reverse(
+                    "portal_processamento_status",
+                    kwargs={"codigo": processamento.codigo},
+                ),
+            })
 
         messages.success(
             self.request,

@@ -973,6 +973,40 @@ button.danger-action:hover {
   white-space: nowrap;
 }
 
+.agent-exec-progress {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 216, 255, 0.14);
+}
+
+.agent-exec-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: .42rem .9rem;
+  background: linear-gradient(90deg, var(--neon), var(--neon-2));
+  color: #04111e;
+  font-weight: 700;
+  font-size: .8rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 0 12px rgba(0, 216, 255, 0.3);
+  align-self: flex-start;
+  transition: box-shadow .2s;
+}
+
+.agent-exec-download-btn:hover {
+  box-shadow: 0 0 20px rgba(0, 216, 255, 0.55);
+}
+
+.agent-exec-progress [data-output-unavailable] {
+  font-size: .75rem;
+  color: var(--muted, #7ca5b8);
+}
+
 .empty-agents {
   grid-column: 1 / -1;
   min-height: 320px;

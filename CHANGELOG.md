@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.4] — 2026-06-22
+
+### Adicionado
+- **Modal de confirmação antes de executar agente** — ao clicar em **Executar** no card de um agente, o sistema agora exibe um modal de confirmação em vez de disparar a execução imediatamente. O modal apresenta um resumo da operação: **nome do agente**, **integração IA**, **origem dos documentos** (tipo de entrada + nome da integração local, quando houver) e **formato de saída**. Dois botões encerram o fluxo: **"Confirmar execução"** (prossegue) e **"Desistir"** (fecha o modal sem nada). O modal também fecha com **Esc** ou clique fora da caixa. O campo `formato_saida` (label legível de `default_output_format`) foi adicionado ao dataclass `AgenteLeituraResumo` e ao builder `_montar_resumos_agentes` (`apps/agentes_ia/selectors.py`); os dados são expostos para o JS via `data-*` attributes no `<form>` do card (`templates/portal_operacional/agentes_leitura.html`). O modal é renderizado uma única vez no `<body>` e reutilizado por todos os cards da página.
+- **Progresso de execução inline no card do agente** — após confirmar a execução, o painel de progresso aparece **diretamente no card**, eliminando a necessidade de navegar à tela de Processamentos para acompanhar o resultado. O card exibe: **barra de progresso** com percentual, **etapa atual**, **documento sendo processado** (quando disponível), **aviso de possível travamento** (após 3 min sem atividade), **painel de erro** recolhível (vermelho para erro, amarelo para atenção) e **botão de download** do arquivo de saída assim que ele fica disponível — exatamente a mesma estrutura da tela de Processamentos. O polling consulta o endpoint `/processamentos/<codigo>/status/` a cada **8 segundos** (mesmo intervalo da tela dedicada). O indicador de disponibilidade do card muda para **amarelo** durante a execução e é restaurado automaticamente ao término; o botão **Executar** fica desabilitado durante a execução e volta ao normal ao finalizar. **Ao atualizar a página ou executar novamente**, o painel é removido/substituído — não há estado persistido entre sessões. Tecnicamente: a view `AgenteExecucaoView.post()` detecta requisições AJAX (`X-Requested-With: XMLHttpRequest`) e retorna `{"codigo": ..., "status_endpoint": ...}` em vez de redirecionar; erros retornam `{"erro": ...}` com HTTP 400. O JS submete o formulário via `fetch()` e cria o painel dinamicamente no DOM, reutilizando as classes CSS já existentes (`.processing-live-panel`, `.processing-progress-track`, `.processing-progress-fill`, `.processing-error-panel`) e adicionando `.agent-exec-progress` e `.agent-exec-download-btn` (`static/portal_operacional/css/menu_inicial.css`). O fluxo de upload em chunks para agentes com upload na execução foi mantido integralmente; apenas a submissão final foi convertida de `form.submit()` para `fetch()`.
+
+---
+
 ## [1.5.3] — 2026-06-22
 
 ### Adicionado

@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doc Sistema - Agentes</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260608-doc-system-agentes-2">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260622-doc-system-agentes-3">
 </head>
 <body class="agent-builder-page">
   <main class="portal-shell">
@@ -47,7 +47,8 @@
           <li>Leia o bloco de disponibilidade para confirmar se ele esta apto a executar.</li>
           <li>Se o agente exigir envio de documento, anexe o arquivo pelo icone de pasta (PDF, TXT, CSV, imagens ou XLSX — limite 50 MB).</li>
           <li>Clique em <strong>Executar</strong>.</li>
-          <li>Acompanhe o andamento na tela de <strong>Processamentos</strong>.</li>
+          <li>No modal de confirmacao, revise o resumo da operacao (nome do agente, integracao de IA, origem dos documentos e formato de saida). Clique em <strong>Confirmar execucao</strong> para prosseguir ou em <strong>Desistir</strong> para cancelar.</li>
+          <li>O progresso aparece diretamente no card do agente: barra de andamento, etapa atual e documento em processamento sao atualizados em tempo real. Ao concluir, o botao <strong>Baixar resultado</strong> aparece no proprio card.</li>
         </ol>
       </section>
 
@@ -127,6 +128,11 @@
             <div>Verificacao de permissao do usuario</div>
             <div>Aparece em laranja quando o agente usa pasta local fixa e o usuario nao e membro autorizado. Nesse caso o botao Executar e substituido por <strong>Sem acesso</strong>.</div>
           </div>
+          <div class="doc-table-row">
+            <div><strong>Progresso de execucao</strong></div>
+            <div>Atualizado em tempo real via polling (a cada 8 s)</div>
+            <div>Aparece no proprio card logo apos confirmar a execucao: barra de andamento com percentual, etapa atual, documento em processamento, aviso de travamento e, ao finalizar, botao de download. Some ao recarregar a pagina ou ao iniciar uma nova execucao.</div>
+          </div>
         </div>
       </section>
 
@@ -179,8 +185,9 @@
             <pre><code>1. Clicar no icone de pasta
 2. Escolher um arquivo (PDF, TXT, CSV,
    PNG, JPG, JPEG ou XLSX — limite 50 MB)
-3. Confirmar o envio pelo botao Executar
-4. Acompanhar o processamento depois</code></pre>
+3. Clicar em Executar
+4. Confirmar no modal de confirmacao
+5. Acompanhar o progresso no proprio card</code></pre>
           </div>
         </div>
 
@@ -216,6 +223,45 @@ Conexao de IA: OpenAI Producao</code></pre>
 
       <section class="builder-card">
         <div class="form-section-heading">
+          <p class="eyebrow">Confirmacao e progresso</p>
+          <h2>O que acontece depois de clicar em Executar</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Modal de confirmacao</span>
+            <p>Antes de iniciar, o sistema exibe um resumo da operacao: nome do agente, integracao de IA, origem dos documentos e formato de saida. O usuario confirma ou cancela sem risco de execucao acidental.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Progresso no card</span>
+            <p>Apos confirmar, uma barra de progresso aparece no proprio card com o percentual, a etapa atual e o documento em processamento. Nao e necessario navegar para outra tela.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Aviso de travamento</span>
+            <p>Se o processamento ficar sem atividade por mais de 3 minutos, o painel exibe um aviso de possivel travamento para que o usuario tome providencias.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Download no card</span>
+            <p>Quando a execucao conclui com arquivo de saida, o botao <strong>Baixar resultado</strong> aparece diretamente no card — sem precisar abrir a tela de Processamentos.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Reset do progresso</span>
+            <p>O painel de progresso e temporario: some ao recarregar a pagina ou ao iniciar uma nova execucao no mesmo card. O historico completo fica disponivel em <strong>Processamentos</strong>.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Indicador de disponibilidade</span>
+            <p>Durante a execucao, o indicador do card muda para <strong>amarelo</strong> com o texto "Executando". Ao concluir, o indicador e restaurado automaticamente para o estado anterior.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
           <p class="eyebrow">Diferenca entre telas</p>
           <h2>Agentes x Gerenciar agentes</h2>
         </div>
@@ -244,7 +290,7 @@ Conexao de IA: OpenAI Producao</code></pre>
           <li>Se um agente estiver indisponivel, revise sua configuracao em <strong>Gerenciar agentes</strong>.</li>
           <li>Quando o botao exibir <strong>Sem acesso</strong>, o agente usa pasta local e o usuario nao e membro autorizado. Solicite acesso ao administrador.</li>
           <li>Quando houver upload manual, use apenas arquivos nos formatos aceitos (PDF, TXT, CSV, PNG, JPG, JPEG, XLSX) dentro do limite de 50 MB.</li>
-          <li>Depois de clicar em executar, o acompanhamento principal deve ser feito em <strong>Processamentos</strong>.</li>
+          <li>Depois de confirmar a execucao, o progresso aparece diretamente no card do agente. A tela de <strong>Processamentos</strong> continua disponivel para consultar historico e execucoes anteriores.</li>
           <li>Agentes tecnicos ficam fora da lista operacional comum para evitar uso indevido.</li>
         </ul>
       </section>
