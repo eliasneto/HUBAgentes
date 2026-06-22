@@ -68,7 +68,7 @@ class OpenAIProviderAdapter(BaseAIProviderAdapter):
         prompt_text = self._maybe_add_json_hint(prompt, params)
         content = [
             self._document_part(document_bytes, document_mime_type, document_name),
-            {"type": "input_text", "text": f"{prompt_text}\n\nArquivo analisado: {document_name}"},
+            {"type": "input_text", "text": prompt_text},
         ]
         payload = {
             "model": model_name or self.integration.default_model,
@@ -90,16 +90,13 @@ class OpenAIProviderAdapter(BaseAIProviderAdapter):
         url = self.build_url()
         params = execution_params or {}
         content = []
-        doc_names = []
         for doc in documents or []:
             doc_bytes = doc.get("document_bytes", b"")
             doc_mime = doc.get("document_mime_type", "application/pdf")
             doc_name = doc.get("document_name", "documento.pdf")
-            doc_names.append(doc_name)
             content.append(self._document_part(doc_bytes, doc_mime, doc_name))
         prompt_text = self._maybe_add_json_hint(prompt, params)
-        suffix = f"\n\nArquivos analisados: {', '.join(doc_names)}" if doc_names else ""
-        content.append({"type": "input_text", "text": prompt_text + suffix})
+        content.append({"type": "input_text", "text": prompt_text})
         payload = {
             "model": model_name or self.integration.default_model,
             "input": [{"role": "user", "content": content}],

@@ -97,6 +97,10 @@ _MENSAGENS_ATENCAO = (
     "caminho nao encontrado",
     "nenhum documento encontrado",
     "nenhum item encontrado",
+    # Indisponibilidade temporaria do provedor de IA: condicao transitoria,
+    # o usuario apenas precisa tentar novamente — atencao (amarelo), nao erro.
+    "temporariamente indisponivel",
+    "sobrecarregado",
 )
 
 

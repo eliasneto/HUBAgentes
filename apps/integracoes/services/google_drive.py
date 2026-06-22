@@ -65,6 +65,17 @@ def build_drive_service(google_drive_integration):
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
 
+def get_folder_name(google_drive_integration, folder_id: str) -> str:
+    service = build_drive_service(google_drive_integration)
+    try:
+        result = service.files().get(fileId=folder_id, fields="name").execute()
+        return result.get("name", "")
+    except Exception as exc:
+        raise GoogleDriveServiceError(
+            f"Falha ao obter o nome da pasta no Google Drive: {exc}"
+        ) from exc
+
+
 def fetch_folder_metadata(folder_source) -> dict[str, Any]:
     service = build_drive_service(folder_source.google_drive_integration)
     try:

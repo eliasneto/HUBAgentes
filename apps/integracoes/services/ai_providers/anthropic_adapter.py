@@ -28,6 +28,7 @@ class AnthropicProviderAdapter(BaseAIProviderAdapter):
         return {
             "x-api-key": self.integration.api_key,
             "anthropic-version": self.api_version,
+            "anthropic-beta": "prompt-caching-2024-07-31",
             "Content-Type": "application/json",
         }
 
@@ -60,8 +61,11 @@ class AnthropicProviderAdapter(BaseAIProviderAdapter):
 
     def execute_prompt_without_document(self, *, prompt, execution_params, model_name):
         url = self.build_url()
-        payload = self._text_payload(model_name, prompt, execution_params)
-        return self._call(url, payload, execution_params)
+        params = execution_params or {}
+        prompt_text = self._maybe_add_json_hint(prompt, params)
+        system = [{"type": "text", "text": prompt_text, "cache_control": {"type": "ephemeral"}}]
+        payload = self._messages_payload(model_name, "Processe conforme as instrucoes.", params, system=system)
+        return self._call(url, payload, params)
 
     # ── Execução com 1 documento ──────────────────────────────────
 
@@ -78,11 +82,12 @@ class AnthropicProviderAdapter(BaseAIProviderAdapter):
         url = self.build_url()
         params = execution_params or {}
         prompt_text = self._maybe_add_json_hint(prompt, params)
-        content = [
-            self._document_part(document_bytes, document_mime_type, document_name),
-            {"type": "text", "text": f"{prompt_text}\n\nArquivo analisado: {document_name}"},
-        ]
-        payload = self._messages_payload(model_name, content, params)
+        system = [{"type": "text", "text": prompt_text, "cache_control": {"type": "ephemeral"}}]
+        content = [self._document_part(document_bytes, document_mime_type, document_name)]
+        # PDFs nao incluem o nome no bloco do documento; adiciona label breve
+        if document_mime_type == "application/pdf":
+            content.append({"type": "text", "text": f"Arquivo: {document_name}"})
+        payload = self._messages_payload(model_name, content, params, system=system)
         return self._call(url, payload, params)
 
     # ── Execução com N documentos ─────────────────────────────────
@@ -97,18 +102,17 @@ class AnthropicProviderAdapter(BaseAIProviderAdapter):
     ):
         url = self.build_url()
         params = execution_params or {}
+        prompt_text = self._maybe_add_json_hint(prompt, params)
+        system = [{"type": "text", "text": prompt_text, "cache_control": {"type": "ephemeral"}}]
         content = []
-        doc_names = []
         for doc in documents or []:
             doc_bytes = doc.get("document_bytes", b"")
             doc_mime = doc.get("document_mime_type", "application/pdf")
             doc_name = doc.get("document_name", "documento.pdf")
-            doc_names.append(doc_name)
+            if doc_mime == "application/pdf":
+                content.append({"type": "text", "text": f"Arquivo: {doc_name}"})
             content.append(self._document_part(doc_bytes, doc_mime, doc_name))
-        prompt_text = self._maybe_add_json_hint(prompt, params)
-        suffix = f"\n\nArquivos analisados: {', '.join(doc_names)}" if doc_names else ""
-        content.append({"type": "text", "text": prompt_text + suffix})
-        payload = self._messages_payload(model_name, content, params)
+        payload = self._messages_payload(model_name, content, params, system=system)
         return self._call(url, payload, params)
 
     # ── Helpers ───────────────────────────────────────────────────
@@ -146,17 +150,14 @@ class AnthropicProviderAdapter(BaseAIProviderAdapter):
             text_content = document_bytes.decode("latin-1", errors="replace")
         return {"type": "text", "text": f"[Arquivo: {document_name}]\n{text_content}"}
 
-    def _text_payload(self, model_name, prompt, execution_params):
-        params = execution_params or {}
-        content = self._maybe_add_json_hint(prompt, params)
-        return self._messages_payload(model_name, content, params)
-
-    def _messages_payload(self, model_name, content, params):
+    def _messages_payload(self, model_name, content, params, system=None):
         payload = {
             "model": model_name or self.integration.default_model,
             "max_tokens": _DEFAULT_MAX_TOKENS,
             "messages": [{"role": "user", "content": content}],
         }
+        if system:
+            payload["system"] = system
         if not isinstance(params, dict):
             return payload
         if params.get("max_output_tokens"):

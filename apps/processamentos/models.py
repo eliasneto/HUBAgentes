@@ -415,6 +415,11 @@ class DocumentoEntrada(TimestampedModel):
         default=DocumentStatus.PENDENTE,
     )
     mensagem_erro = models.TextField(blank=True)
+    # Quando o documento termina em ERRO, indica se a falha é transitória
+    # (provedor indisponível, timeout) e pode ser reprocessada automaticamente,
+    # ou se exige intervenção manual (chave inválida, documento grande demais,
+    # saída inválida) e não deve ser re-tentada num reprocessamento.
+    erro_reprocessavel = models.BooleanField(default=True)
     processado_em = models.DateTimeField(null=True, blank=True)
 
     class Meta:

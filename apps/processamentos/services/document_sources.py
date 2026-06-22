@@ -420,10 +420,16 @@ def _update_documento_if_needed(documento, defaults):
             if field in {"nome_arquivo", "drive_path", "source_reference", "checksum"}:
                 requires_reprocessing = True
     if documento.status == DocumentStatus.ERRO:
-        documento.status = DocumentStatus.PENDENTE
-        documento.mensagem_erro = ""
-        documento.processado_em = None
-        changed = True
+        # Só erros transitórios (provedor indisponível, timeout) são reprocessados
+        # automaticamente. Erros que exigem intervenção manual (chave inválida,
+        # documento grande demais, saída inválida) permanecem em ERRO — repetir
+        # não resolveria. Exceção: se o arquivo de origem mudou (conteúdo novo),
+        # o erro anterior pode não valer mais, então reprocessa mesmo assim.
+        if documento.erro_reprocessavel or requires_reprocessing:
+            documento.status = DocumentStatus.PENDENTE
+            documento.mensagem_erro = ""
+            documento.processado_em = None
+            changed = True
     elif requires_reprocessing and documento.status == DocumentStatus.PROCESSADO:
         documento.status = DocumentStatus.PENDENTE
         documento.mensagem_erro = ""
