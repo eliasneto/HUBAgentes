@@ -102,6 +102,7 @@
                 {{ form.folder_url }}
                 <small>Cole a URL completa da pasta do Google Drive que deve ser monitorada.</small>
                 {% for error in form.folder_url.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                <small id="gdrive-folder-preview" style="display:none;color:var(--color-text-muted,#6b7280);"></small>
               </div>
             </div>
 
@@ -179,6 +180,12 @@
 
         <div class="execution-actions builder-actions">
           <a class="secondary-action" href="{% url 'portal_fontes_documentos' %}">Voltar</a>
+          {% if modo_edicao and source_type == "google-drive-folder" %}
+            <form method="post" action="{% url 'portal_fonte_gdrive_excluir' source_edicao.id %}" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir a fonte \'{{ source_edicao.nome }}\'? Essa ação não pode ser desfeita.')">
+              {% csrf_token %}
+              <button type="submit" class="secondary-action danger-action">Excluir fonte</button>
+            </form>
+          {% endif %}
           <button class="start-button" type="submit">
             {% if modo_edicao %}Salvar fonte{% else %}Criar fonte{% endif %}
           </button>
@@ -186,5 +193,64 @@
       </form>
     </section>
   </main>
+{% if source_type == "google-drive-folder" %}
+<script>
+(function () {
+  var urlField = document.getElementById('{{ form.folder_url.id_for_label }}');
+  var integrationField = document.getElementById('{{ form.google_drive_integration.id_for_label }}');
+  var preview = document.getElementById('gdrive-folder-preview');
+  var apiUrl = '{% url "portal_fonte_documento_gdrive_nome_pasta" %}';
+
+  if (!urlField || !integrationField || !preview) return;
+
+  var timer;
+
+  function fetchFolderName() {
+    var folderUrl = urlField.value.trim();
+    var integrationId = integrationField.value;
+
+    if (!folderUrl || !integrationId) {
+      preview.style.display = 'none';
+      preview.textContent = '';
+      return;
+    }
+
+    preview.style.display = 'block';
+    preview.style.color = 'var(--color-text-muted, #6b7280)';
+    preview.textContent = 'Buscando nome da pasta...';
+
+    fetch(apiUrl + '?integration_id=' + encodeURIComponent(integrationId) + '&folder_url=' + encodeURIComponent(folderUrl))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        preview.style.display = 'block';
+        if (data.nome) {
+          preview.style.color = 'var(--color-text-muted, #6b7280)';
+          preview.textContent = '📁 ' + data.nome;
+        } else if (data.erro) {
+          preview.style.color = 'var(--color-error, #e53e3e)';
+          preview.textContent = data.erro;
+        } else {
+          preview.style.display = 'none';
+        }
+      })
+      .catch(function () {
+        preview.style.display = 'none';
+      });
+  }
+
+  urlField.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(fetchFolderName, 600);
+  });
+
+  integrationField.addEventListener('change', function () {
+    clearTimeout(timer);
+    fetchFolderName();
+  });
+
+  fetchFolderName();
+}());
+</script>
+{% endif %}
 </body>
 </html>

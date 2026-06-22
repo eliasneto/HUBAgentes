@@ -180,15 +180,14 @@ class GeminiProviderAdapter(BaseAIProviderAdapter):
             "contents": [
                 {
                     "parts": [
+                        {"text": f"[Arquivo: {document_name}]"},
                         {
                             "inline_data": {
                                 "mime_type": document_mime_type,
                                 "data": base64.b64encode(document_bytes).decode("utf-8"),
                             }
                         },
-                        {
-                            "text": f"{prompt}\n\nArquivo analisado: {document_name}",
-                        },
+                        {"text": prompt},
                     ]
                 }
             ]
@@ -228,12 +227,11 @@ class GeminiProviderAdapter(BaseAIProviderAdapter):
         execution_params,
     ):
         parts = []
-        document_names = []
         for document in documents:
             document_bytes = document.get("document_bytes", b"")
             document_mime_type = document.get("document_mime_type", "application/pdf")
             document_name = document.get("document_name", "documento.pdf")
-            document_names.append(document_name)
+            parts.append({"text": f"[Arquivo: {document_name}]"})
             parts.append(
                 {
                     "inline_data": {
@@ -242,16 +240,7 @@ class GeminiProviderAdapter(BaseAIProviderAdapter):
                     }
                 }
             )
-        joined_names = ", ".join(document_names)
-        parts.append(
-            {
-                "text": (
-                    f"{prompt}\n\nArquivos analisados em conjunto: {joined_names}"
-                    if joined_names
-                    else prompt
-                )
-            }
-        )
+        parts.append({"text": prompt})
         payload = {"contents": [{"parts": parts}]}
         generation_config = self._build_generation_config(execution_params)
         if generation_config:

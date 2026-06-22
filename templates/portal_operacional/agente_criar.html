@@ -248,6 +248,25 @@
             {{ form.prompt_base }}
             <small>Use as variaveis no prompt com chaves duplas. Exemplo: {% verbatim %}{{pergunta_1}}{% endverbatim %}.</small>
             {% for error in form.prompt_base.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+
+            <div id="prompt-formats-guide" style="margin-top:14px;padding:14px 16px;border-radius:10px;border:1px solid rgba(51,244,255,0.15);background:rgba(0,216,255,0.04);font-size:13px;line-height:1.6;color:var(--muted,#7ca5b8);display:none">
+              <p style="margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#7ca5b8)">Formatos que a IA pode gerar neste modo</p>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ Excel (.xlsx)</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ CSV</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ PDF</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ TXT</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ JSON</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;font-size:12px;font-weight:500">✓ HTML</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);color:#f87171;font-size:12px;font-weight:500">✗ PowerPoint</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);color:#f87171;font-size:12px;font-weight:500">✗ Word (.docx)</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);color:#f87171;font-size:12px;font-weight:500">✗ Imagens</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);color:#f87171;font-size:12px;font-weight:500">✗ ZIP</span>
+              </div>
+              <p style="margin:0;font-size:12px">Formatos não suportados não serão gerados mesmo que pedidos no prompt. Para Excel e CSV o sistema converte automaticamente dados tabulares; PDF e TXT a partir de texto; HTML a partir de código HTML retornado pela IA.</p>
+            </div>
           </div>
 
           <div class="prompt-parameters-panel builder-wide" data-prompt-parameters>
@@ -405,19 +424,21 @@
 
 (function () {
   const FORMAT_HINTS = {
-    'ai_defined': 'A IA decide o formato de saída retornando um campo <code>formato_saida</code> no JSON. O sistema converte automaticamente para JSON, Excel, CSV, PDF ou TXT.',
-    'livre':      'A resposta da IA é salva exatamente como veio, sem conversão. O sistema detecta a extensão automaticamente pelo conteúdo. Use quando o prompt define o formato completo.',
+    'ai_defined': 'A IA analisa o conteúdo e escolhe automaticamente o melhor formato de saída (Excel, CSV, PDF, JSON ou TXT). Você <strong>não precisa mencionar o formato no prompt</strong> — o sistema instrui a IA internamente e converte o arquivo.',
+    'livre':      'Você instrui o formato diretamente no prompt (ex.: <em>"retorne uma planilha Excel"</em>, <em>"escreva um resumo em texto"</em>). O sistema não adiciona instruções extras e respeita o que a IA retornar: dados em tabela viram Excel, código HTML vira página, texto puro vira TXT.',
     'json':       'A saída é salva como arquivo <strong>.json</strong>. A IA deve retornar um objeto JSON válido.',
-    'xlsx':       'A saída é convertida para <strong>Excel (.xlsx)</strong>. Requer que a IA retorne dados estruturados em formato de tabela.',
-    'csv':        'A saída é salva como <strong>CSV</strong>. Ideal para dados tabulares simples que serão importados em planilhas.',
+    'xlsx':       'A saída é convertida para <strong>Excel (.xlsx)</strong>. A IA deve retornar dados estruturados em formato de tabela — não é necessário pedir Excel no prompt.',
+    'csv':        'A saída é salva como <strong>CSV</strong>. Ideal para dados tabulares simples que serão importados em outras planilhas ou sistemas.',
     'pdf':        'A saída é gerada como <strong>PDF</strong> a partir do texto retornado pela IA.',
     'txt':        'A resposta da IA é salva como <strong>texto puro (.txt)</strong>, sem nenhuma conversão de formato.',
   };
-  const sel  = document.getElementById('{{ form.default_output_format.id_for_label }}');
-  const hint = document.getElementById('output-format-hint');
+  const sel   = document.getElementById('{{ form.default_output_format.id_for_label }}');
+  const hint  = document.getElementById('output-format-hint');
+  const guide = document.getElementById('prompt-formats-guide');
   if (!sel || !hint) return;
   function updateHint() {
     hint.innerHTML = FORMAT_HINTS[sel.value] || '';
+    if (guide) guide.style.display = sel.value === 'livre' ? 'block' : 'none';
   }
   sel.addEventListener('change', updateHint);
   updateHint();
