@@ -8,11 +8,15 @@ from apps.core.models import ConfiguracaoGeral
 
 @admin.register(ConfiguracaoGeral)
 class ConfiguracaoGeralAdmin(admin.ModelAdmin):
-    list_display = ("visibilidade_dashboard", "limpeza_automatica_ativa", "dias_retencao_arquivos", "updated_at", "atualizado_por")
+    list_display = ("visibilidade_dashboard", "mascote_ativo", "limpeza_automatica_ativa", "dias_retencao_arquivos", "updated_at", "atualizado_por")
     readonly_fields = ("updated_at", "atualizado_por")
     fieldsets = (
         ("Painel inicial", {
             "fields": ("visibilidade_dashboard",),
+        }),
+        ("Assistente Biel", {
+            "fields": ("mascote_ativo",),
+            "description": "Quando ativo, o mascote Biel aparece flutuando no portal para todos os usuários.",
         }),
         ("Limpeza automática de arquivos", {
             "fields": ("limpeza_automatica_ativa", "dia_execucao_limpeza", "dias_retencao_arquivos"),

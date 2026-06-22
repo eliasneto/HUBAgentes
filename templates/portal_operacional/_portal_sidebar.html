@@ -1,5 +1,292 @@
 {% load static %}
 
+{% if mascote_ativo %}
+<!-- Mascote Biel — arrastável + chat -->
+<div id="biel-mascot" title="Biel — Clique para conversar!">
+  <button id="biel-close" title="Fechar Biel" aria-label="Fechar mascote">×</button>
+  <img src="{% static 'portal_operacional/img/Biel_sem_fundo.png' %}?v=1" alt="Biel" draggable="false">
+  <div id="biel-tooltip">Clique para conversar 💬</div>
+</div>
+
+<!-- Painel de chat do Biel -->
+<div id="biel-chat-panel" aria-label="Chat com o Biel" role="dialog" aria-modal="false">
+  <div class="biel-resize biel-resize-n"></div>
+  <div class="biel-resize biel-resize-s"></div>
+  <div class="biel-resize biel-resize-e"></div>
+  <div class="biel-resize biel-resize-w"></div>
+  <div class="biel-resize biel-resize-ne"></div>
+  <div class="biel-resize biel-resize-nw"></div>
+  <div class="biel-resize biel-resize-se"></div>
+  <div class="biel-resize biel-resize-sw"></div>
+  <div id="biel-chat-header">
+    <div id="biel-chat-avatar">
+      <img src="{% static 'portal_operacional/img/Biel_sem_fundo.png' %}?v=1" alt="">
+    </div>
+    <div id="biel-chat-title">
+      <strong>Biel</strong>
+      <span>Assistente HUB Agentes</span>
+    </div>
+    <button id="biel-chat-close" aria-label="Fechar chat">×</button>
+  </div>
+  <div id="biel-chat-messages" role="log" aria-live="polite"></div>
+  <div id="biel-chat-typing" aria-hidden="true">
+    <span></span><span></span><span></span>
+  </div>
+  <form id="biel-chat-form" autocomplete="off">
+    <input id="biel-chat-input" type="text" placeholder="Digite sua pergunta…" maxlength="300" aria-label="Mensagem para o Biel">
+    <button type="submit" id="biel-chat-send" aria-label="Enviar">
+      <svg viewBox="0 0 20 20" fill="none" width="18" height="18"><path d="M2 10L18 3l-5 7 5 7-16-7z" fill="currentColor"/></svg>
+    </button>
+  </form>
+</div>
+
+<style>
+/* ── Mascote ── */
+#biel-mascot {
+  position: fixed;
+  bottom: 90px;
+  right: 28px;
+  width: 120px;
+  height: 120px;
+  z-index: 9999;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  filter: drop-shadow(0 0 10px rgba(0,216,255,0.55));
+  animation: biel-float 3.2s ease-in-out infinite;
+  transition: filter 0.2s;
+}
+#biel-mascot.dragging {
+  cursor: grabbing;
+  animation: none;
+  filter: drop-shadow(0 0 18px rgba(0,216,255,0.9));
+}
+#biel-mascot.chat-open {
+  filter: drop-shadow(0 0 20px rgba(0,216,255,1));
+}
+#biel-mascot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+#biel-close {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(4,19,44,0.92);
+  border: 1px solid rgba(0,216,255,0.5);
+  color: #e8fbff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+  z-index: 1;
+  padding: 0;
+}
+#biel-close:hover { background: rgba(255,91,110,0.8); border-color: #ff5b6e; }
+#biel-mascot:hover #biel-close { opacity: 1; }
+#biel-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: rgba(4,19,44,0.92);
+  border: 1px solid rgba(0,216,255,0.45);
+  color: #e8fbff;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  backdrop-filter: blur(6px);
+}
+#biel-mascot:hover #biel-tooltip { opacity: 1; }
+@keyframes biel-float {
+  0%, 100% { transform: translateY(0px) rotate(-2deg); }
+  50%       { transform: translateY(-10px) rotate(2deg); }
+}
+
+/* ── Handles de resize ── */
+.biel-resize { position: absolute; z-index: 10; }
+.biel-resize-n  { top: -4px;    left: 14px;  right: 14px; height: 8px;  cursor: n-resize;  }
+.biel-resize-s  { bottom: -4px; left: 14px;  right: 14px; height: 8px;  cursor: s-resize;  }
+.biel-resize-e  { right: -4px;  top: 14px; bottom: 14px;  width: 8px;   cursor: e-resize;  }
+.biel-resize-w  { left: -4px;   top: 14px; bottom: 14px;  width: 8px;   cursor: w-resize;  }
+.biel-resize-ne { top: -6px;    right: -6px; width: 14px; height: 14px; cursor: ne-resize; }
+.biel-resize-nw { top: -6px;    left: -6px;  width: 14px; height: 14px; cursor: nw-resize; }
+.biel-resize-se { bottom: -6px; right: -6px; width: 14px; height: 14px; cursor: se-resize; }
+.biel-resize-sw { bottom: -6px; left: -6px;  width: 14px; height: 14px; cursor: sw-resize; }
+
+/* ── Painel de chat ── */
+#biel-chat-panel {
+  position: fixed;
+  bottom: 220px;
+  right: 28px;
+  width: 340px;
+  height: 480px;
+  background: rgba(4,19,44,0.97);
+  border: 1px solid rgba(0,216,255,0.35);
+  border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,216,255,0.1);
+  backdrop-filter: blur(16px);
+  z-index: 9998;
+  min-width: 260px;
+  min-height: 300px;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  animation: biel-chat-in 0.22s ease;
+}
+#biel-chat-panel.open { display: flex; }
+@keyframes biel-chat-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+#biel-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0,216,255,0.2);
+  background: rgba(0,216,255,0.06);
+  flex-shrink: 0;
+}
+#biel-chat-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,216,255,0.4);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(0,216,255,0.05);
+}
+#biel-chat-avatar img { width: 100%; height: 100%; object-fit: contain; }
+#biel-chat-title { flex: 1; }
+#biel-chat-title strong { display: block; font-size: 14px; color: #e8fbff; }
+#biel-chat-title span   { font-size: 11px; color: #9ec4d3; }
+#biel-chat-close {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid rgba(0,216,255,0.3);
+  color: #9ec4d3;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+#biel-chat-close:hover { background: rgba(255,91,110,0.7); border-color: #ff5b6e; color: #fff; }
+#biel-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scroll-behavior: smooth;
+}
+#biel-chat-messages::-webkit-scrollbar { width: 4px; }
+#biel-chat-messages::-webkit-scrollbar-track { background: transparent; }
+#biel-chat-messages::-webkit-scrollbar-thumb { background: rgba(0,216,255,0.25); border-radius: 2px; }
+.biel-msg {
+  max-width: 88%;
+  font-size: 13px;
+  line-height: 1.55;
+  padding: 9px 12px;
+  border-radius: 12px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.biel-msg-biel {
+  align-self: flex-start;
+  background: rgba(0,216,255,0.1);
+  border: 1px solid rgba(0,216,255,0.25);
+  color: #e8fbff;
+  border-bottom-left-radius: 4px;
+}
+.biel-msg-user {
+  align-self: flex-end;
+  background: rgba(0,216,255,0.18);
+  border: 1px solid rgba(0,216,255,0.4);
+  color: #e8fbff;
+  border-bottom-right-radius: 4px;
+}
+.biel-msg-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #00d8ff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0,216,255,0.4);
+  transition: border-color 0.2s;
+}
+.biel-msg-link:hover { border-color: #00d8ff; }
+#biel-chat-typing {
+  padding: 0 12px 8px;
+  display: none;
+  gap: 4px;
+  align-items: center;
+}
+#biel-chat-typing.visible { display: flex; }
+#biel-chat-typing span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(0,216,255,0.6);
+  animation: biel-dot 1.2s ease-in-out infinite;
+}
+#biel-chat-typing span:nth-child(2) { animation-delay: 0.2s; }
+#biel-chat-typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes biel-dot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%            { transform: scale(1);   opacity: 1; }
+}
+#biel-chat-form {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(0,216,255,0.2);
+  background: rgba(0,216,255,0.04);
+  flex-shrink: 0;
+}
+#biel-chat-input {
+  flex: 1;
+  background: rgba(0,216,255,0.07);
+  border: 1px solid rgba(0,216,255,0.3);
+  border-radius: 8px;
+  color: #e8fbff;
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+#biel-chat-input::placeholder { color: #9ec4d3; }
+#biel-chat-input:focus { border-color: rgba(0,216,255,0.7); }
+#biel-chat-send {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: rgba(0,216,255,0.15);
+  border: 1px solid rgba(0,216,255,0.4);
+  color: #00d8ff;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+#biel-chat-send:hover { background: rgba(0,216,255,0.3); }
+#biel-chat-send:disabled { opacity: 0.4; cursor: default; }
+</style>
+
 <!-- Botão hamburguer (mobile) -->
 <button class="sidebar-toggle" data-sidebar-toggle aria-label="Abrir menu" aria-expanded="false">
   <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -14,7 +301,7 @@
 
 <aside class="portal-sidebar" aria-label="Menu principal" data-sidebar>
   <div class="brand-block">
-    <img class="brand-mark" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="">
+    <img class="brand-mark" id="brand-bot-icon" src="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}?v=20260524-brand-3" alt="" title="Chamar o Biel" style="cursor:pointer;">
     <div>
       <strong>HUB Agentes</strong>
       <span>Portal operacional</span>
@@ -111,3 +398,312 @@
   });
 }());
 </script>
+
+<script>
+(function () {
+  var el       = document.getElementById('biel-mascot');
+  var panel    = document.getElementById('biel-chat-panel');
+  var msgs     = document.getElementById('biel-chat-messages');
+  var typing   = document.getElementById('biel-chat-typing');
+  var form     = document.getElementById('biel-chat-form');
+  var input    = document.getElementById('biel-chat-input');
+  var sendBtn  = document.getElementById('biel-chat-send');
+  var closeBtn = document.getElementById('biel-close');
+  var chatClose= document.getElementById('biel-chat-close');
+  var brandBot = document.getElementById('brand-bot-icon');
+
+  if (!el) return;
+
+  /* ── Estado ── */
+  var chatOpen    = false;
+  var saudouJa    = false;
+  var dragging    = false;
+  var hasMoved    = false;
+  var ox = 0, oy = 0;
+
+  /* ── Helpers ── */
+  function getCsrf() {
+    var match = document.cookie.match(/csrftoken=([^;]+)/);
+    return match ? match[1] : '';
+  }
+
+  function formatarTexto(txt) {
+    return txt
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+  }
+
+  function adicionarMsg(texto, de, link) {
+    var div = document.createElement('div');
+    div.className = 'biel-msg biel-msg-' + de;
+    div.innerHTML = formatarTexto(texto);
+    if (link) {
+      var a = document.createElement('a');
+      a.href = link;
+      a.className = 'biel-msg-link';
+      a.textContent = '📖 Ver documentação completa';
+      a.target = '_blank';
+      var br = document.createElement('br');
+      div.appendChild(br);
+      div.appendChild(a);
+    }
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function posicionarPanel() {
+    var rect = el.getBoundingClientRect();
+    var pw = 340, ph = 480;
+    var left = rect.left - pw - 12;
+    var top  = rect.bottom - ph;
+    if (left < 8) left = rect.right + 12;
+    if (top  < 8) top  = 8;
+    if (left + pw > window.innerWidth  - 8) left = window.innerWidth  - pw - 8;
+    if (top  + ph > window.innerHeight - 8) top  = window.innerHeight - ph - 8;
+    panel.style.left   = left + 'px';
+    panel.style.top    = top  + 'px';
+    panel.style.right  = 'auto';
+    panel.style.bottom = 'auto';
+  }
+
+  function abrirChat() {
+    chatOpen = true;
+    posicionarPanel();
+    panel.classList.add('open');
+    el.classList.add('chat-open');
+    if (!saudouJa) {
+      saudouJa = true;
+      adicionarMsg('Oi! 👋 Sou o Biel, assistente do HUB Agentes.\nPosso te ajudar com dúvidas sobre o sistema. O que você precisa?', 'biel', null);
+    }
+    setTimeout(function () { input.focus(); }, 80);
+  }
+
+  function fecharChat() {
+    chatOpen = false;
+    panel.classList.remove('open');
+    el.classList.remove('chat-open');
+  }
+
+  /* ── Enviar mensagem ── */
+  function enviar(mensagem) {
+    adicionarMsg(mensagem, 'user', null);
+    input.value = '';
+    sendBtn.disabled = true;
+    typing.classList.add('visible');
+    msgs.scrollTop = msgs.scrollHeight;
+
+    fetch('/biel/chat/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrf()
+      },
+      body: JSON.stringify({ mensagem: mensagem })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      typing.classList.remove('visible');
+      adicionarMsg(data.resposta || '…', 'biel', data.link || null);
+    })
+    .catch(function () {
+      typing.classList.remove('visible');
+      adicionarMsg('Ops, tive um problema ao buscar a resposta. Tente novamente.', 'biel', null);
+    })
+    .finally(function () {
+      sendBtn.disabled = false;
+      input.focus();
+    });
+  }
+
+  /* ── Ícone do robô no menu traz o Biel de volta ── */
+  if (brandBot) {
+    brandBot.addEventListener('click', function () {
+      el.style.display = '';
+      try { localStorage.removeItem('biel-hidden'); } catch(e) {}
+    });
+  }
+
+  /* ── Botão × do mascote ── */
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      fecharChat();
+      el.style.display = 'none';
+      try { localStorage.setItem('biel-hidden', '1'); } catch(e) {}
+    });
+  }
+
+  /* ── Botão × do chat ── */
+  if (chatClose) {
+    chatClose.addEventListener('click', fecharChat);
+  }
+
+  /* ── Formulário de envio ── */
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var msg = (input.value || '').trim();
+      if (msg) enviar(msg);
+    });
+  }
+
+  /* ── Se estava escondido, mantém oculto ── */
+  try { if (localStorage.getItem('biel-hidden') === '1') el.style.display = 'none'; } catch(e) {}
+
+  /* ── Restaura posição salva ── */
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem('biel-pos')); } catch(e) {}
+  if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+    el.style.left   = saved.x + 'px';
+    el.style.top    = saved.y + 'px';
+    el.style.right  = 'auto';
+    el.style.bottom = 'auto';
+  }
+
+  /* ── Drag com detecção de clique ── */
+  el.addEventListener('mousedown', function (e) {
+    if (e.button !== 0) return;
+    if (e.target === closeBtn) return;
+    dragging = true;
+    hasMoved = false;
+    var rect = el.getBoundingClientRect();
+    ox = e.clientX - rect.left;
+    oy = e.clientY - rect.top;
+    el.classList.add('dragging');
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', function (e) {
+    if (!dragging) return;
+    hasMoved = true;
+    var x = Math.max(0, Math.min(window.innerWidth  - el.offsetWidth,  e.clientX - ox));
+    var y = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, e.clientY - oy));
+    el.style.left   = x + 'px';
+    el.style.top    = y + 'px';
+    el.style.right  = 'auto';
+    el.style.bottom = 'auto';
+    if (chatOpen) posicionarPanel();
+  });
+
+  document.addEventListener('mouseup', function () {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    if (!hasMoved) {
+      chatOpen ? fecharChat() : abrirChat();
+    }
+    try {
+      localStorage.setItem('biel-pos', JSON.stringify({
+        x: parseFloat(el.style.left),
+        y: parseFloat(el.style.top)
+      }));
+    } catch(e) {}
+  });
+
+  /* ── Touch ── */
+  el.addEventListener('touchstart', function (e) {
+    var t = e.touches[0];
+    var rect = el.getBoundingClientRect();
+    ox = t.clientX - rect.left;
+    oy = t.clientY - rect.top;
+    hasMoved = false;
+    el.classList.add('dragging');
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchmove', function (e) {
+    if (!el.classList.contains('dragging')) return;
+    hasMoved = true;
+    var t = e.touches[0];
+    var x = Math.max(0, Math.min(window.innerWidth  - el.offsetWidth,  t.clientX - ox));
+    var y = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, t.clientY - oy));
+    el.style.left   = x + 'px';
+    el.style.top    = y + 'px';
+    el.style.right  = 'auto';
+    el.style.bottom = 'auto';
+    if (chatOpen) posicionarPanel();
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchend', function () {
+    if (!el.classList.contains('dragging')) return;
+    el.classList.remove('dragging');
+    if (!hasMoved) {
+      chatOpen ? fecharChat() : abrirChat();
+    }
+    try {
+      localStorage.setItem('biel-pos', JSON.stringify({
+        x: parseFloat(el.style.left),
+        y: parseFloat(el.style.top)
+      }));
+    } catch(e) {}
+  });
+
+  /* Fecha chat com Escape */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && chatOpen) fecharChat();
+  });
+
+  /* ── Resize do painel ── */
+  var resizing = false;
+  var resizeDir = '';
+  var resizeStart = {};
+
+  panel.querySelectorAll('.biel-resize').forEach(function (handle) {
+    handle.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      e.preventDefault();
+      resizing  = true;
+      resizeDir = handle.className.replace('biel-resize biel-resize-', '');
+      var rect  = panel.getBoundingClientRect();
+      resizeStart = {
+        mx: e.clientX, my: e.clientY,
+        x: rect.left,  y: rect.top,
+        w: rect.width,  h: rect.height
+      };
+      document.body.style.cursor = handle.style.cursor || window.getComputedStyle(handle).cursor;
+      document.body.style.userSelect = 'none';
+    });
+  });
+
+  document.addEventListener('mousemove', function (e) {
+    if (!resizing) return;
+    var dx = e.clientX - resizeStart.mx;
+    var dy = e.clientY - resizeStart.my;
+    var d  = resizeDir;
+    var minW = 260, minH = 300;
+    var maxW = window.innerWidth  - resizeStart.x - 8;
+    var maxH = window.innerHeight - resizeStart.y - 8;
+
+    var newW = resizeStart.w, newH = resizeStart.h;
+    var newX = resizeStart.x, newY = resizeStart.y;
+
+    if (d === 'e'  || d === 'ne' || d === 'se') newW = Math.max(minW, Math.min(maxW, resizeStart.w + dx));
+    if (d === 'w'  || d === 'nw' || d === 'sw') {
+      newW = Math.max(minW, resizeStart.w - dx);
+      newX = resizeStart.x + (resizeStart.w - newW);
+    }
+    if (d === 's'  || d === 'se' || d === 'sw') newH = Math.max(minH, Math.min(maxH, resizeStart.h + dy));
+    if (d === 'n'  || d === 'ne' || d === 'nw') {
+      newH = Math.max(minH, resizeStart.h - dy);
+      newY = resizeStart.y + (resizeStart.h - newH);
+    }
+
+    panel.style.width  = newW + 'px';
+    panel.style.height = newH + 'px';
+    panel.style.left   = newX + 'px';
+    panel.style.top    = newY + 'px';
+    panel.style.right  = 'auto';
+    panel.style.bottom = 'auto';
+  });
+
+  document.addEventListener('mouseup', function () {
+    if (!resizing) return;
+    resizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+}());
+</script>
+{% endif %}

@@ -88,6 +88,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'apps.core.context_processors.app_version',
                 'apps.core.context_processors.paginas_menu',
+                'apps.core.context_processors.mascote_config',
             ],
         },
     },

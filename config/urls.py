@@ -20,6 +20,7 @@ from django.conf.urls.static import static
 from django.urls import include, path
 
 from apps.auditoria.views import AuditoriaView
+from apps.doc_system.views import BielChatView, BielToggleView
 from apps.core.views import (
     AdicionarUsuarioPastaView,
     AlterarPermissaoPastaView,
@@ -115,6 +116,8 @@ urlpatterns = [
     path('configuracao-tela-login/', ConfiguracaoTelaLoginView.as_view(), name='portal_tela_login'),
     path('configuracao-tela-login/ativar/', AtivarTelaLoginView.as_view(), name='portal_tela_login_ativar'),
     path('login-preview/<str:tela>/', LoginPreviewView.as_view(), name='portal_login_preview'),
+    path('biel/chat/', BielChatView.as_view(), name='biel_chat'),
+    path('biel/toggle/', BielToggleView.as_view(), name='biel_toggle'),
     path('sair/', PortalLogoutView.as_view(), name='portal_logout'),
     path('admini/', admin.site.urls),
 ]

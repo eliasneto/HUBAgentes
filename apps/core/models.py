@@ -43,6 +43,10 @@ class ConfiguracaoGeral(models.Model):
         default=2,
         help_text="Maximo de execucoes simultaneas por usuario. 0 = sem limite.",
     )
+    mascote_ativo = models.BooleanField(
+        default=True,
+        help_text="Quando ativo, o assistente Biel aparece flutuando no portal para todos os usuarios.",
+    )
     atualizado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
