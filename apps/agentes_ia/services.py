@@ -326,6 +326,7 @@ def criar_agente_portal(
     modelo_preferencial,
     default_input_source_type,
     default_folder_source,
+    default_gdrive_subfolder_path=None,
     default_local_storage_integration,
     default_local_relative_input_path,
     permitir_upload_na_execucao,
@@ -366,6 +367,7 @@ def criar_agente_portal(
             ),
             default_input_source_type=default_input_source_type,
             default_folder_source=default_folder_source,
+            default_gdrive_subfolder_path=default_gdrive_subfolder_path or [],
             default_local_storage_integration=default_local_storage_integration,
             default_local_relative_input_path=default_local_relative_input_path,
             allowed_input_extensions=["pdf"],
@@ -409,6 +411,7 @@ def atualizar_agente_portal(
     modelo_preferencial,
     default_input_source_type,
     default_folder_source,
+    default_gdrive_subfolder_path=None,
     default_local_storage_integration,
     default_local_relative_input_path,
     permitir_upload_na_execucao,
@@ -437,6 +440,7 @@ def atualizar_agente_portal(
         )
         configuracao.default_input_source_type = default_input_source_type
         configuracao.default_folder_source = default_folder_source
+        configuracao.default_gdrive_subfolder_path = default_gdrive_subfolder_path or []
         configuracao.default_local_storage_integration = (
             default_local_storage_integration
         )

@@ -162,6 +162,13 @@
               {% for error in form.default_folder_source.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
 
+            <div class="execution-field builder-wide" data-builder-source="google_drive_folder" id="gdrive-subfolder-field">
+              <label>Subpasta do Google Drive</label>
+              {{ form.default_gdrive_subfolder_path }}
+              <div id="gdrive-cascade-container"></div>
+              <small id="gdrive-cascade-hint" style="margin-top:4px;display:block"></small>
+            </div>
+
             <div class="execution-field" data-builder-source="local_folder">
               <label for="{{ form.default_local_storage_integration.id_for_label }}">{{ form.default_local_storage_integration.label }}</label>
               {{ form.default_local_storage_integration }}
@@ -419,6 +426,138 @@
   // Carrega ao abrir em modo edicao se ja tiver valor
   if (integracaoSelect.value) {
     carregarSubpastas(integracaoSelect.value);
+  }
+}());
+
+(function () {
+  var folderSourceSelect = document.getElementById('{{ form.default_folder_source.id_for_label }}');
+  var pathInput          = document.getElementById('{{ form.default_gdrive_subfolder_path.id_for_label }}');
+  var cascadeContainer   = document.getElementById('gdrive-cascade-container');
+  var cascadeHint        = document.getElementById('gdrive-cascade-hint');
+
+  if (!folderSourceSelect || !cascadeContainer) return;
+
+  // levels: [{el, select, driveId}] — driveId = ID do Drive desta pasta (pai dos filhos neste nível)
+  var levels = [];
+
+  function getStoredPath() {
+    try { return JSON.parse(pathInput ? pathInput.value : '[]') || []; }
+    catch (e) { return []; }
+  }
+
+  function savePath() {
+    // Monta o caminho a partir das seleções actuais
+    var path = [];
+    for (var i = 0; i < levels.length; i++) {
+      var sel = levels[i].select;
+      if (!sel.value) break;
+      var opt = sel.options[sel.selectedIndex];
+      path.push({ id: sel.value, nome: opt.textContent });
+    }
+    if (pathInput) pathInput.value = JSON.stringify(path);
+    if (cascadeHint) {
+      cascadeHint.textContent = path.length
+        ? '📁 ' + path.map(function(p){ return p.nome; }).join(' › ')
+        : '';
+    }
+  }
+
+  function clearLevelsFrom(index) {
+    while (levels.length > index) {
+      levels.pop().el.remove();
+    }
+    savePath();
+  }
+
+  function buildSelect(placeholder) {
+    var sel = document.createElement('select');
+    sel.className = 'portal-input';
+    sel.style.marginTop = '6px';
+    sel.innerHTML = '<option value="">' + placeholder + '</option>';
+    return sel;
+  }
+
+  function addLevel(folderSourceId, parentDriveId, preSelectId) {
+    var levelIndex = levels.length;
+    var isRoot = (levelIndex === 0);
+    var placeholder = isRoot ? '— Pasta raiz (sem subpasta) —' : '— Usar esta pasta —';
+
+    var el  = document.createElement('div');
+    var sel = buildSelect(placeholder);
+    var hint = document.createElement('small');
+    hint.style.display = 'block';
+    hint.textContent = 'Carregando...';
+    el.appendChild(sel);
+    el.appendChild(hint);
+    cascadeContainer.appendChild(el);
+    levels.push({ el: el, select: sel, driveId: parentDriveId });
+
+    var url = isRoot
+      ? '/agentes/api/subpastas-gdrive/' + folderSourceId + '/'
+      : '/agentes/api/subpastas-gdrive/' + folderSourceId + '/filhas/' + parentDriveId + '/';
+
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.erro) { hint.textContent = 'Erro: ' + data.erro; return; }
+
+        var items = data.subpastas || [];
+        hint.textContent = '';
+
+        if (items.length === 0) {
+          // Sem subpastas neste nível — remove o select se não for raiz
+          if (!isRoot) { el.remove(); levels.pop(); }
+          else { hint.textContent = 'Nenhuma subpasta encontrada.'; }
+          savePath();
+          return;
+        }
+
+        items.forEach(function (item) {
+          var opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = item.nome;
+          if (String(preSelectId) === String(item.id)) opt.selected = true;
+          sel.appendChild(opt);
+        });
+
+        // Se há pré-seleção, carrega o próximo nível automaticamente
+        if (preSelectId && sel.value) {
+          savePath();
+          addLevel(folderSourceId, sel.value, '');
+        } else {
+          savePath();
+        }
+      })
+      .catch(function () { hint.textContent = 'Erro ao carregar subpastas.'; });
+
+    sel.addEventListener('change', function () {
+      clearLevelsFrom(levelIndex + 1);
+      savePath();
+      if (sel.value) {
+        addLevel(folderSourceId, sel.value, '');
+      }
+    });
+  }
+
+  function initCascade(folderSourceId) {
+    clearLevelsFrom(0);
+    if (!folderSourceId) return;
+    // Restaura a partir do caminho salvo (para modo edição)
+    var path = getStoredPath();
+    var preSelectId = path.length > 0 ? path[0].id : '';
+    addLevel(folderSourceId, null, preSelectId);
+  }
+
+  // Quando a fonte de documentos muda, reinicia o cascade
+  folderSourceSelect.addEventListener('change', function () {
+    if (pathInput) pathInput.value = '[]';
+    if (cascadeHint) cascadeHint.textContent = '';
+    initCascade(this.value);
+  });
+
+  // Inicializa na abertura da página
+  if (folderSourceSelect.value) {
+    initCascade(folderSourceSelect.value);
   }
 }());
 

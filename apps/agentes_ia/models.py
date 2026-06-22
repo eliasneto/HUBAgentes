@@ -262,6 +262,9 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
         related_name="agentes_configuracao_padrao",
     )
     default_local_relative_input_path = models.CharField(max_length=500, blank=True)
+    # Lista de {id, nome} do caminho completo de subpastas do Google Drive selecionado.
+    # Ex: [{"id": "drive_id_filho", "nome": "FILHO"}, {"id": "drive_id_sub", "nome": "SUB-FILHO"}]
+    default_gdrive_subfolder_path = models.JSONField(default=list, blank=True)
     allowed_input_extensions = models.JSONField(
         default=default_allowed_input_extensions,
         blank=True,

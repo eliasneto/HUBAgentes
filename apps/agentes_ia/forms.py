@@ -83,6 +83,10 @@ class AgentePortalCreateForm(forms.Form):
         max_length=500,
         required=False,
     )
+    default_gdrive_subfolder_path = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
     permitir_upload_na_execucao = forms.BooleanField(
         label="Permitir documento na execucao",
         required=False,
@@ -194,6 +198,10 @@ class AgentePortalCreateForm(forms.Form):
                     "default_local_relative_input_path": (
                         configuracao.default_local_relative_input_path
                     ),
+                    "default_gdrive_subfolder_path": json.dumps(
+                        configuracao.default_gdrive_subfolder_path or [],
+                        ensure_ascii=False,
+                    ),
                     "permitir_upload_na_execucao": permitir_upload_na_execucao,
                     "default_output_format": configuracao.default_output_format,
                     "document_execution_mode": (
@@ -210,6 +218,22 @@ class AgentePortalCreateForm(forms.Form):
             )
 
         self.initial.update(initial_data)
+
+    def clean_default_gdrive_subfolder_path(self):
+        raw = self.cleaned_data.get("default_gdrive_subfolder_path") or "[]"
+        if not raw or raw == "[]":
+            return []
+        try:
+            parsed = json.loads(raw)
+            if not isinstance(parsed, list):
+                return []
+            return [
+                {"id": str(item["id"]), "nome": str(item["nome"])}
+                for item in parsed
+                if isinstance(item, dict) and "id" in item and "nome" in item
+            ]
+        except (json.JSONDecodeError, KeyError):
+            return []
 
     def clean_max_tentativas(self):
         value = self.cleaned_data.get("max_tentativas")
@@ -297,6 +321,7 @@ class AgentePortalCreateForm(forms.Form):
             "modelo_preferencial": self.cleaned_data["modelo_preferencial"],
             "default_input_source_type": self.cleaned_data["default_input_source_type"],
             "default_folder_source": self.cleaned_data.get("default_folder_source"),
+            "default_gdrive_subfolder_path": self.cleaned_data.get("default_gdrive_subfolder_path") or [],
             "default_local_storage_integration": self.cleaned_data.get(
                 "default_local_storage_integration"
             ),

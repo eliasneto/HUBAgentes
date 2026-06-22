@@ -735,6 +735,50 @@ class FonteDocumentoGDriveFolderNameView(LoginRequiredMixin, View):
             return JsonResponse({"erro": "Não foi possível buscar o nome da pasta."}, status=400)
 
 
+class GoogleDriveSubpastasView(LoginRequiredMixin, View):
+    login_url = reverse_lazy("portal_login")
+
+    def get(self, request, folder_source_id):
+        from apps.integracoes.models import GoogleDriveFolderSource
+        from apps.integracoes.services.google_drive import (
+            list_subfolders_from_drive_folder_id,
+            GoogleDriveServiceError,
+        )
+        try:
+            folder_source = get_object_or_404(GoogleDriveFolderSource, pk=folder_source_id)
+            subpastas = list_subfolders_from_drive_folder_id(
+                folder_source.google_drive_integration,
+                folder_source.folder_id,
+            )
+            return JsonResponse({"subpastas": subpastas})
+        except GoogleDriveServiceError as exc:
+            return JsonResponse({"subpastas": [], "erro": str(exc)})
+        except Exception:
+            return JsonResponse({"subpastas": [], "erro": "Erro ao buscar subpastas."})
+
+
+class GoogleDriveSubpastasFilhasView(LoginRequiredMixin, View):
+    login_url = reverse_lazy("portal_login")
+
+    def get(self, request, folder_source_id, drive_folder_id):
+        from apps.integracoes.models import GoogleDriveFolderSource
+        from apps.integracoes.services.google_drive import (
+            list_subfolders_from_drive_folder_id,
+            GoogleDriveServiceError,
+        )
+        try:
+            folder_source = get_object_or_404(GoogleDriveFolderSource, pk=folder_source_id)
+            subpastas = list_subfolders_from_drive_folder_id(
+                folder_source.google_drive_integration,
+                drive_folder_id,
+            )
+            return JsonResponse({"subpastas": subpastas})
+        except GoogleDriveServiceError as exc:
+            return JsonResponse({"subpastas": [], "erro": str(exc)})
+        except Exception:
+            return JsonResponse({"subpastas": [], "erro": "Erro ao buscar subpastas."})
+
+
 class IntegracoesView(LoginRequiredMixin, TemplateView):
     template_name = "portal_operacional/integracoes.html"
     login_url = reverse_lazy("portal_login")
