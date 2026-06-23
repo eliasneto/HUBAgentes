@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doc Sistema - Otimização de Custos IA</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260621-doc-otimizacao-custos-ia-1">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260623-doc-otimizacao-custos-ia-2">
 </head>
 <body class="agent-builder-page">
   <main class="portal-shell">
@@ -332,7 +332,7 @@ lista de listas com cabecalhos na 1a linha.</code></pre>
           </div>
           <div class="doc-table-row">
             <div><strong>Gemini</strong></div>
-            <div>Gemini 2.5 Flash, 2.5 Pro</div>
+            <div>gemini-3.1-flash-lite (recomendado), gemini-3.5-flash, gemini-3-flash, gemini-2.5-flash</div>
             <div>Implicito (&gt;32k tokens)</div>
             <div>Sim — PDF, imagens, texto, audio, video</div>
           </div>
@@ -349,6 +349,87 @@ lista de listas com cabecalhos na 1a linha.</code></pre>
           <li>Tokens de cache escritos (write) tem um pequeno custo adicional na Anthropic (~25% do preco normal de entrada).</li>
           <li>O consumo de tokens e registrado por execucao e pode ser consultado em <strong>Configuracao de Custos</strong>.</li>
         </ul>
+      </section>
+
+      <!-- ── Modelos Gemini — selecao ───────────────────────────────── -->
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Gemini — guia de selecao</p>
+          <h2>Qual modelo Gemini usar no HUB Agentes</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          O Google oferece varios modelos Gemini com niveis de custo e capacidade diferentes.
+          Para o fluxo do HUB Agentes (documento + prompt &rarr; resposta), os modelos de texto abaixo
+          sao os mais relevantes. Os limites indicados sao do plano gratuito (sem custo).
+        </p>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Modelo</div>
+            <div>Limite gratis (RPD)</div>
+            <div>RPM</div>
+            <div>Recomendado para</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>gemini-3.1-flash-lite</strong> &nbsp;<span class="doc-chip" style="font-size:10px;padding:2px 6px">recomendado</span></div>
+            <div>500 / dia</div>
+            <div>15</div>
+            <div>Uso diario no HUB Agentes — melhor custo-beneficio do free tier</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>gemini-3.5-flash</strong></div>
+            <div>20 / dia</div>
+            <div>5</div>
+            <div>Maxima qualidade gratuita — modelo mais novo, limite menor</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>gemini-3-flash</strong></div>
+            <div>20 / dia</div>
+            <div>5</div>
+            <div>Alternativa solida da geracao 3</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>gemini-2.5-flash-lite</strong></div>
+            <div>20 / dia</div>
+            <div>10</div>
+            <div>Geracao 2.5 — boa qualidade, limite menor que o 3.1</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>gemini-2.5-flash</strong></div>
+            <div>20 / dia</div>
+            <div>5</div>
+            <div>Mais robusto para documentos complexos na geracao 2.5</div>
+          </div>
+        </div>
+
+        <div class="doc-guide-grid" style="margin-top:16px">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Recomendacao padrao</span>
+            <p>Use <code>gemini-3.1-flash-lite</code> no campo <strong>Modelo padrao</strong> da integracao Gemini. Com 500 requisicoes/dia gratis, cobre o uso tipico do HUB Agentes sem custo.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Embedding vs Gerativo</span>
+            <p>Modelos como <code>Gemini Embedding 1</code> e <code>Gemini Embedding 2</code> convertem texto em vetores numericos — eles nao geram respostas. Nao devem ser usados no campo Modelo padrao de uma integracao de IA.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">RPD vs RPM</span>
+            <p><strong>RPD</strong> = requisicoes por dia (limite diario). <strong>RPM</strong> = requisicoes por minuto (limite de velocidade). Para lotes grandes, o RPM pode ser o gargalo antes do RPD.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Geracao importa</span>
+            <p>O <code>gemini-3.1-flash-lite</code> supera o <code>gemini-2.0-flash</code> em qualidade apesar do nome "lite" — pertence a uma geracao mais nova com arquitetura melhorada.</p>
+          </article>
+        </div>
+
+        <div class="doc-code-panel" style="margin-top:16px">
+          <strong>Exemplo de conexao Gemini com modelo recomendado</strong>
+          <pre><code>Nome: Gemini Producao
+Status: ativa
+Provedor: gemini
+Modelo padrao: gemini-3.1-flash-lite
+Timeout em segundos: 90
+Chave de API: AIza...</code></pre>
+        </div>
       </section>
 
       <div class="execution-actions builder-actions">
