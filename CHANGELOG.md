@@ -5,6 +5,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.9] — 2026-08-16
+
+### Adicionado
+- **Indicador global de progresso na sidebar** — um widget fixo na sidebar (visível em qualquer tela do portal, não só na de execução) mostra os processamentos ativos do usuário logado, com percentual, status e um "×" para dispensar. Antes, o painel de progresso só existia dentro da tela onde a execução foi iniciada: ao navegar para outra página, o usuário perdia toda visibilidade sobre se o processamento ainda estava rodando, travado ou tinha terminado com erro. Novo endpoint `GET /processamentos/ativos/` (`ProcessamentosAtivosView`, `apps/core/views.py`) alimentado pelo selector `listar_processamentos_ativos_do_usuario` (`apps/processamentos/selectors.py`), consultado via polling a cada 8s por um script incluído em `_portal_sidebar.html`. Mostra também processamentos concluídos (sucesso/atenção/erro) nos últimos 10 minutos, para o usuário ver o resultado final mesmo que tenha saído da tela antes de terminar. Dispensar um item some com aquele status específico — se o status mudar depois (ex.: de "rodando" para "erro"), o aviso reaparece.
+
+### Corrigido
+- **Alerta de "possível travamento" disparando em execuções saudáveis** — investigação em produção (processamento `PROC-20260816204934-797C8A23`, agente "A2 - Serviços") mostrou uma chamada legítima ao gemini-2.5-pro levando 226s (incluindo um retry por timeout de conexão), sem nenhum erro real, mas ultrapassando o limiar de 180s usado para marcar `possivel_travamento`. Levantamento do histórico do servidor mostrou execuções bem-sucedidas de outros modelos passando de 3 minutos com frequência (claude-haiku-4.5 chegou a 482s numa única chamada). Duas correções: (1) `STALL_SECONDS_THRESHOLD` subiu de 180s para 300s (`apps/processamentos/selectors.py`); (2) nova classe `_AtividadeHeartbeat` (`apps/processamentos/services/agent_execution.py`) mantém `ultima_atividade_em` atualizado a cada 30s enquanto uma chamada ao provedor de IA está em andamento (inclusive durante retries internos do adapter), evitando que o gap real chegue perto do limiar mesmo em chamadas bem mais longas que o normal.
+
+---
+
 ## [1.5.8] — 2026-06-23
 
 ### Adicionado

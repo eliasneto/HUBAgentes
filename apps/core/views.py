@@ -45,6 +45,7 @@ from apps.integracoes.services.validation import (
 )
 from apps.processamentos.forms import AgenteExecucaoForm
 from apps.processamentos.selectors import (
+    listar_processamentos_ativos_do_usuario,
     listar_processamentos_para_portal,
     obter_status_processamento_para_portal,
 )
@@ -1388,6 +1389,40 @@ class ProcessamentoStatusView(LoginRequiredMixin, View):
                     "concluidos": status.resumo_concluidos,
                     "com_erro": status.resumo_com_erro,
                 },
+            }
+        )
+
+
+class ProcessamentosAtivosView(LoginRequiredMixin, View):
+    """Indicador global de progresso: processamentos do usuario logado que
+    ainda estao em andamento ou terminaram ha pouco tempo.
+
+    Consultado via polling pelo widget fixo na sidebar (visivel em qualquer
+    tela do portal), para o usuario nao perder a visao do progresso ao
+    navegar para outra pagina.
+    """
+
+    login_url = reverse_lazy("portal_login")
+
+    def get(self, request, *args, **kwargs):
+        ativos = listar_processamentos_ativos_do_usuario(request.user)
+        return JsonResponse(
+            {
+                "processamentos": [
+                    {
+                        "codigo": item.codigo,
+                        "agente": item.agente,
+                        "status": item.status,
+                        "status_codigo": item.status_codigo,
+                        "percentual": item.percentual,
+                        "etapa_atual": item.etapa_atual,
+                        "documento_atual_nome": item.documento_atual_nome,
+                        "mensagem_erro": item.mensagem_erro,
+                        "finalizado": item.finalizado,
+                        "status_endpoint": item.status_endpoint,
+                    }
+                    for item in ativos
+                ]
             }
         )
 

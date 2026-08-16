@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.core.paginator import Paginator
 from django.urls import reverse
@@ -97,7 +97,19 @@ class ProcessamentoStatusPortal:
     resumo_com_erro: int
 
 
-STALL_SECONDS_THRESHOLD = 180
+# Investigacao em producao (16/08/2026, PROC-20260816204934-797C8A23) mostrou
+# chamadas de IA legitimas (sem erro) levando ate 226s (gemini-2.5-pro) e 482s
+# (claude-haiku-4.5) so aguardando a resposta do provedor — 180s gerava alerta
+# de "possivel travamento" em execucoes saudaveis. Ver tambem o heartbeat em
+# apps/processamentos/services/agent_execution.py (_AtividadeHeartbeat), que
+# atualiza ultima_atividade_em durante a chamada e reduz a chance de o gap
+# real chegar perto deste limiar.
+STALL_SECONDS_THRESHOLD = 300
+
+# Janela em que um processamento recem-concluido (sucesso/erro/atencao)
+# continua aparecendo no indicador global, para o usuario ver o resultado
+# final mesmo que tenha navegado para outra tela antes de terminar.
+PROCESSAMENTOS_ATIVOS_JANELA_MINUTOS = 10
 
 
 def _duracao_minutos(duracao_ms: int | None) -> float | None:
@@ -298,6 +310,69 @@ def obter_status_processamento_para_portal(codigo: str) -> ProcessamentoStatusPo
         ),
         **_resumo_counts(),
     )
+
+
+@dataclass(frozen=True)
+class ProcessamentoAtivoResumo:
+    codigo: str
+    agente: str
+    status: str
+    status_codigo: str
+    percentual: int
+    etapa_atual: str
+    documento_atual_nome: str
+    mensagem_erro: str
+    finalizado: bool
+    status_endpoint: str
+
+
+def listar_processamentos_ativos_do_usuario(
+    usuario, *, limite: int = 5
+) -> list[ProcessamentoAtivoResumo]:
+    """Processamentos do usuario em andamento ou concluidos ha pouco tempo.
+
+    Alimenta o indicador global de progresso (visivel em qualquer tela do
+    portal via `_portal_sidebar.html`), para que o usuario nao perca a visao
+    de uma execucao ao navegar para outra pagina.
+    """
+    from django.db.models import Q
+
+    em_andamento_statuses = {
+        ProcessingStatus.CRIADO,
+        ProcessingStatus.EM_FILA,
+        ProcessingStatus.EM_PROCESSAMENTO,
+    }
+    recem_finalizado_desde = timezone.now() - timedelta(
+        minutes=PROCESSAMENTOS_ATIVOS_JANELA_MINUTOS
+    )
+    queryset = (
+        Processamento.objects.select_related("agente")
+        .prefetch_related("documentos", "documentos_saida", "execucoes_ia")
+        .filter(iniciado_por=usuario)
+        .filter(
+            Q(status__in=em_andamento_statuses)
+            | Q(finalizado_em__gte=recem_finalizado_desde)
+        )
+        .order_by("-iniciado_em")[:limite]
+    )
+    return [
+        ProcessamentoAtivoResumo(
+            codigo=processamento.codigo,
+            agente=str(processamento.agente) if processamento.agente_id else "",
+            status=processamento.get_status_display(),
+            status_codigo=processamento.status,
+            percentual=_calcular_percentual(processamento),
+            etapa_atual=processamento.etapa_atual,
+            documento_atual_nome=processamento.documento_atual_nome,
+            mensagem_erro=_erro_operacional(processamento),
+            finalizado=processamento.status not in em_andamento_statuses,
+            status_endpoint=reverse(
+                "portal_processamento_status",
+                kwargs={"codigo": processamento.codigo},
+            ),
+        )
+        for processamento in queryset
+    ]
 
 
 def _resumo_counts() -> dict:

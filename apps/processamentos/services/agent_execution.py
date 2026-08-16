@@ -1,11 +1,13 @@
 import json
+import logging
+import threading
 from pathlib import Path
 from collections.abc import Iterable
 
 from django.apps import apps as django_apps
 from django.core.files.base import ContentFile
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import transaction
+from django.db import close_old_connections, transaction
 from django.db.models import Max
 from django.utils import timezone
 
@@ -26,6 +28,7 @@ from apps.processamentos.models import (
     DocumentStatus,
     ExecutionScopeType,
     OutputDocumentStatus,
+    Processamento,
     ProcessamentoExecucaoIA,
     ProcessingInputSourceType,
     ProcessingOutputFormat,
@@ -94,6 +97,61 @@ def _registrar_atividade_processamento(
     processamento.etapa_atual = etapa_atual
     processamento.documento_atual_nome = documento_atual_nome
     processamento.ultima_atividade_em = timezone.now()
+
+
+logger = logging.getLogger(__name__)
+
+
+class _AtividadeHeartbeat:
+    """Mantem `ultima_atividade_em` atualizado enquanto uma chamada ao
+    provedor de IA esta em andamento (inclusive durante retries internos do
+    adapter, ver apps.integracoes.services.ai_providers.base).
+
+    Sem isso, uma unica chamada de IA legitima que passe do limiar de
+    "possivel travamento" (selectors.STALL_SECONDS_THRESHOLD) faz o indicador
+    de progresso mostrar um alerta de trava mesmo com o processamento
+    seguindo ativo, so aguardando resposta do provedor (caso investigado em
+    producao em 16/08/2026, PROC-20260816204934-797C8A23: 226s numa unica
+    chamada ao gemini-2.5-pro, com um retry por timeout no meio).
+
+    Usa UPDATE direto (nao passa por Processamento.save) para nao conflitar
+    com o objeto `processamento` em memoria, que a thread principal continua
+    alterando e salvando normalmente apos a chamada terminar.
+    """
+
+    INTERVALO_SEGUNDOS = 30
+
+    def __init__(self, processamento):
+        self._processamento_id = processamento.pk
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def _run(self):
+        try:
+            while not self._stop_event.wait(self.INTERVALO_SEGUNDOS):
+                try:
+                    Processamento.objects.filter(pk=self._processamento_id).update(
+                        ultima_atividade_em=timezone.now()
+                    )
+                except Exception:
+                    logger.debug(
+                        "Falha ao atualizar heartbeat de atividade do processamento %s.",
+                        self._processamento_id,
+                        exc_info=True,
+                    )
+        finally:
+            # Django nao gerencia conexoes de threads fora do ciclo de
+            # request/response; fecha a conexao que esta thread abriu.
+            close_old_connections()
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self._stop_event.set()
+        self._thread.join(timeout=5)
+        return False
 
 
 def execute_processing(processamento, actor):
@@ -654,11 +712,12 @@ def _execute_without_document(
         )
 
     adapter = get_ai_provider_adapter(integration)
-    execution_result = adapter.execute_prompt_without_document(
-        prompt=processamento.prompt_snapshot or processamento.agente.prompt_base,
-        execution_params=execution_params,
-        model_name=model_name,
-    )
+    with _AtividadeHeartbeat(processamento):
+        execution_result = adapter.execute_prompt_without_document(
+            prompt=processamento.prompt_snapshot or processamento.agente.prompt_base,
+            execution_params=execution_params,
+            model_name=model_name,
+        )
     execution_finished_at = timezone.now()
     telemetry = _build_execution_telemetry(
         execution_result.usage_metadata,
@@ -792,14 +851,15 @@ def _execute_document(
 
     document_bytes = load_document_bytes(processamento, documento)
     adapter = get_ai_provider_adapter(integration)
-    execution_result = adapter.execute_prompt_with_document(
-        prompt=processamento.prompt_snapshot or processamento.agente.prompt_base,
-        document_bytes=document_bytes,
-        document_mime_type=documento.mime_type or "application/pdf",
-        document_name=documento.nome_arquivo,
-        execution_params=execution_params,
-        model_name=model_name,
-    )
+    with _AtividadeHeartbeat(processamento):
+        execution_result = adapter.execute_prompt_with_document(
+            prompt=processamento.prompt_snapshot or processamento.agente.prompt_base,
+            document_bytes=document_bytes,
+            document_mime_type=documento.mime_type or "application/pdf",
+            document_name=documento.nome_arquivo,
+            execution_params=execution_params,
+            model_name=model_name,
+        )
     execution_finished_at = timezone.now()
     telemetry = _build_execution_telemetry(
         execution_result.usage_metadata,
@@ -970,12 +1030,13 @@ def _execute_document_group(
         )
 
     adapter = get_ai_provider_adapter(integration)
-    execution_result = adapter.execute_prompt_with_documents(
-        prompt=processamento.prompt_snapshot or processamento.agente.prompt_base,
-        documents=documents_payload,
-        execution_params=execution_params,
-        model_name=model_name,
-    )
+    with _AtividadeHeartbeat(processamento):
+        execution_result = adapter.execute_prompt_with_documents(
+            prompt=processamento.prompt_snapshot or processamento.agente.prompt_base,
+            documents=documents_payload,
+            execution_params=execution_params,
+            model_name=model_name,
+        )
     execution_finished_at = timezone.now()
     telemetry = _build_execution_telemetry(
         execution_result.usage_metadata,
