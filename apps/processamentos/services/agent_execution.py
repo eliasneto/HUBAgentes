@@ -46,6 +46,11 @@ from apps.custos.selectors import (
     obter_precificacao_modelo,
 )
 from apps.processamentos.services.error_handling import normalizar_erro_processamento
+from apps.processamentos.services.pdf_preprocessing import (
+    PdfPreprocessingError,
+    eh_pdf,
+    pre_processar_pdf,
+)
 from apps.processamentos.services.output_packaging import (
     OutputPackagingError,
     publicar_saida_final,
@@ -96,7 +101,32 @@ def _registrar_atividade_processamento(
 ):
     processamento.etapa_atual = etapa_atual
     processamento.documento_atual_nome = documento_atual_nome
+    # Reseta o sub-progresso: cada chamada aqui marca o INICIO de uma etapa
+    # "inteira" nova (ex.: "Lendo documento atual", "Documento processado
+    # com sucesso"). Sub-progresso dentro da etapa atual usa
+    # _registrar_progresso_etapa, que preserva etapa_atual e so avanca o
+    # percentual.
+    processamento.progresso_etapa_percentual = 0
     processamento.ultima_atividade_em = timezone.now()
+
+
+def _registrar_progresso_etapa(processamento, *, percentual, etapa_atual):
+    """Avanca o sub-progresso (0-100) da etapa em andamento no documento
+    atual, sem trocar `documento_atual_nome`. Usado pelo pre-processamento
+    de PDF para o indicador de progresso mostrar avanco continuo em vez de
+    saltar direto de 0% para 100% num processamento de 1 documento so (ver
+    selectors._calcular_percentual, que mistura este valor)."""
+    processamento.etapa_atual = etapa_atual
+    processamento.progresso_etapa_percentual = max(0, min(percentual, 100))
+    processamento.ultima_atividade_em = timezone.now()
+    processamento.save(
+        update_fields=[
+            "etapa_atual",
+            "progresso_etapa_percentual",
+            "ultima_atividade_em",
+            "updated_at",
+        ]
+    )
 
 
 logger = logging.getLogger(__name__)
@@ -340,6 +370,7 @@ def _start_processing_batch(*, processamento, batch_started_at, integration, mod
                 "arquivo_saida_liberado_em",
                 "etapa_atual",
                 "documento_atual_nome",
+                "progresso_etapa_percentual",
                 "ultima_atividade_em",
                 "ai_provider_integration_snapshot",
                 "prompt_snapshot",
@@ -703,6 +734,7 @@ def _execute_without_document(
                 "duracao_processamento_ms",
                 "etapa_atual",
                 "documento_atual_nome",
+                "progresso_etapa_percentual",
                 "ultima_atividade_em",
                 "ai_provider_integration_snapshot",
                 "prompt_snapshot",
@@ -813,6 +845,46 @@ def _execute_without_document(
     }
 
 
+def _aplicar_preprocessamento_pdf(processamento, documento, document_bytes):
+    """Roda o pre-processamento deterministico de PDF (remocao de paginas
+    duplicadas/quase-duplicadas, ignorando cabecalhos/rodapes repetidos) e
+    reporta o avanco no `processamento` a medida que roda. Em qualquer falha,
+    loga e devolve o documento original sem reducao — isto e uma otimizacao
+    de custo, nunca deve bloquear a analise pela IA.
+    """
+    ultimo_percentual_reportado = None
+
+    def _reportar(percentual, etapa_atual):
+        nonlocal ultimo_percentual_reportado
+        if percentual == ultimo_percentual_reportado:
+            return
+        ultimo_percentual_reportado = percentual
+        _registrar_progresso_etapa(processamento, percentual=percentual, etapa_atual=etapa_atual)
+
+    try:
+        resultado = pre_processar_pdf(document_bytes, on_progress=_reportar)
+    except PdfPreprocessingError:
+        logger.warning(
+            "Falha no pre-processamento do PDF de '%s' (processamento %s); "
+            "enviando o documento original para a IA sem reducao.",
+            documento.nome_arquivo,
+            processamento.codigo,
+            exc_info=True,
+        )
+        return document_bytes
+
+    if resultado.reduziu_documento:
+        logger.info(
+            "Pre-processamento removeu %d de %d paginas de '%s' (processamento %s) "
+            "antes de enviar para a IA.",
+            resultado.paginas_removidas,
+            resultado.paginas_originais,
+            documento.nome_arquivo,
+            processamento.codigo,
+        )
+    return resultado.pdf_bytes
+
+
 def _execute_document(
     *,
     processamento,
@@ -841,6 +913,7 @@ def _execute_document(
                 "duracao_processamento_ms",
                 "etapa_atual",
                 "documento_atual_nome",
+                "progresso_etapa_percentual",
                 "ultima_atividade_em",
                 "updated_at",
             ]
@@ -850,7 +923,28 @@ def _execute_document(
         documento.save(update_fields=["status", "mensagem_erro", "updated_at"])
 
     document_bytes = load_document_bytes(processamento, documento)
+
+    configuracao_operacional = getattr(processamento.agente, "configuracao_operacional", None)
+    preprocessamento_aplicado = bool(
+        configuracao_operacional
+        and configuracao_operacional.enable_pdf_preprocessing
+        and eh_pdf(documento.mime_type, documento.nome_arquivo)
+    )
+    if preprocessamento_aplicado:
+        document_bytes = _aplicar_preprocessamento_pdf(processamento, documento, document_bytes)
+
     adapter = get_ai_provider_adapter(integration)
+    if preprocessamento_aplicado:
+        # Fecha a fatia de progresso do pre-processamento (0-48%, ver
+        # pdf_preprocessing.pre_processar_pdf) e segura em 50% enquanto
+        # aguarda so a IA — que e uma unica chamada opaca, sem como reportar
+        # avanco parcial. _AtividadeHeartbeat mantem ultima_atividade_em
+        # fresca nesse meio tempo para o alerta de travamento nao disparar.
+        _registrar_progresso_etapa(
+            processamento,
+            percentual=50,
+            etapa_atual="Aguardando resposta da IA",
+        )
     with _AtividadeHeartbeat(processamento):
         execution_result = adapter.execute_prompt_with_document(
             prompt=processamento.prompt_snapshot or processamento.agente.prompt_base,
@@ -957,6 +1051,7 @@ def _execute_document(
                 "total_processados",
                 "etapa_atual",
                 "documento_atual_nome",
+                "progresso_etapa_percentual",
                 "ultima_atividade_em",
                 "updated_at",
             ]
@@ -1010,6 +1105,7 @@ def _execute_document_group(
                 "duracao_processamento_ms",
                 "etapa_atual",
                 "documento_atual_nome",
+                "progresso_etapa_percentual",
                 "ultima_atividade_em",
                 "updated_at",
             ]
@@ -1129,6 +1225,7 @@ def _execute_document_group(
                 "total_processados",
                 "etapa_atual",
                 "documento_atual_nome",
+                "progresso_etapa_percentual",
                 "ultima_atividade_em",
                 "updated_at",
             ]
@@ -1443,6 +1540,7 @@ def _mark_document_max_tentativas(*, processamento, documento, message):
             update_fields=[
                 "etapa_atual",
                 "documento_atual_nome",
+                "progresso_etapa_percentual",
                 "ultima_atividade_em",
                 "updated_at",
             ]
@@ -1502,6 +1600,7 @@ def _mark_document_error(
                 "status",
                 "etapa_atual",
                 "documento_atual_nome",
+                "progresso_etapa_percentual",
                 "ultima_atividade_em",
                 "updated_at",
             ]
@@ -1594,6 +1693,7 @@ def _mark_document_group_error(
                 "status",
                 "etapa_atual",
                 "documento_atual_nome",
+                "progresso_etapa_percentual",
                 "ultima_atividade_em",
                 "updated_at",
             ]

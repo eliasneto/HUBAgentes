@@ -95,6 +95,16 @@ class AgentePortalCreateForm(forms.Form):
             "pode anexar um documento no momento de executar."
         ),
     )
+    pre_processar_pdf = forms.BooleanField(
+        label="Pre-processar PDF antes da IA",
+        required=False,
+        help_text=(
+            "Antes de enviar o PDF para a IA, remove paginas duplicadas ou "
+            "quase-duplicadas e ignora cabecalhos/rodapes repetidos na "
+            "comparacao. Reduz tokens e custo; so afeta documentos PDF e, "
+            "por enquanto, so tem efeito no modo de entrada Individual."
+        ),
+    )
     default_output_format = forms.ChoiceField(
         label="Formato padrao de saida",
         choices=AgentDefaultOutputFormat.choices,
@@ -203,6 +213,7 @@ class AgentePortalCreateForm(forms.Form):
                         ensure_ascii=False,
                     ),
                     "permitir_upload_na_execucao": permitir_upload_na_execucao,
+                    "pre_processar_pdf": configuracao.enable_pdf_preprocessing,
                     "default_output_format": configuracao.default_output_format,
                     "document_execution_mode": (
                         configuracao.document_execution_mode
@@ -331,6 +342,7 @@ class AgentePortalCreateForm(forms.Form):
             "permitir_upload_na_execucao": self.cleaned_data.get(
                 "permitir_upload_na_execucao", False
             ),
+            "pre_processar_pdf": self.cleaned_data.get("pre_processar_pdf", False),
             "default_output_format": self.cleaned_data["default_output_format"],
             "default_output_destination": AgentOutputDestination.INTERNAL_MEDIA,
             "document_execution_mode": self.cleaned_data["document_execution_mode"],

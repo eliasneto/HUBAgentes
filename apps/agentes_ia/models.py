@@ -311,6 +311,19 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
         default=3,
         help_text="Numero maximo de tentativas de execucao por documento. 0 = sem limite.",
     )
+    # Pre-processamento deterministico (sem IA) do PDF antes de envia-lo ao
+    # provedor: remove paginas duplicadas/quase-duplicadas e ignora
+    # cabecalhos/rodapes repetidos na comparacao, reduzindo tokens e custo.
+    # So se aplica a documentos PDF; nao altera outros formatos. Default
+    # False para nao mudar o comportamento de agentes ja existentes.
+    enable_pdf_preprocessing = models.BooleanField(
+        default=False,
+        help_text=(
+            "Antes de enviar o PDF para a IA, remove paginas duplicadas ou "
+            "quase-duplicadas e ignora cabecalhos/rodapes repetidos na "
+            "comparacao, reduzindo tokens e custo. So afeta documentos PDF."
+        ),
+    )
 
     class Meta:
         verbose_name = "Configuracao operacional do agente"

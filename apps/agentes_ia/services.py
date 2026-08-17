@@ -337,6 +337,7 @@ def criar_agente_portal(
     output_packaging_mode,
     prompt_parameters,
     max_tentativas=3,
+    pre_processar_pdf=False,
 ):
     with transaction.atomic():
         agente = AgenteIA(
@@ -387,6 +388,7 @@ def criar_agente_portal(
             output_assembly_mode=output_assembly_mode,
             output_packaging_mode=output_packaging_mode,
             max_tentativas=max_tentativas,
+            enable_pdf_preprocessing=pre_processar_pdf,
             prompt_parameters=normalizar_parametros_prompt(prompt_parameters),
             concurrency_policy=AgenteConfiguracaoOperacional._meta.get_field(
                 "concurrency_policy"
@@ -422,6 +424,7 @@ def atualizar_agente_portal(
     output_packaging_mode,
     prompt_parameters,
     max_tentativas=3,
+    pre_processar_pdf=False,
 ):
     with transaction.atomic():
         agente.nome = nome
@@ -465,6 +468,7 @@ def atualizar_agente_portal(
         configuracao.output_assembly_mode = output_assembly_mode
         configuracao.output_packaging_mode = output_packaging_mode
         configuracao.max_tentativas = max_tentativas
+        configuracao.enable_pdf_preprocessing = pre_processar_pdf
         configuracao.prompt_parameters = normalizar_parametros_prompt(
             prompt_parameters
         )
@@ -540,6 +544,7 @@ def clonar_agente(*, agente, actor, novo_nome=None):
             output_assembly_mode=configuracao_origem.output_assembly_mode,
             output_packaging_mode=configuracao_origem.output_packaging_mode,
             max_tentativas=configuracao_origem.max_tentativas,
+            enable_pdf_preprocessing=configuracao_origem.enable_pdf_preprocessing,
             prompt_parameters=configuracao_origem.prompt_parameters,
             concurrency_policy=configuracao_origem.concurrency_policy,
             created_by=actor,

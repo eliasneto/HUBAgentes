@@ -410,7 +410,20 @@ def _calcular_percentual(processamento: Processamento) -> int:
     total_processados = _total_processados(processamento)
     if not total_documentos:
         return 100 if processamento.status == ProcessingStatus.CONCLUIDO_SUCESSO else 0
-    return min(round((total_processados / total_documentos) * 100), 100)
+    # Enquanto o documento em andamento ainda nao terminou, soma a fracao do
+    # sub-progresso dele (0-100, ver Processamento.progresso_etapa_percentual
+    # e agent_execution._registrar_progresso_etapa) para o indicador avancar
+    # de forma continua durante o pre-processamento de PDF, em vez de saltar
+    # direto de 0% para 100% num processamento de 1 documento so.
+    fracao_documento_atual = 0.0
+    if (
+        processamento.status == ProcessingStatus.EM_PROCESSAMENTO
+        and total_processados < total_documentos
+    ):
+        percentual_etapa = max(0, min(processamento.progresso_etapa_percentual or 0, 100))
+        fracao_documento_atual = percentual_etapa / 100
+    progresso = total_processados + fracao_documento_atual
+    return min(round((progresso / total_documentos) * 100), 100)
 
 
 def _ultima_atividade_humanizada(processamento: Processamento) -> str:

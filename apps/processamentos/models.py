@@ -191,6 +191,12 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     execucao_finalizada_em = models.DateTimeField(null=True, blank=True)
     etapa_atual = models.CharField(max_length=120, blank=True)
     documento_atual_nome = models.CharField(max_length=255, blank=True)
+    # Progresso (0-100) dentro do documento que esta sendo lido/preparado
+    # agora mesmo — usado pelo pre-processamento de PDF para mostrar avanco
+    # granular antes da chamada de IA (que e uma unica etapa opaca). So tem
+    # sentido enquanto status = em_processamento; volta a 0 a cada nova
+    # etapa "inteira" registrada via _registrar_atividade_processamento.
+    progresso_etapa_percentual = models.PositiveSmallIntegerField(default=0)
     ultima_atividade_em = models.DateTimeField(null=True, blank=True)
     duracao_processamento_ms = models.PositiveIntegerField(null=True, blank=True)
     input_tokens = models.PositiveIntegerField(null=True, blank=True)

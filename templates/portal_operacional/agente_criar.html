@@ -199,6 +199,18 @@
               </label>
               {% for error in form.permitir_upload_na_execucao.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
+
+            <div class="execution-field builder-wide upload-toggle-card">
+              <label class="toggle-line" for="{{ form.pre_processar_pdf.id_for_label }}">
+                {{ form.pre_processar_pdf }}
+                <span class="toggle-switch" aria-hidden="true"></span>
+                <span>
+                  <strong>{{ form.pre_processar_pdf.label }}</strong>
+                  <small>{{ form.pre_processar_pdf.help_text }}</small>
+                </span>
+              </label>
+              {% for error in form.pre_processar_pdf.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
           </div>
         </section>
 

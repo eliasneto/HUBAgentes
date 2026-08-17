@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.10] — 2026-08-17
+
+### Adicionado
+- **Pre-processamento deterministico de PDF antes da IA (opcional por agente)** — novo modulo `apps/processamentos/services/pdf_preprocessing.py` que, usando **PyMuPDF** e **RapidFuzz** (sem IA), extrai o texto de cada pagina do PDF, identifica linhas de cabecalho/rodape institucional repetidas na maioria das paginas (numero de pagina, nome do orgao, CNPJ etc.) e detecta paginas duplicadas ou quase-duplicadas (limiar de 97% de similaridade, ignorando cabecalho/rodape na comparacao) para remove-las antes de enviar o documento ao provedor de IA — reduzindo tokens e custo. Testado contra editais reais e um PDF sintetico com duplicatas propositais (detecção 100% correta, sem falso positivo, ~68% de redução quando ha duplicacao real). Novo toggle **"Pre-processar PDF antes da IA"** na tela Gerenciar Agentes (`AgenteConfiguracaoOperacional.enable_pdf_preprocessing`, migration `agentes_ia/0015`), desligado por padrao em todos os agentes existentes. Por enquanto so tem efeito no modo de execucao Individual. Em qualquer falha do pre-processamento, cai de volta para o documento original sem interromper a analise.
+- **Percentual de progresso mostra o pre-processamento, depois so espera a IA** — novo campo `Processamento.progresso_etapa_percentual` (migration `processamentos/0027`) usado como sub-progresso (0-100) do documento em andamento. `selectors._calcular_percentual` passa a misturar esse valor: durante o pre-processamento a porcentagem avanca de forma real (extraindo texto → identificando cabecalho/rodape → comparando paginas, 8-46%), trava em 50% na etapa "Aguardando resposta da IA" (unica chamada opaca, sem como reportar avanco parcial) e só fecha em 100% quando a IA responde e o documento e marcado como processado. Sem o toggle ligado, o comportamento de qualquer agente existente fica exatamente como antes (0% → 100%).
+
+---
+
 ## [1.5.9] — 2026-08-16
 
 ### Adicionado
