@@ -137,10 +137,19 @@ class ProcessamentoAdmin(
         "total_tokens_historico",
         "total_documentos",
         "total_processados",
+        "total_documentos_ignorados",
+        "forcar_reprocessamento",
+        "descartado_sem_documentos",
         "download_saida",
         "iniciado_em",
     )
-    list_filter = ("status", "agente", "input_source_type", "output_format")
+    list_filter = (
+        "status",
+        "agente",
+        "input_source_type",
+        "output_format",
+        ("deleted_at", admin.EmptyFieldListFilter),
+    )
     search_fields = (
         "codigo",
         "drive_folder_id_escolhida",
@@ -169,6 +178,7 @@ class ProcessamentoAdmin(
         "total_tokens",
         "arquivo_saida_formato",
         "arquivo_saida_liberado_em",
+        "deleted_at",
         "created_at",
         "updated_at",
     )
@@ -178,6 +188,22 @@ class ProcessamentoAdmin(
         ProcessamentoExecucaoIAInline,
     )
     actions = ("preparar_documentos_da_origem", "executar_agente_nos_documentos")
+
+    def get_queryset(self, request):
+        # Processamentos "sem trabalho" (pasta vazia ou 100% ja processada
+        # antes — ver operational_execution._finalizar_processamento_sem_trabalho)
+        # sao soft-deletados para nao aparecer no Portal Operacional, mas
+        # continuam aqui no admin para auditoria (all_objects inclui os
+        # registros com deleted_at preenchido).
+        qs = self.model.all_objects.get_queryset()
+        ordering = self.get_ordering(request)
+        if ordering:
+            qs = qs.order_by(*ordering)
+        return qs
+
+    @admin.display(description="Descartado (sem documentos)", boolean=True)
+    def descartado_sem_documentos(self, obj):
+        return obj.deleted_at is not None
 
     @admin.display(description="Origem")
     def origem_resumida(self, obj):
@@ -210,6 +236,7 @@ class ProcessamentoAdmin(
                 [
                     "total_documentos",
                     "total_processados",
+                    "total_documentos_ignorados",
                     "arquivo_saida",
                     "arquivo_saida_nome",
                 ]
@@ -285,12 +312,14 @@ class ProcessamentoAdmin(
                 update_fields=["total_documentos", "mensagem_erro", "updated_at"]
             )
             success_count += 1
+            ignorados = sync_result.get("ignorados") or 0
             self.message_user(
                 request,
                 (
                     f"{processamento.codigo}: {sync_result['created']} documento(s) novo(s), "
-                    f"{sync_result['updated']} atualizado(s) e "
-                    f"{sync_result['total']} total(is) materializado(s)."
+                    f"{sync_result['updated']} atualizado(s), "
+                    f"{sync_result['total']} total(is) materializado(s)"
+                    + (f" e {ignorados} ignorado(s) por ja processado(s)." if ignorados else ".")
                 ),
             )
 

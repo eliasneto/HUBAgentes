@@ -70,7 +70,10 @@ def criar_e_iniciar_processamento_para_agente(*, agente, actor, cleaned_data):
         OutputPackagingError,
     ) as exc:
         mensagem_operacional, mensagem_tecnica = normalizar_erro_processamento(exc)
-        _finalizar_processamento_com_erro(processamento, mensagem_operacional, mensagem_tecnica)
+        if getattr(exc, "sem_trabalho", False):
+            _finalizar_processamento_sem_trabalho(processamento, mensagem_operacional, mensagem_tecnica)
+        else:
+            _finalizar_processamento_com_erro(processamento, mensagem_operacional, mensagem_tecnica)
         raise OperationalExecutionError(mensagem_operacional) from exc
     except Exception as exc:
         # Fallback para exceções não mapeadas (DatabaseError, MemoryError, etc.)
@@ -97,10 +100,20 @@ _MENSAGENS_ATENCAO = (
     "caminho nao encontrado",
     "nenhum documento encontrado",
     "nenhum item encontrado",
+    # Todos os arquivos da pasta ja foram processados com sucesso em execucao
+    # anterior deste agente — situacao normal, nao erro.
+    "ja foram processados anteriormente",
     # Indisponibilidade temporaria do provedor de IA: condicao transitoria,
     # o usuario apenas precisa tentar novamente — atencao (amarelo), nao erro.
     "temporariamente indisponivel",
     "sobrecarregado",
+    # Falha de conteudo da propria IA (resposta truncada/mal formada ou
+    # vazia) que persistiu mesmo apos a retentativa automatica de fim de
+    # lote (ver agent_execution._execute_documents_individually e
+    # _parse_structured_output, retryable=True para estes dois casos) — e
+    # instabilidade do provedor, nao um erro tecnico do sistema.
+    "nao veio em json valido",
+    "nao retornou conteudo util",
 )
 
 
@@ -137,6 +150,44 @@ def _finalizar_processamento_com_erro(processamento, mensagem_operacional, mensa
     )
 
 
+def _finalizar_processamento_sem_trabalho(processamento, mensagem_operacional, mensagem_tecnica=""):
+    """
+    Usado quando nenhum documento chegou a ser selecionado para processamento
+    (pasta vazia ou 100% ja processada antes por este agente — ver
+    ProcessamentoExecutionError.sem_trabalho) — nenhuma chamada de IA
+    aconteceu. Registra o resultado normalmente (status/mensagem, para
+    auditoria) mas descarta o Processamento via soft-delete
+    (SoftDeleteModel.delete()) em vez de deixa-lo "concluido com atencao"
+    visivel no Portal: como nada foi de fato tentado, nao ha progresso para
+    o usuario acompanhar, so ruido na lista de Processamentos.
+
+    O registro continua no banco e visivel no Django Admin (auditoria) via
+    `Processamento.all_objects` — so some do Portal Operacional, que usa o
+    manager padrao `Processamento.objects` (SoftDeleteManager).
+    """
+    processamento.refresh_from_db()
+    processamento.status = ProcessingStatus.CONCLUIDO_ATENCAO
+    processamento.mensagem_erro = mensagem_operacional
+    processamento.mensagem_erro_tecnico = mensagem_tecnica
+    processamento.finalizado_em = timezone.now()
+    processamento.etapa_atual = "Nenhum documento pendente para processar"
+    processamento.documento_atual_nome = ""
+    processamento.ultima_atividade_em = timezone.now()
+    processamento.save(
+        update_fields=[
+            "status",
+            "mensagem_erro",
+            "mensagem_erro_tecnico",
+            "finalizado_em",
+            "etapa_atual",
+            "documento_atual_nome",
+            "ultima_atividade_em",
+            "updated_at",
+        ]
+    )
+    processamento.delete()  # soft-delete: so seta deleted_at, nao remove do banco
+
+
 def _criar_processamento(*, agente, actor, cleaned_data):
     configuracao = obter_ou_criar_configuracao_operacional(agente)
     source_type = cleaned_data["input_source_type"]
@@ -147,6 +198,7 @@ def _criar_processamento(*, agente, actor, cleaned_data):
         iniciado_por=actor,
         agente=agente,
         input_source_type=source_type,
+        forcar_reprocessamento=bool(cleaned_data.get("forcar_reprocessamento")),
         output_format=cleaned_data.get("output_format")
         or configuracao.default_output_format,
         arquivo_saida_formato=cleaned_data.get("output_format")

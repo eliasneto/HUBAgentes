@@ -1,4 +1,5 @@
 import json
+import re
 import unicodedata
 
 from django.contrib.admin.views.decorators import staff_member_required
@@ -29,9 +30,19 @@ _KNOWLEDGE_BASE = [
         "link": "/doc-system/agentes/",
     },
     {
-        "keywords": ["processamento", "processamentos", "acompanhar", "status", "progresso", "download", "baixar resultado", "arquivo final", "concluido", "erro processamento", "falha execucao"],
-        "resposta": "**Processamentos** é onde você acompanha cada execução.\n\n📊 **Status possíveis:**\n• **Aguardando** — na fila, ainda não iniciou\n• **Em andamento** — processando agora\n• **Concluído** — arquivo pronto para download\n• **Erro** — clique em \"Ver erro\" para ver o detalhe\n\nO botão de download aparece automaticamente quando o arquivo está pronto.",
+        "keywords": ["processamento", "processamentos", "acompanhar", "status", "progresso", "download", "baixar resultado", "arquivo final", "concluido", "erro processamento", "falha execucao", "concluido com atencao", "atencao amarelo", "qual documento deu erro", "qual arquivo deu erro", "qual documento falhou", "qual arquivo falhou", "documento com erro", "arquivo com erro", "tokens por documento"],
+        "resposta": "**Processamentos** é onde você acompanha cada execução.\n\n📊 **Status possíveis:**\n• **Aguardando** — na fila, ainda não iniciou\n• **Em andamento** — processando agora\n• **Concluído com sucesso** — arquivo pronto para download\n• **Concluído com atenção** (amarelo) — situação normal, não é falha técnica: pasta vazia, arquivos já processados antes, ou instabilidade passageira do provedor de IA\n• **Concluído com erro** (vermelho) — falha técnica real, clique em \"Ver erro\" para ver o detalhe\n\nAbra **Ver tokens por documento** no card para ver o status e a mensagem de erro de cada arquivo do lote individualmente. O botão de download aparece automaticamente quando o arquivo está pronto.",
         "link": "/doc-system/processamentos/",
+    },
+    {
+        "keywords": ["retentativa", "tenta de novo", "tenta novamente", "tentar de novo", "reprocessar automatico", "reprocessa sozinho", "reprocessa automaticamente", "erro sumiu", "tentou de novo sozinho", "quantas tentativas", "maximo de tentativas", "resposta invalida da ia", "json invalido", "ia nao respondeu", "rodou de novo", "de novo automaticamente", "corrigiu sozinho"],
+        "resposta": "**Retentativa automática:** quando um agente processa vários arquivos (modo Individual) e um deles falha por um erro vindo da própria IA (instabilidade, timeout, resposta vazia ou em JSON inválido), o sistema tenta esse arquivo **de novo automaticamente, ao final do lote**, antes de marcar o processamento como concluído — sem você precisar fazer nada.\n\n⚠️ **Erros de configuração não são re-tentados** (chave de API inválida, modelo inexistente, documento maior que o contexto do modelo) — repetir não resolveria, é preciso corrigir a causa.\n\nO limite de tentativas por documento é configurável em **Gerenciar agentes** (campo \"Máximo de tentativas\").",
+        "link": "/doc-system/processamentos/",
+    },
+    {
+        "keywords": ["reprocessar", "reprocessar arquivo", "arquivo ja processado", "ja foi executado", "arquivo que ja foi executado", "arquivos ignorados", "pular arquivo", "nao processou de novo", "forcar reprocessamento", "reprocessar pasta"],
+        "resposta": "**Arquivos já processados:** por padrão, se um arquivo de uma pasta (Google Drive ou local) já foi processado com sucesso antes por aquele agente, ele é **ignorado** nas execuções seguintes — só os novos são processados. Durante a execução, uma nota mostra \"X de Y arquivo(s) já haviam sido processados e foram ignorados\".\n\n🔁 Para forçar o reprocessamento de tudo (inclusive os já feitos), marque a caixa **\"Reprocessar arquivos já executados anteriormente\"** no modal de confirmação, antes de clicar em Executar. Essa opção só aparece para agentes com origem em pasta.",
+        "link": "/doc-system/agentes/",
     },
     {
         "keywords": ["integracao", "integracoes", "conectar", "api", "openai", "gemini", "anthropic", "modelo ia", "chave api", "validar integracao", "adicionar integracao", "nova integracao"],
@@ -45,7 +56,12 @@ _KNOWLEDGE_BASE = [
     },
     {
         "keywords": ["gerenciar agente", "criar agente", "novo agente", "configurar agente", "editar agente", "prompt agente", "slug agente", "modo acionamento", "visibilidade agente"],
-        "resposta": "**Gerenciar agentes** é a área administrativa para criar e configurar agentes.\n\n⚙️ **Principais campos:**\n• Nome, slug e objetivo\n• Integração de IA e fonte de documentos\n• Modo de acionamento (portal, API)\n• Visibilidade (usuário ou técnico)\n• Prompt e configurações de saída\n\nSomente administradores têm acesso.",
+        "resposta": "**Gerenciar agentes** é a área administrativa para criar e configurar agentes.\n\n⚙️ **Principais campos:**\n• Nome, slug e objetivo\n• Integração de IA e fonte de documentos\n• Modo de acionamento (portal, API)\n• Visibilidade (usuário ou técnico)\n• Prompt e configurações de saída\n• Máximo de tentativas por documento\n• Pré-processar PDF antes da IA (reduz custo)\n\nSomente administradores têm acesso.",
+        "link": "/doc-system/gerenciar-agentes/",
+    },
+    {
+        "keywords": ["pre-processar pdf", "pre processar pdf", "reduzir tokens pdf", "duplicata pdf", "paginas duplicadas", "economizar tokens pdf", "custo pdf", "reduzir custo ia pdf"],
+        "resposta": "**Pré-processar PDF antes da IA:** opção por agente (em Gerenciar agentes) que remove páginas idênticas ou quase-idênticas de um PDF **antes** de enviá-lo à IA — sem usar IA nessa etapa, é 100% determinístico. Reduz o número de tokens cobrados sem perder informação relevante.\n\n📉 Ideal para editais e documentos com muita repetição de cabeçalho/rodapé ou páginas duplicadas. Vem desligada por padrão; se algo der errado no pré-processamento, o sistema envia o documento original sem interromper a análise.\n\nSó tem efeito no modo de execução **Individual**.",
         "link": "/doc-system/gerenciar-agentes/",
     },
     {
@@ -86,6 +102,14 @@ _KNOWLEDGE_BASE = [
 ]
 
 
+def _keyword_presente(kw_norm, texto_norm):
+    """Casa a keyword por limite de palavra, nao por substring cru — sem
+    isso, uma keyword curta como "oi" da falso positivo dentro de "foi",
+    "dois" etc. e sequestra a resposta (ex.: qualquer pergunta com "foi"
+    caia na saudacao do Biel)."""
+    return re.search(r"(?<!\w)" + re.escape(kw_norm) + r"(?!\w)", texto_norm) is not None
+
+
 def _biel_responder(mensagem):
     texto_norm = _normalizar(mensagem)
     melhor, melhor_score = None, 0
@@ -93,7 +117,7 @@ def _biel_responder(mensagem):
         score = sum(
             len(kw.split())
             for kw in item["keywords"]
-            if _normalizar(kw) in texto_norm
+            if _keyword_presente(_normalizar(kw), texto_norm)
         )
         if score > melhor_score:
             melhor_score, melhor = score, item

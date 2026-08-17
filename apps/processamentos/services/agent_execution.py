@@ -62,7 +62,15 @@ from apps.processamentos.services.output_renderers import (
 
 
 class ProcessamentoExecutionError(Exception):
-    def __init__(self, message, *, technical_message="", usage_metadata=None, retryable=False):
+    def __init__(
+        self,
+        message,
+        *,
+        technical_message="",
+        usage_metadata=None,
+        retryable=False,
+        sem_trabalho=False,
+    ):
         super().__init__(message)
         self.technical_message = technical_message
         # Tokens consumidos quando a IA respondeu mas o conteudo foi rejeitado
@@ -71,6 +79,13 @@ class ProcessamentoExecutionError(Exception):
         # JSON invalido / saida truncada nao se resolvem sozinhos (mesmo
         # doc+prompt tende a repetir): padrao False = nao reprocessa.
         self.retryable = retryable
+        # True quando NENHUM documento chegou a ser selecionado para
+        # processamento (pasta vazia ou 100% ja processada antes) — nenhuma
+        # chamada de IA aconteceu. Usado por operational_execution para
+        # descartar (soft-delete) o Processamento em vez de deixa-lo visivel
+        # no Portal como uma execucao "concluida com atencao": nada foi
+        # tentado de fato, entao nao ha o que o usuario acompanhar.
+        self.sem_trabalho = sem_trabalho
 
 
 AI_DEFINED_OUTPUT_INSTRUCTION_MARKER = "FORMATO DE SAIDA DEFINIDO PELA IA"
@@ -208,7 +223,9 @@ def execute_processing(processamento, actor):
     if not processamento.modelo_snapshot:
         processamento.modelo_snapshot = model_name
 
-    prepare_documentos(processamento)
+    resultado_preparo = prepare_documentos(processamento)
+    processamento.total_documentos_ignorados = resultado_preparo.get("ignorados", 0)
+    processamento.save(update_fields=["total_documentos_ignorados", "updated_at"])
     documentos = list(_select_documentos(processamento))
     if processamento.input_source_type == ProcessingInputSourceType.NONE:
         return _execute_without_document(
@@ -219,8 +236,20 @@ def execute_processing(processamento, actor):
             actor=actor,
         )
     if not documentos:
+        if resultado_preparo.get("ignorados"):
+            # Todos os arquivos da pasta ja foram processados com sucesso
+            # antes por este agente (ver document_sources._arquivo_ja_processado_anteriormente).
+            # Mensagem precisa bater em _MENSAGENS_ATENCAO para virar
+            # CONCLUIDO_ATENCAO (amarelo) em vez de erro. sem_trabalho=True
+            # porque nenhuma chamada de IA chegou a acontecer.
+            raise ProcessamentoExecutionError(
+                "Todos os arquivos desta pasta ja foram processados anteriormente "
+                "por este agente.",
+                sem_trabalho=True,
+            )
         raise ProcessamentoExecutionError(
-            "Nenhum PDF pendente foi encontrado para execucao nesse processamento."
+            "Nenhum PDF pendente foi encontrado para execucao nesse processamento.",
+            sem_trabalho=True,
         )
 
     batch_started_at = timezone.now()
@@ -447,6 +476,70 @@ def _build_execution_params(processamento):
     return execution_params
 
 
+def _tentar_executar_documento_individual(
+    *,
+    processamento,
+    documento,
+    integration,
+    model_name,
+    execution_params,
+    actor,
+):
+    """Executa um unico documento e normaliza o resultado (sucesso ou erro)
+    num dict simples, sem levantar excecao. Usado tanto na 1a passada quanto
+    na retentativa automatica de fim de lote em _execute_documents_individually
+    — mantem o tratamento de erro (marcar documento, registrar auditoria)
+    identico nos dois casos.
+    """
+    execution_started_at = timezone.now()
+    try:
+        execution_result = _execute_document(
+            processamento=processamento,
+            documento=documento,
+            integration=integration,
+            model_name=model_name,
+            execution_params=execution_params,
+            actor=actor,
+        )
+    except (
+        GoogleDriveServiceError,
+        LocalStorageServiceError,
+        DocumentSourcePreparationError,
+        AIProviderServiceError,
+        OutputRendererError,
+        ProcessamentoExecutionError,
+        OutputPackagingError,
+    ) as exc:
+        mensagem_operacional, mensagem_tecnica = normalizar_erro_processamento(exc)
+        retryable = getattr(exc, "retryable", False)
+        _mark_document_error(
+            processamento=processamento,
+            documento=documento,
+            message=mensagem_operacional,
+            integration=integration,
+            model_name=model_name,
+            execution_started_at=execution_started_at,
+            usage_metadata=getattr(exc, "usage_metadata", None),
+            retryable=retryable,
+        )
+        _log_execution_error(
+            actor=actor,
+            processamento=processamento,
+            documento=documento,
+            integration=integration,
+            model_name=model_name,
+            error_message=str(exc),
+        )
+        return {
+            "sucesso": False,
+            "retryable": retryable,
+            "mensagem_operacional": mensagem_operacional,
+            "mensagem_tecnica": mensagem_tecnica,
+        }
+
+    return {"sucesso": True, "execution_result": execution_result}
+
+
 def _execute_documents_individually(
     *,
     processamento,
@@ -461,13 +554,21 @@ def _execute_documents_individually(
     total_errors = 0
     last_error_message = ""
     last_technical_error_message = ""
-    _custo_cache: dict = {}  # cache de precificacao/cotacao para o batch
 
     # DB-U2: limite de tentativas de execucao por documento (0 = sem limite).
     max_tentativas = obter_ou_criar_configuracao_operacional(
         processamento.agente
     ).max_tentativas
 
+    def _registrar_erro_final(resultado):
+        nonlocal total_errors, last_error_message, last_technical_error_message
+        total_errors += 1
+        last_error_message = resultado["mensagem_operacional"]
+        if resultado["mensagem_tecnica"]:
+            last_technical_error_message = resultado["mensagem_tecnica"]
+
+    # 1a passada: tenta cada documento pendente uma vez.
+    a_retentar = []
     for documento in documentos:
         if _documento_excedeu_tentativas(processamento, documento, max_tentativas):
             total_errors += 1
@@ -483,52 +584,54 @@ def _execute_documents_individually(
             )
             continue
 
-        execution_started_at = timezone.now()
-        try:
-            execution_result = _execute_document(
-                processamento=processamento,
-                documento=documento,
-                integration=integration,
-                model_name=model_name,
-                execution_params=execution_params,
-                actor=actor,
-            )
-        except (
-            GoogleDriveServiceError,
-            LocalStorageServiceError,
-            DocumentSourcePreparationError,
-            AIProviderServiceError,
-            OutputRendererError,
-            ProcessamentoExecutionError,
-            OutputPackagingError,
-        ) as exc:
-            mensagem_operacional, mensagem_tecnica = normalizar_erro_processamento(exc)
-            total_errors += 1
-            last_error_message = mensagem_operacional
-            if mensagem_tecnica:
-                last_technical_error_message = mensagem_tecnica
-            _mark_document_error(
-                processamento=processamento,
-                documento=documento,
-                message=mensagem_operacional,
-                integration=integration,
-                model_name=model_name,
-                execution_started_at=execution_started_at,
-                usage_metadata=getattr(exc, "usage_metadata", None),
-                retryable=getattr(exc, "retryable", False),
-            )
-            _log_execution_error(
-                actor=actor,
-                processamento=processamento,
-                documento=documento,
-                integration=integration,
-                model_name=model_name,
-                error_message=str(exc),
-            )
+        resultado = _tentar_executar_documento_individual(
+            processamento=processamento,
+            documento=documento,
+            integration=integration,
+            model_name=model_name,
+            execution_params=execution_params,
+            actor=actor,
+        )
+        if resultado["sucesso"]:
+            total_success += 1
+            output_records.append(resultado["execution_result"]["output_record"])
             continue
 
-        total_success += 1
-        output_records.append(execution_result["output_record"])
+        if resultado["retryable"] and not _documento_excedeu_tentativas(
+            processamento, documento, max_tentativas
+        ):
+            # Erro potencialmente vindo da propria IA/provedor (timeout,
+            # instabilidade, resposta truncada ou em JSON invalido) — guarda
+            # para uma nova tentativa automatica ao final do lote em vez de
+            # desistir na primeira falha. Erros de configuracao (credenciais,
+            # formato nao suportado, documento maior que o contexto do
+            # modelo) chegam aqui com retryable=False e vao direto para o
+            # erro final, pois tendem a repetir a mesma falha.
+            a_retentar.append(documento)
+            continue
+
+        _registrar_erro_final(resultado)
+
+    # 2a passada: uma unica retentativa automatica, ao final do lote, so para
+    # os documentos guardados acima. Caso do incidente PROC-20260817131407:
+    # 4 de 5 documentos passaram e o 5o falhou com "resposta da IA nao veio
+    # em JSON valido" — falha de conteudo nao-deterministica da IA, nao um
+    # problema permanente do documento; uma nova chamada tem boa chance de
+    # dar certo. Ainda respeita max_tentativas do agente como teto.
+    for documento in a_retentar:
+        resultado = _tentar_executar_documento_individual(
+            processamento=processamento,
+            documento=documento,
+            integration=integration,
+            model_name=model_name,
+            execution_params=execution_params,
+            actor=actor,
+        )
+        if resultado["sucesso"]:
+            total_success += 1
+            output_records.append(resultado["execution_result"]["output_record"])
+            continue
+        _registrar_erro_final(resultado)
 
     return {
         "output_records": output_records,
@@ -1298,6 +1401,11 @@ def _parse_structured_output(output_text, requested_output_format=None, usage_me
         raise ProcessamentoExecutionError(
             "A IA nao retornou conteudo util para compor a saida.",
             usage_metadata=usage_metadata,
+            # Resposta vazia costuma vir de instabilidade do provedor
+            # (filtro de seguranca, sobrecarga) e nao do documento em si:
+            # elegivel para a retentativa automatica de fim de lote (ver
+            # _execute_documents_individually).
+            retryable=True,
         )
 
     normalized_text = output_text.strip()
@@ -1342,6 +1450,13 @@ def _parse_structured_output(output_text, requested_output_format=None, usage_me
             f"Trecho da resposta: {raw_excerpt}"
         ),
         usage_metadata=usage_metadata,
+        # Falha de conteudo da propria IA (resposta truncada ou mal formada),
+        # nao um problema de configuracao do agente/documento — o mesmo
+        # doc+prompt tem boa chance de gerar um JSON valido numa nova
+        # chamada (caso real PROC-20260817131407: 4 de 5 documentos do
+        # mesmo lote passaram, so 1 falhou aqui). Elegivel para a
+        # retentativa automatica de fim de lote, respeitando max_tentativas.
+        retryable=True,
     )
 
 

@@ -143,6 +143,12 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     drive_folder_id_escolhida = models.CharField(max_length=255, blank=True)
     drive_folder_nome_escolhida = models.CharField(max_length=255, blank=True)
     drive_folder_url_escolhida = models.URLField(blank=True)
+    # Quando True, ignora o rastreamento de "arquivo ja processado por este
+    # agente nesta pasta" (ver document_sources._arquivo_ja_processado_anteriormente)
+    # e reprocessa todos os arquivos da pasta nesta execucao, mesmo os que ja
+    # tiverem sido concluidos com sucesso antes. Marcado via checkbox na tela
+    # de execucao — so tem efeito quando input_source_type = google_drive_folder.
+    forcar_reprocessamento = models.BooleanField(default=False)
     output_format = models.CharField(
         max_length=20,
         choices=ProcessingOutputFormat.choices,
@@ -176,6 +182,11 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     mensagem_erro_tecnico = models.TextField(blank=True)
     total_documentos = models.PositiveIntegerField(default=0)
     total_processados = models.PositiveIntegerField(default=0)
+    # Quantos arquivos da pasta de origem foram pulados nesta execucao por ja
+    # terem sido processados com sucesso antes por este agente (ver
+    # document_sources._arquivo_ja_processado_anteriormente). Nao entra em
+    # total_documentos — sao arquivos que nem chegaram a virar DocumentoEntrada.
+    total_documentos_ignorados = models.PositiveIntegerField(default=0)
     arquivo_saida = models.FileField(
         upload_to=processamento_output_path,
         max_length=255,
@@ -436,6 +447,9 @@ class DocumentoEntrada(TimestampedModel):
             models.Index(fields=["drive_file_id"]),
             models.Index(fields=["processamento", "status"]),
             models.Index(fields=["processamento", "source_type"]),
+            # Suporta a consulta de "arquivo ja processado por este agente
+            # nesta pasta em uma execucao anterior" (document_sources.py).
+            models.Index(fields=["nome_arquivo"]),
         ]
 
     EXTENSOES_SUPORTADAS = {"pdf", "txt", "csv", "png", "jpg", "jpeg", "xlsx"}

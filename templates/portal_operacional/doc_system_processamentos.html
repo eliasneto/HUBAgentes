@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doc Sistema - Processamentos</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260527-doc-system-processamentos-1">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260817-doc-system-processamentos-2">
 </head>
 <body class="agent-builder-page">
   <main class="portal-shell">
@@ -113,9 +113,14 @@
             <div>A execucao terminou e, se aplicavel, o arquivo final ja pode estar disponivel.</div>
           </div>
           <div class="doc-table-row">
+            <div><code>concluido_atencao</code></div>
+            <div>Concluido com atencao</div>
+            <div>Amarelo, nao vermelho: situacao normal ou instabilidade passageira, nao falha tecnica do sistema. Cobre pasta vazia, arquivos que ja tinham sido processados antes por este agente, provedor de IA temporariamente indisponivel/sobrecarregado, e resposta da IA vazia ou em JSON invalido que persistiu mesmo apos a retentativa automatica (ver secao "Reprocessamento e tentativas" abaixo).</div>
+          </div>
+          <div class="doc-table-row">
             <div><code>concluido_erro</code></div>
             <div>Concluido com erro</div>
-            <div>Houve falha operacional ou tecnica durante a execucao.</div>
+            <div>Vermelho: falha tecnica real que exige correcao manual (credenciais invalidas, modelo inexistente, documento maior que o contexto do modelo, formato de saida invalido).</div>
           </div>
           <div class="doc-table-row">
             <div><code>cancelado</code></div>
@@ -123,6 +128,13 @@
             <div>O fluxo foi interrompido antes da finalizacao normal.</div>
           </div>
         </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-top:16px;line-height:1.6">
+          Um lote com varios documentos pode terminar com <strong>alguns processados e outros nao</strong> — o status final
+          reflete o <strong>ultimo erro que restou</strong> depois de qualquer retentativa automatica, nao a quantidade de
+          sucessos. Um processamento com 4 de 5 documentos certos ainda pode fechar como "atencao" ou "erro" por causa do
+          5<sup>o</sup>. Abra <strong>Ver tokens por documento</strong> para ver exatamente qual arquivo ficou pendente.
+        </p>
       </section>
 
       <section class="builder-card">
@@ -206,7 +218,57 @@
             <span class="doc-chip">Possivel travamento</span>
             <p>Aviso exibido quando o sistema detecta ausencia de atividade recente acima do limite esperado.</p>
           </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Arquivos ignorados</span>
+            <p>Quando a origem e uma pasta (Google Drive ou local), uma nota mostra "X de Y arquivo(s) ja haviam sido processados e foram ignorados" — arquivos com o mesmo nome ja processados com sucesso antes por este agente nao entram no lote atual, a menos que a opcao de forcar reprocessamento tenha sido marcada na execucao.</p>
+          </article>
         </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Tokens por documento</p>
+          <h2>Ver o status e o erro de cada arquivo do lote individualmente</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          Todo card de processamento com documentos individuais tem um painel recolhivel <strong>"Ver tokens por
+          documento"</strong>. Ele lista cada arquivo do lote junto com o status final e o consumo de tokens — util
+          principalmente quando um lote termina com <strong>parte dos documentos certos e parte com erro</strong>:
+          da pra ver exatamente qual arquivo falhou, sem precisar abrir o Django Admin.
+        </p>
+
+        <div class="doc-two-columns">
+          <div class="doc-code-panel">
+            <strong>Exemplo — lote de 5 PDFs, 1 com erro</strong>
+            <pre><code>edital_uniao.pdf — Processado         6.607
+edital_bernardino.pdf — Processado    6.198
+edital_barras.pdf — Processado        6.253
+edital_ufersa.pdf — Processado       10.781
+edital_serra_do_mel.pdf — Erro        8.625
+  A resposta da IA nao veio em JSON
+  valido para este processamento.</code></pre>
+          </div>
+
+          <div class="doc-code-panel">
+            <strong>Como interpretar</strong>
+            <pre><code>Nome do arquivo — Status    total de tokens
+  (soma de todas as tentativas
+   feitas para aquele documento,
+   inclusive as que falharam antes
+   de uma retentativa dar certo)
+
+Se o status for "Erro", uma linha
+extra em vermelho mostra a mensagem
+especifica daquele arquivo.</code></pre>
+          </div>
+        </div>
+
+        <ul class="doc-note-list" style="margin-top:16px">
+          <li>Um documento que falhou na 1a tentativa mas se recuperou na retentativa automatica de fim de lote aparece limpo, com status "Processado" e sem mensagem de erro — o que importa e o resultado final.</li>
+          <li>Em agentes com modo de entrada "Grupo unico" ou "Lote por pasta", a linha representa o grupo inteiro (varios arquivos numa unica chamada de IA), nao um documento isolado.</li>
+        </ul>
       </section>
 
       <section class="builder-card">
@@ -242,10 +304,15 @@
         </div>
 
         <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
-          Ao reprocessar um agente, o sistema so re-tenta documentos cujo erro e <strong>transitorio</strong>
-          (se resolve sozinho). Erros que exigem <strong>intervencao manual</strong> nao sao re-tentados, porque
-          repetir nao resolveria — o documento permanece em erro ate a causa ser corrigida. Documentos que ja
-          foram processados com sucesso nunca sao re-executados.
+          Existem <strong>dois momentos</strong> de retentativa. O primeiro e automatico e acontece
+          <strong>dentro da mesma execucao</strong>: no modo de entrada Individual, se um documento falhar por um erro
+          vindo da propria IA/provedor, o sistema tenta esse documento <strong>de novo automaticamente ao final do
+          lote</strong>, depois de terminar os demais — sem voce precisar fazer nada. O segundo e o reprocessamento
+          manual entre execucoes: ao executar o agente de novo, o sistema so re-tenta documentos cujo erro e
+          <strong>transitorio</strong> (se resolve sozinho). Erros que exigem <strong>intervencao manual</strong> nao
+          sao re-tentados em nenhum dos dois casos — repetir nao resolveria. Documentos ja processados com sucesso
+          nunca sao re-executados (a menos que a origem seja uma pasta e a opcao de forcar reprocessamento tenha
+          sido marcada na tela de execucao).
         </p>
 
         <div class="doc-two-columns">
@@ -255,7 +322,10 @@
   (HTTP 429 / 503 / 529, apos esgotar as
   retentativas automaticas)
 - Falha de conexao com o provedor
-- Timeout da requisicao</code></pre>
+- Timeout da requisicao
+- Resposta da IA vazia ou em JSON invalido
+  (retentativa automatica de fim de lote,
+  modo Individual — ver acima)</code></pre>
           </div>
 
           <div class="doc-code-panel">
@@ -264,8 +334,8 @@
 - Requisicao malformada (400 / 404)
 - Documento maior que o contexto do modelo
   (trocar o modelo ou dividir o documento)
-- Saida invalida ou truncada da IA
-  (ajustar prompt / limite de tokens)
+- Formato de saida invalido definido pela IA
+  (ajustar o prompt)
 - Limite de tentativas por documento atingido</code></pre>
           </div>
         </div>
@@ -289,6 +359,14 @@
             <span class="doc-chip">Indisponibilidade do provedor</span>
             <p>Esse caso aparece como <strong>atencao</strong> (amarelo), nao como erro tecnico (vermelho):
             e so aguardar alguns instantes e executar novamente.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Resposta invalida que persistiu</span>
+            <p>Se a resposta vazia/JSON invalido da IA sobreviver mesmo apos a retentativa automatica de fim de
+            lote, o processamento tambem fecha como <strong>atencao</strong> (amarelo) — e instabilidade do
+            provedor naquele momento, nao um erro tecnico do sistema. Execute o agente novamente mais tarde para
+            esse arquivo especifico.</p>
           </article>
         </div>
       </section>

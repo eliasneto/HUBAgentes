@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% if modo_gerenciamento_agentes %}Gerenciar agentes{% else %}Agentes{% endif %} - Portal</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-sidebar-footer-1">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260817-toast-1">
   <style>
     .agent-folder-action input[type="file"] {
       position: absolute !important;
@@ -28,7 +28,7 @@
       white-space: nowrap !important;
     }
   </style>
-  <script src="{% static 'portal_operacional/js/agente_execucao.js' %}?v=20260610-exec-chunk-1" defer></script>
+  <script src="{% static 'portal_operacional/js/agente_execucao.js' %}?v=20260817-toast-1" defer></script>
 </head>
 <body>
   <main class="portal-shell">
@@ -149,6 +149,7 @@
                 data-agent-tipo-entrada="{{ agente.tipo_entrada }}"
                 data-agent-nome-integracao="{{ agente.nome_integracao_local }}"
                 data-agent-formato-saida="{{ agente.formato_saida }}"
+                data-agent-permite-forcar="{{ agente.permite_forcar_reprocessamento|yesno:'true,false' }}"
               >
                 {% csrf_token %}
                 {% if agente.pode_executar and agente.usuario_tem_acesso %}
@@ -218,6 +219,13 @@
         <dd id="modal-exec-formato-saida" style="font-size:.9rem;color:#e8f4fa;margin:0;">—</dd>
       </div>
     </dl>
+    <label
+      id="modal-exec-forcar-wrap"
+      style="display:none;align-items:flex-start;gap:.6rem;margin:0 0 1.4rem;font-size:.82rem;color:#b8d8e8;cursor:pointer;line-height:1.35;"
+    >
+      <input type="checkbox" id="modal-exec-forcar-reprocessamento" style="margin-top:.2rem;accent-color:#00d8ff;">
+      <span>Reprocessar arquivos já executados anteriormente por este agente nesta pasta.</span>
+    </label>
     <div style="display:flex;gap:.75rem;justify-content:flex-end;">
       <button
         id="modal-exec-cancelar"

@@ -2,13 +2,16 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from django.core.paginator import Paginator
+from django.db.models import Prefetch
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from apps.processamentos.models import (
     DocumentStatus,
+    ExecutionScopeType,
     Processamento,
+    ProcessamentoExecucaoIA,
     ProcessingOutputFormat,
     ProcessingStatus,
 )
@@ -19,6 +22,14 @@ from apps.processamentos.services.error_handling import (
 from apps.processamentos.services.stalled_processing import (
     reconciliar_processamento_orfao,
 )
+
+
+@dataclass(frozen=True)
+class DocumentoTokensResumo:
+    nome_arquivo: str
+    status: str
+    total_tokens: int
+    mensagem_erro: str = ""
 
 
 @dataclass(frozen=True)
@@ -48,6 +59,7 @@ class ProcessamentoResumo:
     arquivo_saida_nome: str
     download_saida_url: str
     tem_arquivo_saida: bool
+    documentos_tokens: list[DocumentoTokensResumo]
 
 
 @dataclass(frozen=True)
@@ -78,6 +90,7 @@ class ProcessamentoStatusPortal:
     formato_saida: str
     total_documentos: int
     total_processados: int
+    total_documentos_ignorados: int
     total_tokens: int | None
     percentual: int
     duracao_minutos: float | None
@@ -95,6 +108,7 @@ class ProcessamentoStatusPortal:
     resumo_em_andamento: int
     resumo_concluidos: int
     resumo_com_erro: int
+    documentos_tokens: list[DocumentoTokensResumo]
 
 
 # Investigacao em producao (16/08/2026, PROC-20260816204934-797C8A23) mostrou
@@ -173,6 +187,71 @@ def _erro_operacional(processamento: Processamento) -> str:
     return ""
 
 
+def _tokens_por_documento(processamento: Processamento) -> list[DocumentoTokensResumo]:
+    """
+    Quebra o total de tokens do processamento por documento, somando todas as
+    tentativas de IA feitas para aquele documento (inclusive as que deram
+    erro antes de um reprocessamento dar certo — reflete o custo real gasto
+    com ele, mesmo criterio do "Tokens total" agregado do processamento).
+
+    Opera em cima de `processamento.execucoes_ia.all()` — que precisa vir
+    prefetched com `select_related("documento")` e
+    `prefetch_related("documentos_entrada")` (ver Prefetch usado nos
+    querysets abaixo) para nao disparar uma query nova por processamento.
+
+    Execucoes em modo "Grupo"/"Lote por pasta" processam varios documentos
+    numa unica chamada de IA — nesses casos nao existe um total individual
+    por documento (o provedor retorna uso agregado da chamada inteira), entao
+    a linha representa o grupo inteiro, com os nomes dos documentos juntos.
+
+    `mensagem_erro` reflete o estado FINAL do documento (`DocumentoEntrada.
+    mensagem_erro`), nao a tentativa que falhou no meio do caminho — ou seja,
+    um documento que falhou na 1a tentativa mas passou na retentativa
+    automatica de fim de lote (ver agent_execution._execute_documents_individually)
+    aparece aqui sem mensagem, com status "Processado", refletindo so o
+    resultado que realmente importa para quem esta acompanhando.
+    """
+    status_labels = dict(DocumentStatus.choices)
+    individuais: dict[int, dict] = {}
+    grupos = []
+
+    for execucao in processamento.execucoes_ia.all():
+        tokens = execucao.total_tokens or 0
+        if execucao.scope_type == ExecutionScopeType.INDIVIDUAL and execucao.documento_id:
+            documento = execucao.documento
+            acumulado = individuais.setdefault(
+                documento.id,
+                {
+                    "nome_arquivo": documento.nome_arquivo,
+                    "status": status_labels.get(documento.status, ""),
+                    "total_tokens": 0,
+                    "mensagem_erro": (
+                        documento.mensagem_erro
+                        if documento.status == DocumentStatus.ERRO
+                        else ""
+                    ),
+                },
+            )
+            acumulado["total_tokens"] += tokens
+        elif execucao.scope_type == ExecutionScopeType.GRUPO:
+            nomes = sorted(doc.nome_arquivo for doc in execucao.documentos_entrada.all())
+            if nomes:
+                grupos.append(
+                    DocumentoTokensResumo(
+                        nome_arquivo="Grupo: " + ", ".join(nomes),
+                        status=execucao.get_status_display(),
+                        total_tokens=tokens,
+                    )
+                )
+
+    linhas = [
+        DocumentoTokensResumo(**dados)
+        for dados in sorted(individuais.values(), key=lambda d: d["nome_arquivo"])
+    ]
+    linhas.extend(grupos)
+    return linhas
+
+
 def listar_processamentos_para_portal(
     *,
     page_number: int | str | None = 1,
@@ -181,7 +260,16 @@ def listar_processamentos_para_portal(
     """Retorna somente dados operacionais seguros dos processamentos."""
     queryset = (
         Processamento.objects.select_related("agente")
-        .prefetch_related("documentos", "documentos_saida", "execucoes_ia")
+        .prefetch_related(
+            "documentos",
+            "documentos_saida",
+            Prefetch(
+                "execucoes_ia",
+                queryset=ProcessamentoExecucaoIA.objects.select_related(
+                    "documento"
+                ).prefetch_related("documentos_entrada"),
+            ),
+        )
         .order_by("-iniciado_em", "-created_at")
     )
     paginator = Paginator(queryset, per_page)
@@ -216,6 +304,7 @@ def listar_processamentos_para_portal(
                 kwargs={"codigo": processamento.codigo},
             ),
             tem_arquivo_saida=bool(processamento.arquivo_saida),
+            documentos_tokens=_tokens_por_documento(processamento),
         )
         for processamento in page_obj.object_list
     ]
@@ -273,7 +362,16 @@ def _resolver_formato_saida_exibido(processamento: Processamento) -> str:
 def obter_status_processamento_para_portal(codigo: str) -> ProcessamentoStatusPortal:
     processamento = get_object_or_404(
         Processamento.objects.select_related("agente", "ai_provider_integration_snapshot")
-        .prefetch_related("documentos", "documentos_saida", "execucoes_ia"),
+        .prefetch_related(
+            "documentos",
+            "documentos_saida",
+            Prefetch(
+                "execucoes_ia",
+                queryset=ProcessamentoExecucaoIA.objects.select_related(
+                    "documento"
+                ).prefetch_related("documentos_entrada"),
+            ),
+        ),
         codigo=codigo,
     )
     total_documentos = _total_documentos(processamento)
@@ -288,6 +386,7 @@ def obter_status_processamento_para_portal(codigo: str) -> ProcessamentoStatusPo
         formato_saida=_resolver_formato_saida_exibido(processamento),
         total_documentos=total_documentos,
         total_processados=total_processados,
+        total_documentos_ignorados=processamento.total_documentos_ignorados,
         total_tokens=processamento.total_tokens,
         percentual=percentual,
         duracao_minutos=_duracao_minutos(processamento.duracao_processamento_ms),
@@ -308,6 +407,7 @@ def obter_status_processamento_para_portal(codigo: str) -> ProcessamentoStatusPo
             "portal_processamento_download_saida",
             kwargs={"codigo": processamento.codigo},
         ),
+        documentos_tokens=_tokens_por_documento(processamento),
         **_resumo_counts(),
     )
 

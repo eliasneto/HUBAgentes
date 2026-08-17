@@ -13,6 +13,52 @@
   setupAgentCardUploads();
   setupExecModal();
 
+  // ─── Toast de aviso/erro (substitui alert() nativo do navegador) ─────────
+
+  const TOAST_AUTO_DISMISS_MS = 8000;
+
+  function _ensureToastStack() {
+    let stack = document.getElementById("portal-toast-stack");
+    if (!stack) {
+      stack = document.createElement("div");
+      stack.id = "portal-toast-stack";
+      stack.className = "portal-toast-stack";
+      stack.setAttribute("role", "status");
+      stack.setAttribute("aria-live", "polite");
+      document.body.appendChild(stack);
+    }
+    return stack;
+  }
+
+  function _showToast(message, tipo) {
+    const stack = _ensureToastStack();
+    const isAtencao = tipo === "atencao";
+
+    const toast = document.createElement("div");
+    toast.className = "portal-toast" + (isAtencao ? " portal-toast-atencao" : " portal-toast-erro");
+    toast.innerHTML =
+      '<span class="portal-toast-icon" aria-hidden="true">' + (isAtencao ? "&#9888;" : "&#10005;") + "</span>" +
+      '<span class="portal-toast-message"></span>' +
+      '<button type="button" class="portal-toast-close" aria-label="Fechar aviso">&times;</button>';
+    toast.querySelector(".portal-toast-message").textContent = message;
+
+    let dismissTimer = null;
+    const dismiss = () => {
+      clearTimeout(dismissTimer);
+      toast.classList.add("is-leaving");
+      setTimeout(() => toast.remove(), 200);
+    };
+    toast.querySelector(".portal-toast-close").addEventListener("click", dismiss);
+    toast.addEventListener("mouseenter", () => clearTimeout(dismissTimer));
+    toast.addEventListener("mouseleave", () => {
+      dismissTimer = setTimeout(dismiss, TOAST_AUTO_DISMISS_MS);
+    });
+
+    stack.appendChild(toast);
+    dismissTimer = setTimeout(dismiss, TOAST_AUTO_DISMISS_MS);
+    return toast;
+  }
+
   if (!form) {
     return;
   }
@@ -92,7 +138,7 @@
     if (fileInput && !fileInput.files.length) {
       event.preventDefault();
       fileInput.focus();
-      alert("Escolha um arquivo antes de executar este agente.");
+      _showToast("Escolha um arquivo antes de executar este agente.", "erro");
     }
   });
 
@@ -169,13 +215,13 @@
       }
       if (data.erro) {
         _restoreCardButton(cardForm);
-        alert("Erro ao iniciar execução: " + data.erro);
+        _showToast(data.erro, data.tipo);
         return;
       }
       _startProgressTracking(cardForm, data.status_endpoint);
     } catch (err) {
       _restoreCardButton(cardForm);
-      alert("Erro ao iniciar execução: " + err.message);
+      _showToast("Erro ao iniciar execução: " + err.message, "erro");
     }
   }
 
@@ -203,6 +249,7 @@
         </div>
         <span data-status-label class="agent-exec-progress-status"></span>
       </div>
+      <small class="agent-exec-ignorados-note" data-ignorados-note hidden></small>
       <details class="processing-error-panel" data-error-panel hidden>
         <summary>&#9888; Ver erro</summary>
         <div>
@@ -237,6 +284,20 @@
       const name = payload.documento_atual_nome || "";
       currentDoc.textContent = name;
       currentDocWrap.hidden = !name;
+    }
+
+    const ignoradosNote = q("[data-ignorados-note]");
+    if (ignoradosNote) {
+      const ignorados = payload.total_documentos_ignorados || 0;
+      if (ignorados > 0) {
+        const totalConsiderado = (payload.total_documentos || 0) + ignorados;
+        ignoradosNote.textContent =
+          ignorados + " de " + totalConsiderado +
+          " arquivo(s) já haviam sido processados e foram ignorados.";
+        ignoradosNote.hidden = false;
+      } else {
+        ignoradosNote.hidden = true;
+      }
     }
 
     const livePanel = q(".processing-live-panel");
@@ -371,10 +432,36 @@
     const nomeInteg = cardForm.dataset.agentNomeIntegracao || "";
     setText("modal-exec-origem", nomeInteg ? tipoEntrada + " · " + nomeInteg : tipoEntrada);
     setText("modal-exec-formato-saida", cardForm.dataset.agentFormatoSaida);
+
+    // Checkbox "reprocessar" só faz sentido quando a origem é uma pasta do
+    // Drive (rastreamento de já-processados não existe para arquivo pontual).
+    const forcarWrap = document.getElementById("modal-exec-forcar-wrap");
+    const forcarCheckbox = document.getElementById("modal-exec-forcar-reprocessamento");
+    const permiteForcar = cardForm.dataset.agentPermiteForcar === "true";
+    if (forcarWrap) forcarWrap.style.display = permiteForcar ? "flex" : "none";
+    if (forcarCheckbox) forcarCheckbox.checked = false; // nunca persiste marcado entre execuções
+
     _modalPendingForm = cardForm;
     modal.style.display = "flex";
     const confirmBtn = document.getElementById("modal-exec-confirmar");
     if (confirmBtn) confirmBtn.focus();
+  }
+
+  function _aplicarForcarReprocessamento(cardForm) {
+    const forcarCheckbox = document.getElementById("modal-exec-forcar-reprocessamento");
+    const marcado = Boolean(forcarCheckbox && forcarCheckbox.checked);
+    let hiddenInput = cardForm.querySelector("input[name='forcar_reprocessamento']");
+    if (marcado) {
+      if (!hiddenInput) {
+        hiddenInput = document.createElement("input");
+        hiddenInput.type = "hidden";
+        hiddenInput.name = "forcar_reprocessamento";
+        cardForm.appendChild(hiddenInput);
+      }
+      hiddenInput.value = "on";
+    } else if (hiddenInput) {
+      hiddenInput.remove();
+    }
   }
 
   function _closeExecModal() {
@@ -391,6 +478,7 @@
     if (confirmBtn) {
       confirmBtn.addEventListener("click", () => {
         const pendingForm = _modalPendingForm;
+        if (pendingForm) _aplicarForcarReprocessamento(pendingForm);
         _closeExecModal();
         if (pendingForm) pendingForm.requestSubmit();
       });
@@ -470,7 +558,7 @@
 
           if (!result.ok) {
             _restoreCardButton(cardForm);
-            alert("Erro ao enviar arquivo: " + result.error);
+            _showToast("Erro ao enviar arquivo: " + result.error, "erro");
             return;
           }
 
@@ -488,7 +576,7 @@
           await _submitFormAsAjax(cardForm);
         } catch (err) {
           _restoreCardButton(cardForm);
-          alert("Erro ao enviar arquivo: " + err.message);
+          _showToast("Erro ao enviar arquivo: " + err.message, "erro");
         }
       });
 

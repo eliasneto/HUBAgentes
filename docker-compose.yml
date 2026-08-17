@@ -40,6 +40,16 @@ services:
       - "8010:8010"
 
     volumes:
+      # Bind-mount do codigo fonte (dev): edicoes no host refletem no
+      # container sem rebuild de imagem — so precisa "docker compose restart
+      # web" (gunicorn nao faz auto-reload) pra codigo Python valer, e
+      # templates/estaticos ja valem so com o restart tambem (collectstatic
+      # roda de novo no entrypoint). Nao inclui docker/ (so usado no build).
+      - ./apps:/app/apps
+      - ./config:/app/config
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - ./manage.py:/app/manage.py
       - media_data:/app/media
       - staticfiles_data:/app/staticfiles
       - ${LOCAL_STORAGE_PATH:-./entradas}:/app/entradas
@@ -67,6 +77,9 @@ services:
       web:
         condition: service_healthy
     volumes:
+      - ./apps:/app/apps
+      - ./config:/app/config
+      - ./manage.py:/app/manage.py
       - media_data:/app/media
       - ${LOCAL_STORAGE_PATH:-./entradas}:/app/entradas
     command: >

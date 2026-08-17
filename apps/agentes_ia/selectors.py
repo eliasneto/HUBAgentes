@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from apps.agentes_ia.models import (
     AgenteIA,
+    AgentDefaultInputSourceType,
     AgentInputPolicy,
     AgentStatus,
     AgentTriggerMode,
@@ -38,6 +39,7 @@ class AgenteLeituraResumo:
     nome_integracao_local: str = ""
     usuario_tem_acesso: bool = True
     formato_saida: str = ""
+    permite_forcar_reprocessamento: bool = False
 
 
 def _label_formato_saida(config) -> str:
@@ -119,6 +121,7 @@ def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]
         tipo_entrada, nome_integ = _label_tipo_entrada(config)
         tem_acesso = _usuario_pode_usar_entrada(agente, usuario)
         formato_saida = _label_formato_saida(config)
+        permite_forcar_reprocessamento = _permite_forcar_reprocessamento(config)
         agentes_resumo.append(
             AgenteLeituraResumo(
                 id=agente.id,
@@ -143,9 +146,25 @@ def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]
                 nome_integracao_local=nome_integ,
                 usuario_tem_acesso=tem_acesso,
                 formato_saida=formato_saida,
+                permite_forcar_reprocessamento=permite_forcar_reprocessamento,
             )
         )
     return agentes_resumo
+
+
+def _permite_forcar_reprocessamento(config) -> bool:
+    """
+    True quando a origem padrao do agente e uma pasta (Google Drive ou
+    Local) — os unicos casos em que o rastreamento de "arquivo ja
+    processado" se aplica, e por isso os unicos em que a opcao de forcar
+    reprocessamento faz sentido.
+    """
+    if not config:
+        return False
+    return config.default_input_source_type in {
+        AgentDefaultInputSourceType.GOOGLE_DRIVE_FOLDER,
+        AgentDefaultInputSourceType.LOCAL_FOLDER,
+    }
 
 
 def _permite_upload_na_execucao(agente):

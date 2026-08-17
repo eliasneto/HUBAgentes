@@ -121,12 +121,18 @@ def _prepare_google_drive_documents(processamento):
 
     created = 0
     updated = 0
+    ignorados = 0
     for drive_file in files:
         documento = _find_existing_documento(
             processamento,
             source_type=ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER,
             source_reference=drive_file["id"],
         )
+        if documento is None and _arquivo_ja_processado_anteriormente(
+            processamento, drive_file["name"]
+        ):
+            ignorados += 1
+            continue
         defaults = {
             "nome_arquivo": drive_file["name"],
             "drive_file_id": drive_file["id"],
@@ -145,7 +151,12 @@ def _prepare_google_drive_documents(processamento):
         else:
             _update_documento_if_needed(documento, defaults)
             updated += 1
-    return {"created": created, "updated": updated, "total": processamento.documentos.count()}
+    return {
+        "created": created,
+        "updated": updated,
+        "total": processamento.documentos.count(),
+        "ignorados": ignorados,
+    }
 
 
 def _prepare_local_folder_documents(processamento):
@@ -168,12 +179,18 @@ def _prepare_local_folder_documents(processamento):
 
     created = 0
     updated = 0
+    ignorados = 0
     for local_file in files:
         documento = _find_existing_documento(
             processamento,
             source_type=ProcessingInputSourceType.LOCAL_FOLDER,
             source_reference=local_file["relative_path"],
         )
+        if documento is None and _arquivo_local_ja_processado_anteriormente(
+            processamento, local_file["name"]
+        ):
+            ignorados += 1
+            continue
         defaults = {
             "nome_arquivo": local_file["name"],
             "drive_file_id": "",
@@ -189,7 +206,12 @@ def _prepare_local_folder_documents(processamento):
         else:
             _update_documento_if_needed(documento, defaults)
             updated += 1
-    return {"created": created, "updated": updated, "total": processamento.documentos.count()}
+    return {
+        "created": created,
+        "updated": updated,
+        "total": processamento.documentos.count(),
+        "ignorados": ignorados,
+    }
 
 
 def _prepare_local_folder_documents_por_pasta(processamento):
@@ -217,6 +239,7 @@ def _prepare_local_folder_documents_por_pasta(processamento):
 
     created = 0
     updated = 0
+    ignorados = 0
     for subpasta in subpastas:
         try:
             files = list_pdf_files_from_subfolder(
@@ -233,6 +256,11 @@ def _prepare_local_folder_documents_por_pasta(processamento):
                 source_type=ProcessingInputSourceType.LOCAL_FOLDER,
                 source_reference=local_file["relative_path"],
             )
+            if documento is None and _arquivo_local_ja_processado_anteriormente(
+                processamento, local_file["name"], pasta_grupo=subpasta.name
+            ):
+                ignorados += 1
+                continue
             defaults = {
                 "nome_arquivo": local_file["name"],
                 "drive_file_id": "",
@@ -250,7 +278,12 @@ def _prepare_local_folder_documents_por_pasta(processamento):
                 _update_documento_if_needed(documento, defaults)
                 updated += 1
 
-    return {"created": created, "updated": updated, "total": processamento.documentos.count()}
+    return {
+        "created": created,
+        "updated": updated,
+        "total": processamento.documentos.count(),
+        "ignorados": ignorados,
+    }
 
 
 def _prepare_google_drive_documents_por_pasta(processamento):
@@ -271,6 +304,7 @@ def _prepare_google_drive_documents_por_pasta(processamento):
 
     created = 0
     updated = 0
+    ignorados = 0
     drive_integration = processamento.folder_source.google_drive_integration
 
     for subpasta in subpastas:
@@ -288,6 +322,11 @@ def _prepare_google_drive_documents_por_pasta(processamento):
                 source_type=ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER,
                 source_reference=drive_file["id"],
             )
+            if documento is None and _arquivo_ja_processado_anteriormente(
+                processamento, drive_file["name"], pasta_grupo=subpasta["nome"]
+            ):
+                ignorados += 1
+                continue
             defaults = {
                 "nome_arquivo": drive_file["name"],
                 "drive_file_id": drive_file["id"],
@@ -305,7 +344,12 @@ def _prepare_google_drive_documents_por_pasta(processamento):
                 _update_documento_if_needed(documento, defaults)
                 updated += 1
 
-    return {"created": created, "updated": updated, "total": processamento.documentos.count()}
+    return {
+        "created": created,
+        "updated": updated,
+        "total": processamento.documentos.count(),
+        "ignorados": ignorados,
+    }
 
 
 def _prepare_local_file_document(processamento):
@@ -406,6 +450,79 @@ def _prepare_upload_document(processamento):
         temporary_field.delete(save=False)
 
     return {"created": created, "updated": updated, "total": processamento.documentos.count()}
+
+
+def _arquivo_ja_processado_em_outra_execucao(
+    processamento, *, source_type, nome_arquivo, pasta_grupo, escopo_filtros
+):
+    """
+    Nucleo comum do rastreamento de "arquivo ja processado" entre execucoes
+    (Processamentos) diferentes de um mesmo agente sobre uma mesma pasta —
+    usado tanto para pasta do Google Drive quanto para pasta local (ver
+    _arquivo_ja_processado_anteriormente e _arquivo_local_ja_processado_anteriormente).
+
+    Identidade = NOME do arquivo (regra de negocio: se o nome nao mudar, nao
+    reprocessa, mesmo que o conteudo do arquivo tenha mudado na origem).
+    Nunca se aplica a execucao pontual de arquivo (upload_at_execution/
+    local_file nao chamam esta funcao). Pode ser ignorado marcando
+    `forcar_reprocessamento` no Processamento (checkbox "Reprocessar
+    arquivos ja executados" na tela de execucao).
+    """
+    if processamento.forcar_reprocessamento:
+        return False
+    return (
+        DocumentoEntrada.objects.filter(
+            processamento__agente_id=processamento.agente_id,
+            source_type=source_type,
+            nome_arquivo=nome_arquivo,
+            pasta_grupo=pasta_grupo,
+            status=DocumentStatus.PROCESSADO,
+            **escopo_filtros,
+        )
+        .exclude(processamento_id=processamento.id)
+        .exists()
+    )
+
+
+def _arquivo_ja_processado_anteriormente(processamento, nome_arquivo, pasta_grupo=""):
+    """
+    Variante para origem Google Drive — escopo (agente, folder_source).
+
+    Limitacao conhecida: quando o agente usa uma subpasta fixa dentro do
+    folder_source (default_gdrive_subfolder_path, modo nao-lote), essa
+    subpasta nao entra na chave — so (agente, folder_source, nome_arquivo).
+    Trocar a subpasta configurada no agente mantendo o mesmo folder_source
+    pode fazer um arquivo de mesmo nome na nova subpasta ser incorretamente
+    tratado como ja processado. Reconfiguracao rara; aceito como trade-off.
+    """
+    return _arquivo_ja_processado_em_outra_execucao(
+        processamento,
+        source_type=ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER,
+        nome_arquivo=nome_arquivo,
+        pasta_grupo=pasta_grupo,
+        escopo_filtros={"processamento__folder_source_id": processamento.folder_source_id},
+    )
+
+
+def _arquivo_local_ja_processado_anteriormente(processamento, nome_arquivo, pasta_grupo=""):
+    """
+    Variante para origem Pasta Local — escopo (agente, local_storage_integration,
+    local_relative_input_path).
+    """
+    return _arquivo_ja_processado_em_outra_execucao(
+        processamento,
+        source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+        nome_arquivo=nome_arquivo,
+        pasta_grupo=pasta_grupo,
+        escopo_filtros={
+            "processamento__local_storage_integration_id": (
+                processamento.local_storage_integration_id
+            ),
+            "processamento__local_relative_input_path": (
+                processamento.local_relative_input_path
+            ),
+        },
+    )
 
 
 def _find_existing_documento(

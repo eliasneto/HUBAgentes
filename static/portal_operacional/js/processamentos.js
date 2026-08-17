@@ -13,6 +13,12 @@ document.addEventListener("DOMContentLoaded", function () {
     return value;
   }
 
+  function escapeHtml(value) {
+    const div = document.createElement("div");
+    div.textContent = value == null ? "" : String(value);
+    return div.innerHTML;
+  }
+
   function updateText(card, selector, value) {
     const element = card.querySelector(selector);
     if (element) {
@@ -142,6 +148,27 @@ document.addEventListener("DOMContentLoaded", function () {
       if (errorSpan) {
         errorSpan.textContent = isAtencao ? "Atenção" : "Detalhes do erro";
       }
+    }
+
+    const tokensPanel = card.querySelector("[data-tokens-panel]");
+    const tokensList = card.querySelector("[data-tokens-list]");
+    if (tokensPanel && tokensList) {
+      const documentosTokens = Array.isArray(payload.documentos_tokens)
+        ? payload.documentos_tokens
+        : [];
+      tokensPanel.hidden = documentosTokens.length === 0;
+      const tokensSummary = tokensPanel.querySelector("[data-tokens-summary]");
+      if (tokensSummary) {
+        tokensSummary.textContent = `Ver tokens por documento (${documentosTokens.length})`;
+      }
+      tokensList.innerHTML = documentosTokens
+        .map(function (doc) {
+          const nome = doc.status
+            ? `${doc.nome_arquivo} — ${doc.status}`
+            : doc.nome_arquivo;
+          return `<li><span>${escapeHtml(nome)}</span><span>${escapeHtml(doc.total_tokens)}</span></li>`;
+        })
+        .join("");
     }
 
     updateSummary(payload);

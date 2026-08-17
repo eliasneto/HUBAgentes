@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doc Sistema - Gerenciar agentes</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260608-doc-system-gerenciar-agentes-3">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260817-doc-system-gerenciar-agentes-4">
 </head>
 <body class="agent-builder-page">
   <main class="portal-shell">
@@ -205,6 +205,35 @@ Uso no prompt: {{pergunta_usuario}}{% endverbatim %}</code></pre>
             </article>
           </div>
         </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Confiabilidade e custo</p>
+          <h2>Campos que controlam retentativas e o consumo de tokens</h2>
+        </div>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Maximo de tentativas por documento</span>
+            <p>Numero maximo de vezes que o sistema tenta executar a IA sobre o mesmo documento antes de desistir e marca-lo como erro definitivo. Padrao: <code>3</code>. Use <code>0</code> para nao ter limite.</p>
+            <small>Vale tanto para a retentativa automatica de fim de lote quanto para reprocessamentos manuais posteriores — a contagem e por documento, dentro do mesmo processamento.</small>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Pre-processar PDF antes da IA</span>
+            <p>Caixa de marcar (desligada por padrao). Quando ativa, o sistema remove paginas identicas ou quase-identicas do PDF <strong>antes</strong> de envia-lo a IA — sem usar IA nessa etapa, e 100% deterministico — reduzindo tokens cobrados sem perder informacao relevante.</p>
+            <small>Ideal para editais e documentos com muita repeticao de cabecalho/rodape ou paginas duplicadas. Se o pre-processamento falhar por qualquer motivo, o documento original e enviado sem reducao — nunca bloqueia a analise. So tem efeito no modo de entrada <strong>Individual</strong>.</small>
+          </article>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-top:16px;line-height:1.6">
+          Quando um documento falha por um erro vindo da propria IA (timeout, instabilidade, resposta vazia ou em
+          JSON invalido), o sistema tenta esse documento <strong>de novo automaticamente ao final do lote</strong>,
+          antes de marcar o processamento como concluido — respeitando o limite configurado aqui. Erros de
+          configuracao (credenciais invalidas, modelo inexistente, documento maior que o contexto do modelo) nunca
+          sao re-tentados. Veja detalhes em <a href="/doc-system/processamentos/">Doc Sistema → Processamentos</a>.
+        </p>
       </section>
 
       <section class="builder-card">

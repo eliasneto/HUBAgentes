@@ -6,8 +6,8 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Processamentos - Portal</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260525-sidebar-footer-1">
-  <script src="{% static 'portal_operacional/js/processamentos.js' %}?v=20260524-live-final-1" defer></script>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260817-tokens-doc-1">
+  <script src="{% static 'portal_operacional/js/processamentos.js' %}?v=20260817-tokens-doc-1" defer></script>
 </head>
 <body>
   <main class="portal-shell">
@@ -184,6 +184,20 @@
                 </dd>
               </div>
             </dl>
+            <details class="processing-tokens-panel" data-tokens-panel {% if not processamento.documentos_tokens %}hidden{% endif %}>
+              <summary data-tokens-summary>Ver tokens por documento ({{ processamento.documentos_tokens|length }})</summary>
+              <ul class="processing-tokens-list" data-tokens-list>
+                {% for doc in processamento.documentos_tokens %}
+                  <li>
+                    <span>{{ doc.nome_arquivo }}{% if doc.status %} — {{ doc.status }}{% endif %}</span>
+                    <span>{{ doc.total_tokens }}</span>
+                  </li>
+                  {% if doc.mensagem_erro %}
+                    <li class="processing-tokens-erro-msg">{{ doc.mensagem_erro }}</li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            </details>
           </article>
         {% empty %}
           <article class="empty-agents processing-empty">

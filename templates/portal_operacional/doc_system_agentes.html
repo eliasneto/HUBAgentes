@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doc Sistema - Agentes</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260622-doc-system-agentes-3">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260817-doc-system-agentes-4">
 </head>
 <body class="agent-builder-page">
   <main class="portal-shell">
@@ -47,7 +47,7 @@
           <li>Leia o bloco de disponibilidade para confirmar se ele esta apto a executar.</li>
           <li>Se o agente exigir envio de documento, anexe o arquivo pelo icone de pasta (PDF, TXT, CSV, imagens ou XLSX — limite 50 MB).</li>
           <li>Clique em <strong>Executar</strong>.</li>
-          <li>No modal de confirmacao, revise o resumo da operacao (nome do agente, integracao de IA, origem dos documentos e formato de saida). Clique em <strong>Confirmar execucao</strong> para prosseguir ou em <strong>Desistir</strong> para cancelar.</li>
+          <li>No modal de confirmacao, revise o resumo da operacao (nome do agente, integracao de IA, origem dos documentos e formato de saida). Se o agente buscar documentos numa pasta (Google Drive ou local), a caixa <strong>"Reprocessar arquivos ja executados anteriormente"</strong> tambem aparece — veja a secao abaixo. Clique em <strong>Confirmar execucao</strong> para prosseguir ou em <strong>Desistir</strong> para cancelar.</li>
           <li>O progresso aparece diretamente no card do agente: uma barra compacta com percentual e status e atualizada em tempo real sem esticar o card. Ao concluir, o icone de download aparece ao lado do botao <strong>Executar</strong> — sem precisar abrir a tela de Processamentos.</li>
         </ol>
       </section>
@@ -252,7 +252,68 @@ Conexao de IA: OpenAI Producao</code></pre>
             <span class="doc-chip">Indicador de disponibilidade</span>
             <p>Durante a execucao, o indicador do card muda para <strong>amarelo</strong> com o texto "Executando...". Ao concluir, o indicador e restaurado automaticamente para o estado anterior.</p>
           </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Arquivos ignorados</span>
+            <p>Se a origem for uma pasta, uma nota aparece no card durante a execucao: "X de Y arquivo(s) ja haviam sido processados e foram ignorados" — arquivos com o mesmo nome que ja foram concluidos com sucesso antes por este agente nao entram de novo no lote.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Avisos e erros</span>
+            <p>Mensagens de aviso ou erro (ex.: "escolha um arquivo antes de executar") aparecem como uma notificacao flutuante no canto da tela — amarela para situacoes normais (atencao), vermelha para falha tecnica real — em vez de uma caixa de alerta do navegador. A notificacao some sozinha apos alguns segundos ou pode ser fechada no X.</p>
+          </article>
         </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Reprocessar arquivos ja executados</p>
+          <h2>Forcar a execucao de arquivos que ja foram processados antes</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          Por padrao, um arquivo de uma pasta (Google Drive ou local) que ja foi <strong>processado com sucesso</strong>
+          antes por aquele agente <strong>nao entra de novo</strong> nas proximas execucoes — so os arquivos novos da
+          pasta sao considerados. Isso evita reprocessar (e re-cobrar tokens de) o que ja foi feito.
+        </p>
+
+        <div class="doc-two-columns">
+          <div class="doc-code-panel">
+            <strong>Quando a caixa aparece</strong>
+            <pre><code>No modal de confirmacao de execucao,
+quando o agente busca documentos
+numa pasta:
+- Google Drive
+- Pasta local
+
+Nao aparece para agentes de arquivo
+unico ou upload na execucao — nesses
+casos nao ha rastreamento de "ja
+processado" para forcar.</code></pre>
+          </div>
+
+          <div class="doc-code-panel">
+            <strong>O que acontece ao marcar</strong>
+            <pre><code>"Reprocessar arquivos ja executados
+anteriormente por este agente
+nesta pasta" — marcado:
+
+→ TODOS os arquivos da pasta entram
+  no lote desta execucao, inclusive
+  os ja concluidos com sucesso antes.
+
+Desmarcado (padrao):
+→ so os arquivos novos entram;
+  os ja processados aparecem na
+  nota "X de Y arquivo(s) ja haviam
+  sido processados e foram ignorados".</code></pre>
+          </div>
+        </div>
+
+        <ul class="doc-note-list" style="margin-top:16px">
+          <li>A caixa nunca fica marcada por padrao entre execucoes — precisa ser marcada de novo toda vez que for necessario.</li>
+          <li>Util quando o conteudo de um arquivo mudou na origem mas o nome permaneceu o mesmo, ou quando voce quer reprocessar tudo de proposito (ex.: apos ajustar o prompt do agente).</li>
+        </ul>
       </section>
 
       <section class="builder-card">

@@ -1170,6 +1170,12 @@ button.danger-action:hover {
   white-space: nowrap;
 }
 
+.agent-exec-ignorados-note {
+  font-size: .68rem;
+  color: var(--muted, #7ca5b8);
+  line-height: 1.3;
+}
+
 .agent-run-download-btn {
   display: inline-flex;
   align-items: center;
@@ -1990,6 +1996,83 @@ button.danger-action:hover {
   line-height: 1.45;
   word-break: break-word;
   white-space: normal;
+}
+
+.processing-tokens-panel {
+  position: relative;
+  z-index: 2;
+  margin-top: 14px;
+  max-width: 620px;
+}
+
+.processing-tokens-panel summary {
+  width: max-content;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid rgba(0, 216, 255, 0.32);
+  border-radius: 999px;
+  color: #b8e8f5;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  background: rgba(0, 216, 255, 0.08);
+  cursor: pointer;
+  list-style: none;
+}
+
+.processing-tokens-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.processing-tokens-panel[open] summary {
+  border-color: rgba(0, 216, 255, 0.6);
+}
+
+.processing-tokens-list {
+  margin: 10px 0 0;
+  padding: 12px;
+  list-style: none;
+  border: 1px solid rgba(0, 216, 255, 0.22);
+  border-radius: 14px;
+  background: rgba(2, 13, 34, 0.82);
+  max-height: 220px;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.processing-tokens-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: #cfe9f5;
+}
+
+.processing-tokens-list li span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.processing-tokens-list li span:last-child {
+  color: var(--neon, #00d8ff);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.processing-tokens-list li.processing-tokens-erro-msg {
+  display: block;
+  margin-top: -4px;
+  padding-left: 2px;
+  color: #ffb6c0;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
 }
 
 /* Variante amarela para status concluido_atencao */
@@ -3706,5 +3789,115 @@ button.danger-action:hover {
   .audit-filter-form {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+/* ─── Toast de aviso/erro (substitui alert() nativo ao executar um agente) ─── */
+
+.portal-toast-stack {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: grid;
+  gap: 10px;
+  width: min(360px, calc(100vw - 40px));
+}
+
+.portal-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(4, 19, 44, 0.97), rgba(2, 9, 20, 0.97));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  animation: portal-toast-in .22s ease;
+}
+
+.portal-toast.is-leaving {
+  animation: portal-toast-out .2s ease forwards;
+}
+
+.portal-toast-erro {
+  border: 1px solid rgba(255, 91, 110, 0.5);
+}
+
+.portal-toast-atencao {
+  border: 1px solid rgba(255, 209, 102, 0.5);
+}
+
+.portal-toast-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 900;
+  margin-top: 1px;
+}
+
+.portal-toast-erro .portal-toast-icon {
+  background: var(--danger);
+  color: #2a0710;
+}
+
+.portal-toast-atencao .portal-toast-icon {
+  background: var(--warning);
+  color: #2a1c02;
+}
+
+.portal-toast-message {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text, #e8fbff);
+}
+
+.portal-toast-close {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--muted, #9ec4d3);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0 0 6px;
+}
+
+.portal-toast-close:hover {
+  color: var(--text, #e8fbff);
+}
+
+@keyframes portal-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes portal-toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@media (max-width: 600px) {
+  .portal-toast-stack {
+    left: 16px;
+    right: 16px;
+    top: 12px;
+    width: auto;
   }
 }

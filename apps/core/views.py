@@ -52,6 +52,7 @@ from apps.processamentos.selectors import (
 from apps.processamentos.models import Processamento
 from apps.processamentos.services.operational_execution import (
     OperationalExecutionError,
+    _e_situacao_atencao,
     criar_e_iniciar_processamento_para_agente,
 )
 from apps.usuarios.selectors import listar_usuarios_acessos_para_portal
@@ -425,6 +426,11 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        self._forcar_reprocessamento = request.POST.get("forcar_reprocessamento") in (
+            "on",
+            "true",
+            "1",
+        )
         token = request.POST.get("arquivo_execucao_token", "").strip()
         if token:
             files = self._carregar_arquivo_token(request, token)
@@ -498,11 +504,15 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
             return self._executar_com_payload(cleaned_data, is_ajax=is_ajax)
         except (OperationalExecutionError, ValueError) as exc:
             if is_ajax:
-                return JsonResponse({"erro": str(exc)}, status=400)
+                return JsonResponse(self._erro_execucao_payload(exc), status=400)
             messages.error(self.request, str(exc))
             return redirect("portal_agentes_leitura")
 
     def _executar_com_payload(self, cleaned_data, is_ajax=False):
+        cleaned_data = dict(cleaned_data)
+        cleaned_data["forcar_reprocessamento"] = getattr(
+            self, "_forcar_reprocessamento", False
+        )
         try:
             processamento = criar_e_iniciar_processamento_para_agente(
                 agente=self.agente,
@@ -511,7 +521,7 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
             )
         except (OperationalExecutionError, ValueError) as exc:
             if is_ajax:
-                return JsonResponse({"erro": str(exc)}, status=400)
+                return JsonResponse(self._erro_execucao_payload(exc), status=400)
             messages.error(self.request, str(exc))
             return redirect("portal_agentes_leitura")
 
@@ -532,6 +542,21 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
             ),
         )
         return redirect("portal_processamentos")
+
+    def _erro_execucao_payload(self, exc):
+        """
+        Monta o JSON de erro da execucao via AJAX, classificando a mensagem
+        como "atencao" (situacao normal — ex.: pasta sem PDF pendente, todos
+        os arquivos ja processados antes) ou "erro" (falha tecnica real).
+        Usa o mesmo criterio ja usado para colorir o status do Processamento
+        (ver _e_situacao_atencao), pra o toast no card do agente exibir o
+        tom/icone certo em vez de tratar tudo como erro grave.
+        """
+        mensagem = str(exc)
+        return {
+            "erro": mensagem,
+            "tipo": "atencao" if _e_situacao_atencao(mensagem) else "erro",
+        }
 
     def _first_form_error(self, form):
         for errors in form.errors.values():
@@ -1370,6 +1395,7 @@ class ProcessamentoStatusView(LoginRequiredMixin, View):
                 "formato_saida": status.formato_saida,
                 "total_documentos": status.total_documentos,
                 "total_processados": status.total_processados,
+                "total_documentos_ignorados": status.total_documentos_ignorados,
                 "total_tokens": status.total_tokens,
                 "percentual": status.percentual,
                 "duracao_minutos": status.duracao_minutos,
@@ -1383,6 +1409,14 @@ class ProcessamentoStatusView(LoginRequiredMixin, View):
                 "possivel_travamento": status.possivel_travamento,
                 "tem_arquivo_saida": status.tem_arquivo_saida,
                 "download_saida_url": status.download_saida_url,
+                "documentos_tokens": [
+                    {
+                        "nome_arquivo": doc.nome_arquivo,
+                        "status": doc.status,
+                        "total_tokens": doc.total_tokens,
+                    }
+                    for doc in status.documentos_tokens
+                ],
                 "resumo": {
                     "total": status.resumo_total,
                     "em_andamento": status.resumo_em_andamento,
