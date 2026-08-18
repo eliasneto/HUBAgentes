@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.13] — 2026-08-18
+
+### Corrigido
+- **Menu "Operação"/"Administrador" vazio em instalação nova** — o `docker/entrypoint.sh` rodava `migrate`, `collectstatic` e criava o superusuário padrão, mas nunca chamava `seed_permissoes_menu`, o comando que popula a tabela `PermissaoMenu` (páginas do menu lateral) e associa os grupos padrão (`administrador`, `analista`, `operador`). Como `paginas_do_usuario()` (`apps/core/models.py`) decide o que aparece no menu — inclusive para superusuário — a partir das linhas existentes em `PermissaoMenu`, uma instalação com essa tabela vazia mostrava só "Painel inicial" e "Documentação" (únicos itens incondicionais do template), mesmo logado como superusuário de verdade (`is_superuser=True`). Descoberto ao subir a primeira instalação em um servidor novo (Hostinger/Docker) e o usuário admin recém-criado não ver a aba "Administrador". `entrypoint.sh` agora chama `python manage.py seed_permissoes_menu` logo após o `collectstatic`, antes da criação do superusuário; o comando é idempotente (`update_or_create` por `chave`), então rodar em toda subida do container (`web` e `worker`) não duplica nem sobrescreve associações manuais feitas depois via Django admin/portal.
+
+---
+
 ## [1.5.12] — 2026-08-17
 
 ### Adicionado

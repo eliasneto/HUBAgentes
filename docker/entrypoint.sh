@@ -47,6 +47,12 @@ python manage.py migrate --noinput
 
 python manage.py collectstatic --noinput
 
+# Popula/atualiza as paginas de menu (PermissaoMenu) e os grupos padrao
+# (administrador/analista/operador). Idempotente (update_or_create) -
+# seguro rodar em toda subida do container, garante que o menu nunca
+# fique vazio em uma instalacao nova.
+python manage.py seed_permissoes_menu
+
 # Cria superusuario padrao se nao existir nenhum admin
 python - <<'PY'
 import os, django
