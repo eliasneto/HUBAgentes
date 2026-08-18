@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.14] — 2026-08-18
+
+### Adicionado
+- **`WEB_BIND_HOST` (opcional, `docker-compose.yml`)** — permite restringir a publicação da porta 8010 do serviço `web` a `127.0.0.1` quando há um proxy reverso (nginx) na frente cuidando de 80/443, em vez do padrão `0.0.0.0` (acesso direto). Motivado pela implantação em produção com domínio + HTTPS via nginx/certbot: com a porta 8010 aberta para a internet, qualquer cliente podia bypassar o proxy e acessar o Django direto por HTTP, sem TLS.
+- **`SECURE_PROXY_SSL_HEADER` (`config/settings.py`)** — Django agora reconhece `X-Forwarded-Proto: https` enviado pelo nginx, então `request.is_secure()` reflete corretamente que a conexão chegou via HTTPS mesmo com o gunicorn recebendo HTTP puro do proxy. Só é seguro habilitar isso quando não há caminho direto até o gunicorn que contorne o proxy — por isso vem acompanhado da restrição `WEB_BIND_HOST`; sem ela, esse cabeçalho poderia ser forjado por qualquer cliente batendo direto na porta interna.
+
+---
+
 ## [1.5.13] — 2026-08-18
 
 ### Corrigido

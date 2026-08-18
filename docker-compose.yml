@@ -37,7 +37,11 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8010:8010"
+      # WEB_BIND_HOST permite restringir a porta 8010 a localhost quando
+      # houver um proxy reverso (nginx) na frente cuidando de 80/443 —
+      # define WEB_BIND_HOST=127.0.0.1 no .env desse ambiente para isso.
+      # Default 0.0.0.0 preserva o comportamento antigo (acesso direto).
+      - "${WEB_BIND_HOST:-0.0.0.0}:8010:8010"
 
     volumes:
       # Bind-mount do codigo fonte (dev): edicoes no host refletem no

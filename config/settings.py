@@ -42,6 +42,15 @@ CSRF_TRUSTED_ORIGINS = config(
     cast=lambda v: [origin.strip() for origin in v.split(",") if origin.strip()],
 )  # type: ignore[arg-type]
 
+# Confia no cabecalho X-Forwarded-Proto do proxy reverso (nginx) para saber
+# que a requisicao chegou via HTTPS — sem isso, request.is_secure() sempre
+# retorna False atras de proxy, mesmo com o cadeado no navegador.
+# SEGURANCA: so e seguro habilitar quando NAO ha caminho direto ate o
+# gunicorn que bypasse o proxy (ver WEB_BIND_HOST no docker-compose.yml);
+# do contrario, qualquer cliente pode forjar esse cabecalho direto na
+# porta interna e enganar o Django fazendo-o achar que e uma conexao segura.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 
 # Application definition
 
