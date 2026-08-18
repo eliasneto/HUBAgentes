@@ -225,6 +225,12 @@ Uso no prompt: {{pergunta_usuario}}{% endverbatim %}</code></pre>
             <p>Caixa de marcar (desligada por padrao). Quando ativa, o sistema remove paginas identicas ou quase-identicas do PDF <strong>antes</strong> de envia-lo a IA — sem usar IA nessa etapa, e 100% deterministico — reduzindo tokens cobrados sem perder informacao relevante.</p>
             <small>Ideal para editais e documentos com muita repeticao de cabecalho/rodape ou paginas duplicadas. Se o pre-processamento falhar por qualquer motivo, o documento original e enviado sem reducao — nunca bloqueia a analise. So tem efeito no modo de entrada <strong>Individual</strong>.</small>
           </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Reduzir custo de raciocinio da IA</span>
+            <p>Caixa de marcar (desligada por padrao). Quando ativa, pede para a IA responder direto, sem gastar tokens com um rascunho interno ("thinking") antes da resposta final — um custo que e cobrado mas nunca aparece pro usuario. Medido em producao: reduziu o total de tokens em ~22-27% num checklist de analise de edital, sem deixar nenhum item sem resposta.</p>
+            <small>So tem efeito em modelos que suportam esse ajuste (hoje, Gemini); em outros provedores a opcao fica sem efeito. Como a IA passa a "pensar menos", vale revisar as respostas depois de ligar — principalmente em itens que exigem julgamento mais fino (ex.: habilitacao em editais) — antes de confiar de olhos fechados em producao.</small>
+          </article>
         </div>
 
         <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-top:16px;line-height:1.6">

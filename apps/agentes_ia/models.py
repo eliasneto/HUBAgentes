@@ -324,6 +324,27 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
             "comparacao, reduzindo tokens e custo. So afeta documentos PDF."
         ),
     )
+    # Reduz o "orcamento de raciocinio" (thinking budget) que alguns modelos
+    # (Gemini) gastam pensando internamente antes de responder — tokens
+    # cobrados mas nunca exibidos ao usuario. Medido em producao: para o
+    # checklist de analise de edital, o raciocinio interno custava sozinho
+    # 8.700-11.700 tokens por documento (quase tanto quanto a resposta final),
+    # e desliga-lo reduziu o total em ~22-27% sem faltar nenhum item
+    # respondido nos testes. So tem efeito em provedores/modelos que suportam
+    # thinking budget (hoje, Gemini); demais adapters ignoram silenciosamente.
+    # Default False para nao mudar o comportamento de agentes ja existentes —
+    # requer validacao manual das respostas antes de ligar em agentes que
+    # dependem de julgamento mais fino (ex.: habilitacao em editais).
+    enable_thinking_budget_reduction = models.BooleanField(
+        default=False,
+        help_text=(
+            "Reduz o custo de 'raciocinio' interno da IA antes de responder "
+            "(tokens cobrados mas nunca exibidos). Corta custo, mas reduz a "
+            "profundidade de analise da IA — valide as respostas antes de "
+            "confiar em producao, especialmente em itens que exigem "
+            "julgamento mais fino."
+        ),
+    )
 
     class Meta:
         verbose_name = "Configuracao operacional do agente"

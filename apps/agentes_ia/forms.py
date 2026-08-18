@@ -105,6 +105,18 @@ class AgentePortalCreateForm(forms.Form):
             "por enquanto, so tem efeito no modo de entrada Individual."
         ),
     )
+    reduzir_raciocinio_ia = forms.BooleanField(
+        label="Reduzir custo de raciocinio da IA",
+        required=False,
+        help_text=(
+            "Pede para a IA responder direto, sem gastar tokens com um "
+            "rascunho interno antes da resposta final. Reduz custo (~22-27% "
+            "medido no checklist de editais), mas pode reduzir a "
+            "profundidade da analise — valide as respostas antes de confiar "
+            "em producao, especialmente em itens que exigem julgamento mais "
+            "fino."
+        ),
+    )
     default_output_format = forms.ChoiceField(
         label="Formato padrao de saida",
         choices=AgentDefaultOutputFormat.choices,
@@ -214,6 +226,7 @@ class AgentePortalCreateForm(forms.Form):
                     ),
                     "permitir_upload_na_execucao": permitir_upload_na_execucao,
                     "pre_processar_pdf": configuracao.enable_pdf_preprocessing,
+                    "reduzir_raciocinio_ia": configuracao.enable_thinking_budget_reduction,
                     "default_output_format": configuracao.default_output_format,
                     "document_execution_mode": (
                         configuracao.document_execution_mode
@@ -343,6 +356,7 @@ class AgentePortalCreateForm(forms.Form):
                 "permitir_upload_na_execucao", False
             ),
             "pre_processar_pdf": self.cleaned_data.get("pre_processar_pdf", False),
+            "reduzir_raciocinio_ia": self.cleaned_data.get("reduzir_raciocinio_ia", False),
             "default_output_format": self.cleaned_data["default_output_format"],
             "default_output_destination": AgentOutputDestination.INTERNAL_MEDIA,
             "document_execution_mode": self.cleaned_data["document_execution_mode"],

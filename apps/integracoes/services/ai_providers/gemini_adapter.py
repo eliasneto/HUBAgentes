@@ -265,6 +265,15 @@ class GeminiProviderAdapter(BaseAIProviderAdapter):
             value = execution_params.get(source_field)
             if value not in (None, "", [], {}):
                 generation_config[target_field] = value
+        # thinkingConfig e aninhado (nao cabe no field_map plano acima) e
+        # thinkingBudget=0 (desabilita o raciocinio interno) e um valor
+        # valido que a checagem `not in (None, "", [], {})` do loop acima
+        # trataria como "ausente" por ser falsy — por isso checa `is not
+        # None` explicitamente. Ver AgenteConfiguracaoOperacional.
+        # enable_thinking_budget_reduction.
+        thinking_budget = execution_params.get("thinking_budget")
+        if thinking_budget is not None:
+            generation_config["thinkingConfig"] = {"thinkingBudget": thinking_budget}
         return generation_config
 
     def _post_json(self, request_url, payload):

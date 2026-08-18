@@ -473,6 +473,17 @@ def _build_execution_params(processamento):
     # garantir rastreabilidade e conversão estruturada.
     if processamento.output_format != ProcessingOutputFormat.LIVRE:
         execution_params.setdefault("response_mime_type", "application/json")
+    # Reducao de thinking budget (ver AgenteConfiguracaoOperacional.
+    # enable_thinking_budget_reduction): pede para a IA nao gastar tokens
+    # com raciocinio interno antes de responder. Diferente do
+    # pre-processamento de PDF, nao depende de documento nem de modo de
+    # execucao — construido aqui uma unica vez, vale para os tres modos
+    # (individual, grupo, pasta) e tambem para execucao sem documento.
+    # Adapters que nao suportam thinking budget (todos exceto Gemini, por
+    # enquanto) ignoram essa chave silenciosamente.
+    configuracao_operacional = getattr(processamento.agente, "configuracao_operacional", None)
+    if configuracao_operacional and configuracao_operacional.enable_thinking_budget_reduction:
+        execution_params.setdefault("thinking_budget", 0)
     return execution_params
 
 

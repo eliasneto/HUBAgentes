@@ -56,12 +56,17 @@ _KNOWLEDGE_BASE = [
     },
     {
         "keywords": ["gerenciar agente", "criar agente", "novo agente", "configurar agente", "editar agente", "prompt agente", "slug agente", "modo acionamento", "visibilidade agente"],
-        "resposta": "**Gerenciar agentes** é a área administrativa para criar e configurar agentes.\n\n⚙️ **Principais campos:**\n• Nome, slug e objetivo\n• Integração de IA e fonte de documentos\n• Modo de acionamento (portal, API)\n• Visibilidade (usuário ou técnico)\n• Prompt e configurações de saída\n• Máximo de tentativas por documento\n• Pré-processar PDF antes da IA (reduz custo)\n\nSomente administradores têm acesso.",
+        "resposta": "**Gerenciar agentes** é a área administrativa para criar e configurar agentes.\n\n⚙️ **Principais campos:**\n• Nome, slug e objetivo\n• Integração de IA e fonte de documentos\n• Modo de acionamento (portal, API)\n• Visibilidade (usuário ou técnico)\n• Prompt e configurações de saída\n• Máximo de tentativas por documento\n• Pré-processar PDF antes da IA (reduz custo)\n• Reduzir custo de raciocínio da IA (reduz custo)\n\nSomente administradores têm acesso.",
         "link": "/doc-system/gerenciar-agentes/",
     },
     {
         "keywords": ["pre-processar pdf", "pre processar pdf", "reduzir tokens pdf", "duplicata pdf", "paginas duplicadas", "economizar tokens pdf", "custo pdf", "reduzir custo ia pdf"],
         "resposta": "**Pré-processar PDF antes da IA:** opção por agente (em Gerenciar agentes) que remove páginas idênticas ou quase-idênticas de um PDF **antes** de enviá-lo à IA — sem usar IA nessa etapa, é 100% determinístico. Reduz o número de tokens cobrados sem perder informação relevante.\n\n📉 Ideal para editais e documentos com muita repetição de cabeçalho/rodapé ou páginas duplicadas. Vem desligada por padrão; se algo der errado no pré-processamento, o sistema envia o documento original sem interromper a análise.\n\nSó tem efeito no modo de execução **Individual**.",
+        "link": "/doc-system/gerenciar-agentes/",
+    },
+    {
+        "keywords": ["reduzir raciocinio", "reduzir custo de raciocinio", "thinking budget", "custo de pensamento", "tokens de pensamento", "thoughts token", "reduzir custo ia raciocinio", "desligar raciocinio ia"],
+        "resposta": "**Reduzir custo de raciocínio da IA:** opção por agente (em Gerenciar agentes) que pede para a IA responder direto, sem gastar tokens com um rascunho interno (\"thinking\") antes da resposta final — um custo cobrado mas que nunca aparece pro usuário.\n\n📉 Medido em produção: reduziu o total de tokens em cerca de 22-27% num checklist de análise de edital, sem deixar nenhum item sem resposta.\n\nSó tem efeito em modelos que suportam esse ajuste (hoje, Gemini). Vem desligada por padrão — como a IA passa a \"pensar menos\", vale revisar as respostas depois de ligar, principalmente em itens que exigem julgamento mais fino (ex.: habilitação em editais).",
         "link": "/doc-system/gerenciar-agentes/",
     },
     {
