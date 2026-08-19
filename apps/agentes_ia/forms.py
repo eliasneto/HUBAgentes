@@ -134,12 +134,12 @@ class AgentePortalCreateForm(forms.Form):
         max_length=200,
         required=False,
         help_text=(
-            "Padrao estilo 'Edital*' (aceita * em qualquer posicao) — so os "
-            "arquivos cujo nome bater o padrao sao processados; os demais "
-            "sao descartados antes de serem lidos ou enviados a IA. Sem "
-            "diferenciar mai/minusculas. Deixe em branco para processar "
-            "todos os arquivos da pasta. So se aplica quando a origem "
-            "padrao e 'Google Drive - pasta' ou 'Pasta local'."
+            "Padrão estilo 'Edital*' (aceita * em qualquer posição) — só os "
+            "arquivos cujo nome bater o padrão são processados; os demais "
+            "são descartados antes de serem lidos ou enviados à IA. Sem "
+            "diferenciar maiúsculas/minúsculas. Deixe em branco para "
+            "processar todos os arquivos da pasta. Só se aplica quando a "
+            "origem é 'Google Drive - pasta' ou 'Pasta local'."
         ),
     )
     default_output_format = forms.ChoiceField(

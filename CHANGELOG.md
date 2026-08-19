@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.18] — 2026-08-19
+
+### Corrigido
+- **Português sem acentuação nas mensagens de frontend do "Filtro por nome de arquivo"** (campo adicionado na 1.5.17) — `label`/`help_text` do form do portal (`agente_criar.html`), `help_text` do model (Django admin), as duas seções novas em `doc_system_gerenciar_agentes.html`/`doc_system_agentes.html` e o item da base de conhecimento do Biel estavam sem acentuação (`nao`, `sao`, `padrao`, `secao`, `execucao` etc.), destoando do restante do texto voltado ao usuário final. Reescrito com acentuação correta em todos esses pontos. Comentários de código (`#`, nunca renderizados) foram mantidos como estão, seguindo o padrão do restante do arquivo.
+
+---
+
 ## [1.5.17] — 2026-08-19
 
 ### Adicionado

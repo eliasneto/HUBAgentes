@@ -382,12 +382,12 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
         max_length=200,
         blank=True,
         help_text=(
-            "Padrao estilo 'Edital*' (aceita * em qualquer posicao) para "
+            "Padrão estilo 'Edital*' (aceita * em qualquer posição) para "
             "filtrar pelo NOME do arquivo antes de enviar para a IA — "
-            "arquivos que nao baterem o padrao sao descartados sem serem "
-            "lidos nem enviados. Sem diferenciar mai/minusculas. Deixe em "
-            "branco para nao filtrar por nome. So se aplica quando a "
-            "origem padrao e uma pasta (Google Drive ou local)."
+            "arquivos que não baterem o padrão são descartados sem serem "
+            "lidos nem enviados. Sem diferenciar maiúsculas/minúsculas. "
+            "Deixe em branco para não filtrar por nome. Só se aplica "
+            "quando a origem padrão é uma pasta (Google Drive ou local)."
         ),
     )
 
