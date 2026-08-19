@@ -1,3 +1,4 @@
+import fnmatch
 import hashlib
 from pathlib import Path
 
@@ -44,6 +45,32 @@ def _deve_incluir_subpastas(processamento):
         return False
     configuracao = getattr(agente, "configuracao_operacional", None)
     return bool(configuracao and configuracao.include_subfolders)
+
+
+def _padrao_nome_arquivo(processamento):
+    """Padrao estilo glob (ex.: 'Edital*') configurado em
+    AgenteConfiguracaoOperacional.allowed_filename_pattern para filtrar por
+    NOME do arquivo antes de o arquivo ser baixado/lido. "" (default) =
+    agente sem filtro por nome configurado."""
+    agente = getattr(processamento, "agente", None)
+    if agente is None:
+        return ""
+    configuracao = getattr(agente, "configuracao_operacional", None)
+    if configuracao is None:
+        return ""
+    return (configuracao.allowed_filename_pattern or "").strip()
+
+
+def _filtrar_por_nome_arquivo(files, padrao, *, name_key="name"):
+    """Mantem so os itens de `files` cujo nome bate `padrao` (fnmatch,
+    estilo glob, sem diferenciar mai/minusculas). Chamado sempre logo apos
+    listar os arquivos da pasta e ANTES de criar qualquer DocumentoEntrada —
+    um arquivo descartado aqui nunca e baixado, nunca e lido e nunca e
+    enviado para a IA. Sem `padrao`, devolve `files` sem alteracao."""
+    if not padrao:
+        return files
+    padrao_lower = padrao.lower()
+    return [item for item in files if fnmatch.fnmatch(item[name_key].lower(), padrao_lower)]
 
 
 def _limite_documentos_novos_por_lote():
@@ -220,6 +247,8 @@ def _prepare_google_drive_documents(processamento):
     except GoogleDriveServiceError as exc:
         raise DocumentSourcePreparationError(str(exc)) from exc
 
+    files = _filtrar_por_nome_arquivo(files, _padrao_nome_arquivo(processamento))
+
     tracker = _LimiteLoteTracker(limite)
     created = 0
     updated = 0
@@ -288,6 +317,8 @@ def _prepare_local_folder_documents(processamento):
             f"Nao foi possivel acessar o caminho configurado — verifique se a maquina que "
             f"hospeda essa pasta esta ligada e acessivel na rede. Detalhe: {exc}"
         ) from exc
+
+    files = _filtrar_por_nome_arquivo(files, _padrao_nome_arquivo(processamento))
 
     tracker = _LimiteLoteTracker(
         _limite_documentos_novos_por_lote() if incluir_subpastas else None
@@ -362,6 +393,7 @@ def _prepare_local_folder_documents_por_pasta(processamento):
             "Nenhuma subpasta encontrada na pasta informada para o modo Lote por pasta."
         )
 
+    padrao_nome = _padrao_nome_arquivo(processamento)
     created = 0
     updated = 0
     ignorados = 0
@@ -374,6 +406,8 @@ def _prepare_local_folder_documents_por_pasta(processamento):
             )
         except LocalStorageServiceError as exc:
             raise DocumentSourcePreparationError(str(exc)) from exc
+
+        files = _filtrar_por_nome_arquivo(files, padrao_nome)
 
         for local_file in files:
             documento = _find_existing_documento(
@@ -432,6 +466,8 @@ def _prepare_local_folder_documents_por_pasta_recursivo(processamento):
             f"Nao foi possivel acessar o caminho configurado — verifique se a maquina que "
             f"hospeda essa pasta esta ligada e acessivel na rede. Detalhe: {exc}"
         ) from exc
+
+    files = _filtrar_por_nome_arquivo(files, _padrao_nome_arquivo(processamento))
 
     arquivos_em_subpasta = [f for f in files if "/" in f["relative_path"]]
     if not arquivos_em_subpasta:
@@ -502,6 +538,7 @@ def _prepare_google_drive_documents_por_pasta(processamento):
             "Nenhuma subpasta encontrada na pasta do Google Drive para o modo Lote por pasta."
         )
 
+    padrao_nome = _padrao_nome_arquivo(processamento)
     created = 0
     updated = 0
     ignorados = 0
@@ -515,6 +552,8 @@ def _prepare_google_drive_documents_por_pasta(processamento):
             )
         except GoogleDriveServiceError as exc:
             raise DocumentSourcePreparationError(str(exc)) from exc
+
+        files = _filtrar_por_nome_arquivo(files, padrao_nome)
 
         for drive_file in files:
             documento = _find_existing_documento(
@@ -568,6 +607,8 @@ def _prepare_google_drive_documents_por_pasta_recursivo(processamento):
         )
     except GoogleDriveServiceError as exc:
         raise DocumentSourcePreparationError(str(exc)) from exc
+
+    files = _filtrar_por_nome_arquivo(files, _padrao_nome_arquivo(processamento))
 
     arquivos_em_subpasta = [f for f in files if "/" in f["relative_path"]]
     if not arquivos_em_subpasta:

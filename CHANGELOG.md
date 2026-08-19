@@ -5,6 +5,20 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.17] — 2026-08-19
+
+### Adicionado
+- **Filtro por nome de arquivo antes de enviar para a IA** (`AgenteConfiguracaoOperacional.allowed_filename_pattern`, migration `agentes_ia/0018`) — novo campo que aceita um padrão estilo glob (ex.: `Edital*`) para restringir, por NOME do arquivo, o que é lido de uma pasta local ou do Google Drive. Motivado por um agente cujo prompt já pedia "leia apenas arquivos que começam com Edital", mas a instrução falhava: o arquivo já tinha sido baixado, lido e enviado por inteiro para a IA antes dela sequer processar o prompt, então a regra só pedia à IA para "ignorar" um conteúdo que ela já tinha recebido — sem garantia nenhuma de que ela obedeceria de forma consistente, especialmente em lote. Com o novo campo, o filtro é aplicado em `apps/processamentos/services/document_sources.py` logo após listar os arquivos da pasta e ANTES de qualquer download/criação de `DocumentoEntrada` — arquivo fora do padrão nunca é baixado, nunca é lido, nunca é enviado à IA, e entra na mesma contagem de "ignorados" que já existia para dedup. Comparação sem diferenciar mai/minúsculas; vazio (default) preserva o comportamento atual de todos os agentes existentes. Só se aplica a origem "Pasta local"/"Google Drive - pasta" (individual, lote por sub-pastas e ambas as variantes recursivas); não afeta upload manual nem arquivo único fixo, onde o arquivo já é escolhido explicitamente.
+  - Disponível tanto no **portal** — campo "Filtro por nome de arquivo" em Gerenciar Agentes > Novo/Editar agente (`agente_criar.html`, `AgentePortalCreateForm`), ao lado de "Ler PDFs de todas as subpastas" — quanto no **Django admin** (Gerenciar Agentes > Entrada), para agentes criados/editados por lá.
+  - `apps/agentes_ia/services.py`: `criar_agente_portal`, `atualizar_agente_portal` e `clonar_agente` propagam o novo campo (`filtro_nome_arquivo` no portal ↔ `allowed_filename_pattern` no model).
+- Cobertura: `apps/processamentos/tests_subpastas_recursivas.py` ganhou 7 testes novos — unidade da função de filtro (`fnmatch`, prefixo com `*`, igualdade exata sem `*`) e ponta a ponta (arquivo fora do padrão descartado antes de criar `DocumentoEntrada`, case-insensitive, funciona com `include_subfolders`, comportamento inalterado sem padrão configurado). Round-trip do formulário do portal (criar → salvar → reabrir para editar) validado manualmente via shell.
+- Documentado seguindo o mesmo padrão em 4 camadas usado por `include_subfolders`: nova seção "Filtro por nome de arquivo" em `doc_system_gerenciar_agentes.html` (+ linha na tabela "Entrada") e em `doc_system_agentes.html` (visão do usuário final: "por que sumiram arquivos da execução"), bullet novo na resposta "gerenciar agente" e item dedicado na `_KNOWLEDGE_BASE` do Biel (`apps/doc_system/views.py`) — explica inclusive por que a mesma regra escrita só no prompt não funciona.
+
+### Corrigido
+- **4 campos de `AgenteConfiguracaoOperacional` sem exposição no Django admin** — `include_subfolders`, `enable_pdf_preprocessing`, `enable_thinking_budget_reduction` e `max_tentativas` existiam no model (adicionados nas versões 1.5.12/1.5.14/1.5.15) mas nunca foram incluídos nos `fieldsets` de `AgenteConfiguracaoOperacionalInline` (`apps/agentes_ia/admin.py`) — como o inline declara `fieldsets` explicitamente, campos não listados simplesmente não aparecem no formulário, então não havia como ligá-los pela tela de admin (só via shell/fixture). Descoberto ao adicionar `allowed_filename_pattern` ao mesmo inline. Adicionados às seções "Entrada" e "Schemas e concorrencia".
+
+---
+
 ## [1.5.16] — 2026-08-19
 
 ### Corrigido

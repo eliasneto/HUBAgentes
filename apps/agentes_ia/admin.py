@@ -21,6 +21,9 @@ class AgenteConfiguracaoOperacionalInline(admin.StackedInline):
                     "default_local_storage_integration",
                     "default_local_relative_input_path",
                     "allowed_input_extensions",
+                    "allowed_filename_pattern",
+                    "include_subfolders",
+                    "enable_pdf_preprocessing",
                     "allow_runtime_input_choice",
                     "allow_runtime_file_upload",
                 )
@@ -44,6 +47,8 @@ class AgenteConfiguracaoOperacionalInline(admin.StackedInline):
                     "runtime_fields_schema",
                     "builder_schema",
                     "concurrency_policy",
+                    "max_tentativas",
+                    "enable_thinking_budget_reduction",
                 )
             },
         ),

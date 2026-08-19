@@ -127,6 +127,11 @@
             <div>Marcado ou desmarcado (desligado por padrao)</div>
             <div>So aparece para origem <code>google_drive_folder</code> ou <code>local_folder</code>. Quando ativo, le os PDFs de todas as subpastas abaixo da raiz configurada, em qualquer profundidade — nao so os arquivos soltos na raiz. Veja a secao "Leitura recursiva de subpastas" abaixo.</div>
           </div>
+          <div class="doc-table-row">
+            <div><strong>Filtro por nome de arquivo</strong></div>
+            <div>Texto livre, padrao estilo glob (ex.: <code>Edital*</code>)</div>
+            <div>So aparece para origem <code>google_drive_folder</code> ou <code>local_folder</code>. Vazio (padrao) processa todos os arquivos da pasta. Veja a secao "Filtro por nome de arquivo" abaixo.</div>
+          </div>
         </div>
       </section>
 
@@ -508,6 +513,35 @@ Lote por pasta→ 1 chamada por subpasta → 1 saída por subpasta</code></pre>
           Veja a experiencia do usuario final (indicador no modal, botao "Continuando (lote N)...") em
           <a href="/doc-system/agentes/">Doc Sistema → Agentes</a>.
         </p>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Filtro por nome de arquivo</p>
+          <h2>Campo "Filtro por nome de arquivo"</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          Por padrao, o agente processa todos os arquivos encontrados na pasta configurada (dentro das
+          extensoes aceitas). Preenchendo este campo com um padrao estilo <strong>glob</strong> — por exemplo
+          <code>Edital*</code> — so os arquivos cujo NOME bater o padrao sao processados; os demais sao
+          descartados <strong>antes</strong> de serem baixados ou lidos, sem gastar nenhum token com eles.
+        </p>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Por que nao usar so o prompt?</span>
+            <p>Escrever no prompt "leia so arquivos que comecam com Edital" nao funciona de forma confiavel: o sistema ja baixa e envia o conteudo do arquivo inteiro para a IA antes dela processar o prompt — a instrucao vira um pedido para a IA "ignorar" um conteudo que ela ja recebeu, sem garantia nenhuma de obediencia consistente, especialmente em lote.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Como escrever o padrao</span>
+            <p><code>*</code> substitui qualquer sequencia de caracteres, em qualquer posicao. <code>Edital*</code> aceita <code>Edital001.pdf</code> e <code>edital_retificado.pdf</code> (sem diferenciar mai/minusculas), mas nao aceita <code>AvisoEdital.pdf</code>. Deixe em branco para nao filtrar por nome.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Onde se aplica</span>
+            <p>So tem efeito quando a origem padrao e <code>google_drive_folder</code> ou <code>local_folder</code> — funciona em qualquer Modo de entrada (Individual, Grupo unico, Lote por sub-pastas) e tambem junto com "Ler PDFs de todas as subpastas". Nao afeta upload na execucao nem arquivo local fixo, onde o arquivo ja e escolhido explicitamente.</p>
+          </article>
+        </div>
       </section>
 
       <section class="builder-card">

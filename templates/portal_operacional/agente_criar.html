@@ -212,6 +212,13 @@
               {% for error in form.ler_subpastas.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
 
+            <div class="execution-field builder-wide" data-builder-source="google_drive_folder local_folder">
+              <label for="{{ form.filtro_nome_arquivo.id_for_label }}">{{ form.filtro_nome_arquivo.label }}</label>
+              {{ form.filtro_nome_arquivo }}
+              <small>{{ form.filtro_nome_arquivo.help_text }}</small>
+              {% for error in form.filtro_nome_arquivo.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+
             <div class="execution-field builder-wide upload-toggle-card">
               <label class="toggle-line" for="{{ form.pre_processar_pdf.id_for_label }}">
                 {{ form.pre_processar_pdf }}

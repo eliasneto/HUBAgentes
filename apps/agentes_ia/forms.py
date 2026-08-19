@@ -129,6 +129,19 @@ class AgentePortalCreateForm(forms.Form):
             "para nao travar a execucao."
         ),
     )
+    filtro_nome_arquivo = forms.CharField(
+        label="Filtro por nome de arquivo",
+        max_length=200,
+        required=False,
+        help_text=(
+            "Padrao estilo 'Edital*' (aceita * em qualquer posicao) — so os "
+            "arquivos cujo nome bater o padrao sao processados; os demais "
+            "sao descartados antes de serem lidos ou enviados a IA. Sem "
+            "diferenciar mai/minusculas. Deixe em branco para processar "
+            "todos os arquivos da pasta. So se aplica quando a origem "
+            "padrao e 'Google Drive - pasta' ou 'Pasta local'."
+        ),
+    )
     default_output_format = forms.ChoiceField(
         label="Formato padrao de saida",
         choices=AgentDefaultOutputFormat.choices,
@@ -240,6 +253,7 @@ class AgentePortalCreateForm(forms.Form):
                     "pre_processar_pdf": configuracao.enable_pdf_preprocessing,
                     "reduzir_raciocinio_ia": configuracao.enable_thinking_budget_reduction,
                     "ler_subpastas": configuracao.include_subfolders,
+                    "filtro_nome_arquivo": configuracao.allowed_filename_pattern,
                     "default_output_format": configuracao.default_output_format,
                     "document_execution_mode": (
                         configuracao.document_execution_mode
@@ -371,6 +385,7 @@ class AgentePortalCreateForm(forms.Form):
             "pre_processar_pdf": self.cleaned_data.get("pre_processar_pdf", False),
             "reduzir_raciocinio_ia": self.cleaned_data.get("reduzir_raciocinio_ia", False),
             "ler_subpastas": self.cleaned_data.get("ler_subpastas", False),
+            "filtro_nome_arquivo": self.cleaned_data.get("filtro_nome_arquivo", ""),
             "default_output_format": self.cleaned_data["default_output_format"],
             "default_output_destination": AgentOutputDestination.INTERNAL_MEDIA,
             "document_execution_mode": self.cleaned_data["document_execution_mode"],

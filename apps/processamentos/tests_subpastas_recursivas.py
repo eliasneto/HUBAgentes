@@ -41,6 +41,7 @@ from apps.processamentos.models import (
     ProcessingInputSourceType,
 )
 from apps.processamentos.services.document_sources import (
+    _filtrar_por_nome_arquivo,
     _pasta_mae_do_caminho,
     _LimiteLoteTracker,
     prepare_documentos,
@@ -283,7 +284,13 @@ class PrepararDocumentosSubpastasLocalTests(TestCase):
     def tearDown(self):
         ConfiguracaoGeral.objects.all().delete()
 
-    def _criar_agente(self, *, include_subfolders, document_execution_mode=AgentDocumentExecutionMode.INDIVIDUAL):
+    def _criar_agente(
+        self,
+        *,
+        include_subfolders,
+        document_execution_mode=AgentDocumentExecutionMode.INDIVIDUAL,
+        allowed_filename_pattern="",
+    ):
         agente = AgenteIA.objects.create(
             nome="Agente Teste",
             slug=f"agente-teste-{AgenteIA.objects.count()}",
@@ -298,6 +305,7 @@ class PrepararDocumentosSubpastasLocalTests(TestCase):
             default_local_storage_integration=self.local_integration,
             include_subfolders=include_subfolders,
             document_execution_mode=document_execution_mode,
+            allowed_filename_pattern=allowed_filename_pattern,
         )
         return agente
 
@@ -452,3 +460,134 @@ class PrepararDocumentosSubpastasLocalTests(TestCase):
         documento = DocumentoEntrada.objects.get(processamento=processamento)
         self.assertEqual(documento.nome_arquivo, "edital.pdf")
         self.assertEqual(documento.pasta_grupo, "2024/janeiro")
+
+
+class FiltrarPorNomeArquivoTests(SimpleTestCase):
+    """Unidade da funcao pura usada para filtrar por
+    AgenteConfiguracaoOperacional.allowed_filename_pattern antes de baixar
+    qualquer arquivo (ver document_sources._filtrar_por_nome_arquivo)."""
+
+    def test_sem_padrao_devolve_a_lista_original(self):
+        files = [{"name": "edital.pdf"}, {"name": "contrato.pdf"}]
+        self.assertEqual(_filtrar_por_nome_arquivo(files, ""), files)
+
+    def test_padrao_prefixo_com_asterisco_mantem_so_o_que_bate(self):
+        files = [
+            {"name": "Edital123.pdf"},
+            {"name": "edital_retificado.pdf"},
+            {"name": "Contrato.pdf"},
+            {"name": "AvisoEdital.pdf"},  # nao comeca com "edital"
+        ]
+        resultado = _filtrar_por_nome_arquivo(files, "Edital*")
+        nomes = {f["name"] for f in resultado}
+        self.assertEqual(nomes, {"Edital123.pdf", "edital_retificado.pdf"})
+
+    def test_padrao_sem_asterisco_exige_igualdade_exata(self):
+        files = [{"name": "Edital.pdf"}, {"name": "Edital2.pdf"}]
+        resultado = _filtrar_por_nome_arquivo(files, "Edital.pdf")
+        self.assertEqual([f["name"] for f in resultado], ["Edital.pdf"])
+
+
+class PrepararDocumentosFiltroNomeArquivoTests(TestCase):
+    """Testa AgenteConfiguracaoOperacional.allowed_filename_pattern de ponta
+    a ponta: arquivo que nao bate o padrao nunca vira DocumentoEntrada, logo
+    nunca e baixado nem enviado a IA. Mesmo setup de
+    PrepararDocumentosSubpastasLocalTests, isolado nesta classe para nao
+    herdar (e reexecutar) os testes daquela."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="operador2", password="x")
+        self.ai_integration = AIProviderIntegration.objects.create(
+            nome="IA Teste 2",
+            api_key="chave-teste",
+            status=IntegrationStatus.ATIVA,
+            default_model="modelo-teste",
+        )
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.base_path = Path(self._tmpdir.name)
+        self.addCleanup(self._tmpdir.cleanup)
+        self.local_integration = LocalStorageIntegration.objects.create(
+            nome="Pasta Teste 2",
+            base_path=str(self.base_path),
+            status=IntegrationStatus.ATIVA,
+            allowed_extensions=["pdf"],
+        )
+
+    def _criar_agente(self, *, include_subfolders, allowed_filename_pattern=""):
+        agente = AgenteIA.objects.create(
+            nome="Agente Teste Filtro",
+            slug=f"agente-teste-filtro-{AgenteIA.objects.count()}",
+            tipo=AgentType.GENERICO,
+            ai_provider_integration=self.ai_integration,
+            status=AgentStatus.ATIVO,
+            prompt_base="prompt",
+        )
+        AgenteConfiguracaoOperacional.objects.create(
+            agente=agente,
+            default_input_source_type=AgentDefaultInputSourceType.LOCAL_FOLDER,
+            default_local_storage_integration=self.local_integration,
+            include_subfolders=include_subfolders,
+            allowed_filename_pattern=allowed_filename_pattern,
+        )
+        return agente
+
+    def _criar_processamento(self, agente):
+        return Processamento.objects.create(
+            codigo=f"PROC-TESTE-FILTRO-{Processamento.objects.count()}",
+            iniciado_por=self.user,
+            agente=agente,
+            input_source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+            local_storage_integration=self.local_integration,
+            local_relative_input_path="",
+        )
+
+    def test_arquivo_fora_do_padrao_e_descartado_antes_de_criar_documento(self):
+        agente = self._criar_agente(
+            include_subfolders=False, allowed_filename_pattern="Edital*"
+        )
+        (self.base_path / "Edital001.pdf").write_bytes(b"pdf")
+        (self.base_path / "Contrato001.pdf").write_bytes(b"pdf")
+        processamento = self._criar_processamento(agente)
+
+        resultado = prepare_documentos(processamento)
+
+        self.assertEqual(resultado["created"], 1)
+        documento = DocumentoEntrada.objects.get(processamento=processamento)
+        self.assertEqual(documento.nome_arquivo, "Edital001.pdf")
+
+    def test_padrao_e_case_insensitive(self):
+        agente = self._criar_agente(
+            include_subfolders=False, allowed_filename_pattern="edital*"
+        )
+        (self.base_path / "EDITAL001.pdf").write_bytes(b"pdf")
+        processamento = self._criar_processamento(agente)
+
+        resultado = prepare_documentos(processamento)
+
+        self.assertEqual(resultado["created"], 1)
+
+    def test_filtro_tambem_se_aplica_com_subpastas_recursivas(self):
+        agente = self._criar_agente(
+            include_subfolders=True, allowed_filename_pattern="Edital*"
+        )
+        (self.base_path / "p0").mkdir()
+        (self.base_path / "p0" / "Edital.pdf").write_bytes(b"pdf")
+        (self.base_path / "p1").mkdir()
+        (self.base_path / "p1" / "Contrato.pdf").write_bytes(b"pdf")
+        processamento = self._criar_processamento(agente)
+
+        resultado = prepare_documentos(processamento)
+
+        self.assertEqual(resultado["created"], 1)
+        documento = DocumentoEntrada.objects.get(processamento=processamento)
+        self.assertEqual(documento.nome_arquivo, "Edital.pdf")
+
+    def test_sem_padrao_configurado_mantem_comportamento_atual(self):
+        agente = self._criar_agente(include_subfolders=False, allowed_filename_pattern="")
+        (self.base_path / "Edital001.pdf").write_bytes(b"pdf")
+        (self.base_path / "Contrato001.pdf").write_bytes(b"pdf")
+        processamento = self._criar_processamento(agente)
+
+        resultado = prepare_documentos(processamento)
+
+        self.assertEqual(resultado["created"], 2)

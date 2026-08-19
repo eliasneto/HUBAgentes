@@ -366,6 +366,30 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
             "lotes automaticos para nao travar a execucao."
         ),
     )
+    # Filtra por NOME do arquivo (padrao estilo glob, ex.: "Edital*") antes
+    # de o arquivo ser baixado/lido — arquivos cujo nome nao bate o padrao
+    # nunca chegam a ser criados como DocumentoEntrada, logo nunca sao lidos
+    # nem enviados a IA (ver apps.processamentos.services.document_sources).
+    # Diferente de colocar a regra no prompt: aqui o arquivo e descartado
+    # ANTES do envio, nao depois — a IA nunca recebe o conteudo do arquivo
+    # errado, em vez de receber e depender dela "obedecer" a instrucao.
+    # Comparacao sem diferenciar mai/minusculas. Vazio (default) = nao
+    # filtra por nome, mantendo o comportamento atual dos agentes
+    # existentes. So tem efeito quando a origem padrao e uma pasta (Google
+    # Drive ou local); nao afeta upload manual nem arquivo unico fixo, onde
+    # o arquivo ja e escolhido explicitamente.
+    allowed_filename_pattern = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text=(
+            "Padrao estilo 'Edital*' (aceita * em qualquer posicao) para "
+            "filtrar pelo NOME do arquivo antes de enviar para a IA — "
+            "arquivos que nao baterem o padrao sao descartados sem serem "
+            "lidos nem enviados. Sem diferenciar mai/minusculas. Deixe em "
+            "branco para nao filtrar por nome. So se aplica quando a "
+            "origem padrao e uma pasta (Google Drive ou local)."
+        ),
+    )
 
     class Meta:
         verbose_name = "Configuracao operacional do agente"
@@ -387,6 +411,7 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
             str(extension).lower().lstrip(".")
             for extension in self.allowed_input_extensions
         ]
+        self.allowed_filename_pattern = (self.allowed_filename_pattern or "").strip()
 
         # M4: valida schema de concurrency_policy
         _validate_concurrency_policy(self.concurrency_policy)
