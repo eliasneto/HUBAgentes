@@ -49,11 +49,16 @@ services:
       # web" (gunicorn nao faz auto-reload) pra codigo Python valer, e
       # templates/estaticos ja valem so com o restart tambem (collectstatic
       # roda de novo no entrypoint). Nao inclui docker/ (so usado no build).
+      # VERSION precisa estar aqui tambem — sem o mount, o container usa a
+      # versao congelada na imagem (COPY . . do Dockerfile), e um "git pull"
+      # + restart no host nunca reflete a versao nova exibida no rodape
+      # (settings.APP_VERSION le o arquivo dentro do container).
       - ./apps:/app/apps
       - ./config:/app/config
       - ./static:/app/static
       - ./templates:/app/templates
       - ./manage.py:/app/manage.py
+      - ./VERSION:/app/VERSION
       - media_data:/app/media
       - staticfiles_data:/app/staticfiles
       - ${LOCAL_STORAGE_PATH:-./entradas}:/app/entradas
@@ -84,6 +89,7 @@ services:
       - ./apps:/app/apps
       - ./config:/app/config
       - ./manage.py:/app/manage.py
+      - ./VERSION:/app/VERSION
       - media_data:/app/media
       - ${LOCAL_STORAGE_PATH:-./entradas}:/app/entradas
     command: >

@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.16] — 2026-08-19
+
+### Corrigido
+- **Rodapé mostrava a versão desatualizada mesmo após `git pull` + restart** — descoberto ao validar o deploy da 1.5.15 em produção (Hostinger): `config/settings.py` lê `APP_VERSION` a partir do arquivo `VERSION` **dentro do container**, mas `docker-compose.yml` nunca incluía `VERSION` na lista de bind-mounts do serviço `web`/`worker` (só `apps/`, `config/`, `static/`, `templates/`, `manage.py`) — então o container sempre usava a versão congelada no momento em que a imagem foi construída (`COPY . .` do `Dockerfile`), e atualizar o arquivo `VERSION` no host + `git pull` + `docker compose restart` nunca refletia no rodapé, sem nenhum erro visível. Adicionado `./VERSION:/app/VERSION` aos volumes de `web` e `worker` em `docker-compose.yml`. Como bind-mount é definido na criação do container (não só no restart), essa mudança específica exige `docker compose up -d` (recriação) uma única vez — depois disso, futuras trocas de versão voltam a valer só com `git pull` + restart, como os demais arquivos já montados.
+
+---
+
 ## [1.5.15] — 2026-08-19
 
 ### Adicionado
