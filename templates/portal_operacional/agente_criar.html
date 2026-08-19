@@ -200,6 +200,18 @@
               {% for error in form.permitir_upload_na_execucao.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
             </div>
 
+            <div class="execution-field builder-wide upload-toggle-card" data-builder-source="google_drive_folder local_folder">
+              <label class="toggle-line" for="{{ form.ler_subpastas.id_for_label }}">
+                {{ form.ler_subpastas }}
+                <span class="toggle-switch" aria-hidden="true"></span>
+                <span>
+                  <strong>{{ form.ler_subpastas.label }}</strong>
+                  <small>{{ form.ler_subpastas.help_text }}</small>
+                </span>
+              </label>
+              {% for error in form.ler_subpastas.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </div>
+
             <div class="execution-field builder-wide upload-toggle-card">
               <label class="toggle-line" for="{{ form.pre_processar_pdf.id_for_label }}">
                 {{ form.pre_processar_pdf }}

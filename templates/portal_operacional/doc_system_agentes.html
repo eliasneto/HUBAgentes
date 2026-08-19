@@ -318,6 +318,39 @@ Desmarcado (padrao):
 
       <section class="builder-card">
         <div class="form-section-heading">
+          <p class="eyebrow">Leitura de subpastas</p>
+          <h2>Quando o agente le PDFs de todas as subpastas</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          Alguns agentes sao configurados (em <strong>Gerenciar agentes</strong>) para ler os PDFs de
+          <strong>todas as subpastas</strong> abaixo da pasta raiz, nao so os arquivos soltos na raiz. Isso e
+          transparente para quem executa — nao exige nenhuma acao extra alem de clicar em Executar — mas muda o
+          que voce ve no modal e no card durante a execucao.
+        </p>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Aviso no modal de confirmacao</span>
+            <p>Quando o agente tem essa opcao ativa, o modal de confirmacao mostra a linha <strong>"Subpastas: sim, todos os PDFs das subpastas serao incluidos"</strong> — para voce saber, antes de confirmar, que a busca vai alem da raiz da pasta.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Processamento em lotes automaticos</span>
+            <p>Pastas com muitos PDFs sao processadas em lotes, para nao travar a execucao. Se sobrar arquivo apos um lote, o botao do card muda para <strong>"Continuando (lote N)..."</strong> e o sistema dispara o proximo lote sozinho — nao e necessario clicar em Executar novamente.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Sem repeticao entre lotes</span>
+            <p>Arquivos ja processados com sucesso em um lote anterior nunca sao reprocessados nos lotes seguintes — a mesma regra de "arquivo ja processado antes" da secao acima vale entre lotes de uma mesma pasta.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Se a continuacao parar</span>
+            <p>Caso a continuacao automatica seja interrompida (ex.: pagina recarregada no meio do processo), basta clicar em <strong>Executar</strong> de novo — o sistema retoma exatamente de onde parou, sem repetir arquivos.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
           <p class="eyebrow">Diferenca entre telas</p>
           <h2>Agentes x Gerenciar agentes</h2>
         </div>

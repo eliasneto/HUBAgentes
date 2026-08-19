@@ -339,6 +339,7 @@ def criar_agente_portal(
     max_tentativas=3,
     pre_processar_pdf=False,
     reduzir_raciocinio_ia=False,
+    ler_subpastas=False,
 ):
     with transaction.atomic():
         agente = AgenteIA(
@@ -391,6 +392,7 @@ def criar_agente_portal(
             max_tentativas=max_tentativas,
             enable_pdf_preprocessing=pre_processar_pdf,
             enable_thinking_budget_reduction=reduzir_raciocinio_ia,
+            include_subfolders=ler_subpastas,
             prompt_parameters=normalizar_parametros_prompt(prompt_parameters),
             concurrency_policy=AgenteConfiguracaoOperacional._meta.get_field(
                 "concurrency_policy"
@@ -428,6 +430,7 @@ def atualizar_agente_portal(
     max_tentativas=3,
     pre_processar_pdf=False,
     reduzir_raciocinio_ia=False,
+    ler_subpastas=False,
 ):
     with transaction.atomic():
         agente.nome = nome
@@ -473,6 +476,7 @@ def atualizar_agente_portal(
         configuracao.max_tentativas = max_tentativas
         configuracao.enable_pdf_preprocessing = pre_processar_pdf
         configuracao.enable_thinking_budget_reduction = reduzir_raciocinio_ia
+        configuracao.include_subfolders = ler_subpastas
         configuracao.prompt_parameters = normalizar_parametros_prompt(
             prompt_parameters
         )
@@ -550,6 +554,7 @@ def clonar_agente(*, agente, actor, novo_nome=None):
             max_tentativas=configuracao_origem.max_tentativas,
             enable_pdf_preprocessing=configuracao_origem.enable_pdf_preprocessing,
             enable_thinking_budget_reduction=configuracao_origem.enable_thinking_budget_reduction,
+            include_subfolders=configuracao_origem.include_subfolders,
             prompt_parameters=configuracao_origem.prompt_parameters,
             concurrency_policy=configuracao_origem.concurrency_policy,
             created_by=actor,

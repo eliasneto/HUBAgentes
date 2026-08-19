@@ -532,15 +532,24 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
                     "portal_processamento_status",
                     kwargs={"codigo": processamento.codigo},
                 ),
+                # True quando a pasta tem mais PDFs em subpastas do que o
+                # lote atual processou (ver AgenteConfiguracaoOperacional.
+                # include_subfolders) — o front-end usa isso para disparar
+                # automaticamente a proxima execucao e continuar sem exigir
+                # outro clique.
+                "mais_pdfs_pendentes": processamento.atingiu_limite_lote_subpastas,
             })
 
-        messages.success(
-            self.request,
-            (
-                f"Processamento {processamento.codigo} iniciado para o agente "
-                f"{self.agente.nome}."
-            ),
+        mensagem_sucesso = (
+            f"Processamento {processamento.codigo} iniciado para o agente "
+            f"{self.agente.nome}."
         )
+        if processamento.atingiu_limite_lote_subpastas:
+            mensagem_sucesso += (
+                " Restam mais PDFs nas subpastas — clique em Executar "
+                "novamente para continuar o processamento."
+            )
+        messages.success(self.request, mensagem_sucesso)
         return redirect("portal_processamentos")
 
     def _erro_execucao_payload(self, exc):
@@ -1741,11 +1750,18 @@ class SalvarConfiguracaoGeralView(PortalAdministradorRequiredMixin, View):
             max_usuario = max(0, min(1000, int(request.POST.get("max_execucoes_por_usuario", 2))))
         except (ValueError, TypeError):
             max_usuario = 2
+        try:
+            max_pdfs_lote = max(
+                0, min(1000, int(request.POST.get("max_pdfs_lote_subpastas", 25)))
+            )
+        except (ValueError, TypeError):
+            max_pdfs_lote = 25
         config = ConfiguracaoGeral.obter()
         config.visibilidade_dashboard = valor
         config.limpeza_automatica_ativa = "limpeza_automatica_ativa" in request.POST
         config.max_execucoes_simultaneas = max_global
         config.max_execucoes_por_usuario = max_usuario
+        config.max_pdfs_lote_subpastas = max_pdfs_lote
         config.atualizado_por = request.user
         config.save()
         messages.success(request, "Configurações gerais salvas com sucesso.")

@@ -187,6 +187,14 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     # document_sources._arquivo_ja_processado_anteriormente). Nao entra em
     # total_documentos — sao arquivos que nem chegaram a virar DocumentoEntrada.
     total_documentos_ignorados = models.PositiveIntegerField(default=0)
+    # True quando a descoberta de documentos (ver document_sources.
+    # prepare_documentos) parou de criar novos DocumentoEntrada por ter
+    # atingido ConfiguracaoGeral.max_pdfs_lote_subpastas — so pode
+    # acontecer com AgenteConfiguracaoOperacional.include_subfolders=True.
+    # Sinaliza para a view/front-end que ainda ha PDFs nao descobertos
+    # nesta pasta; o dedup de "ja processado antes" garante que a proxima
+    # execucao retoma de onde parou, sem repetir nem perder arquivos.
+    atingiu_limite_lote_subpastas = models.BooleanField(default=False)
     arquivo_saida = models.FileField(
         upload_to=processamento_output_path,
         max_length=255,

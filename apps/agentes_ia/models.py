@@ -345,6 +345,27 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
             "julgamento mais fino."
         ),
     )
+    # Quando ativo e a origem padrao do agente e uma pasta (local ou Google
+    # Drive), le os PDFs de TODAS as subpastas abaixo da pasta raiz
+    # configurada, em qualquer profundidade — nao so os arquivos soltos na
+    # raiz. So tem efeito para default_input_source_type in
+    # {LOCAL_FOLDER, GOOGLE_DRIVE_FOLDER}; clean() zera o valor nos demais
+    # casos. Para nao travar o processamento em pastas com muitos
+    # documentos, a execucao e feita em lotes com continuacao automatica
+    # (ver apps.processamentos.services.document_sources e
+    # ConfiguracaoGeral.max_pdfs_lote_subpastas). Default False para nao
+    # mudar o comportamento de agentes ja existentes.
+    include_subfolders = models.BooleanField(
+        default=False,
+        help_text=(
+            "Le os PDFs de todas as subpastas abaixo da pasta raiz "
+            "configurada (Google Drive ou pasta local), em qualquer nivel — "
+            "nao so os arquivos soltos na raiz. So tem efeito quando a "
+            "origem padrao e 'Google Drive - pasta' ou 'Pasta local'. Para "
+            "pastas com muitos documentos, o processamento e feito em "
+            "lotes automaticos para nao travar a execucao."
+        ),
+    )
 
     class Meta:
         verbose_name = "Configuracao operacional do agente"
@@ -415,6 +436,17 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
                     }
                 )
             # Caminho relativo vazio = raiz da pasta autorizada (comportamento válido)
+
+        # "Ler subpastas" so faz sentido com origem de pasta (local ou
+        # Google Drive) — normaliza em vez de erro, pois o toggle no
+        # formulario ja se auto-desmarca ao trocar a origem (ver
+        # agente_criar.js), mas outros caminhos de escrita (admin, clone)
+        # nao passam por essa validacao de UI.
+        if self.default_input_source_type not in {
+            AgentDefaultInputSourceType.LOCAL_FOLDER,
+            AgentDefaultInputSourceType.GOOGLE_DRIVE_FOLDER,
+        }:
+            self.include_subfolders = False
 
         if (
             self.output_assembly_mode == AgentOutputAssemblyMode.UMA_POR_ENTRADA

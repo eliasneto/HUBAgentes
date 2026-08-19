@@ -150,6 +150,8 @@
                 data-agent-nome-integracao="{{ agente.nome_integracao_local }}"
                 data-agent-formato-saida="{{ agente.formato_saida }}"
                 data-agent-permite-forcar="{{ agente.permite_forcar_reprocessamento|yesno:'true,false' }}"
+                data-agent-caminho-origem="{{ agente.caminho_origem }}"
+                data-agent-inclui-subpastas="{{ agente.inclui_subpastas|yesno:'true,false' }}"
               >
                 {% csrf_token %}
                 {% if agente.pode_executar and agente.usuario_tem_acesso %}
@@ -213,6 +215,14 @@
       <div style="display:grid;grid-template-columns:140px 1fr;gap:.3rem .8rem;align-items:baseline;">
         <dt style="font-size:.72rem;color:#7ca5b8;text-transform:uppercase;letter-spacing:.07em;margin:0;">Origem dos docs</dt>
         <dd id="modal-exec-origem" style="font-size:.9rem;color:#e8f4fa;margin:0;">—</dd>
+      </div>
+      <div id="modal-exec-caminho-wrap" style="display:none;grid-template-columns:140px 1fr;gap:.3rem .8rem;align-items:baseline;">
+        <dt style="font-size:.72rem;color:#7ca5b8;text-transform:uppercase;letter-spacing:.07em;margin:0;">Caminho da pasta</dt>
+        <dd id="modal-exec-caminho" style="font-size:.82rem;color:#e8f4fa;margin:0;word-break:break-all;font-family:'Consolas','Courier New',monospace;">—</dd>
+      </div>
+      <div id="modal-exec-subpastas-wrap" style="display:none;grid-template-columns:140px 1fr;gap:.3rem .8rem;align-items:baseline;">
+        <dt style="font-size:.72rem;color:#7ca5b8;text-transform:uppercase;letter-spacing:.07em;margin:0;">Subpastas</dt>
+        <dd style="font-size:.9rem;color:#e8f4fa;margin:0;">Sim, todos os PDFs das subpastas serão incluídos</dd>
       </div>
       <div style="display:grid;grid-template-columns:140px 1fr;gap:.3rem .8rem;align-items:baseline;">
         <dt style="font-size:.72rem;color:#7ca5b8;text-transform:uppercase;letter-spacing:.07em;margin:0;">Formato de saída</dt>

@@ -117,6 +117,18 @@ class AgentePortalCreateForm(forms.Form):
             "fino."
         ),
     )
+    ler_subpastas = forms.BooleanField(
+        label="Ler PDFs de todas as subpastas",
+        required=False,
+        help_text=(
+            "Le os PDFs de todas as subpastas abaixo da pasta raiz "
+            "selecionada (Google Drive ou pasta local), em qualquer nivel — "
+            "nao so os arquivos soltos na raiz. So se aplica quando a "
+            "origem padrao e 'Google Drive - pasta' ou 'Pasta local'. Pastas "
+            "com muitos documentos sao processadas em lotes automaticos "
+            "para nao travar a execucao."
+        ),
+    )
     default_output_format = forms.ChoiceField(
         label="Formato padrao de saida",
         choices=AgentDefaultOutputFormat.choices,
@@ -227,6 +239,7 @@ class AgentePortalCreateForm(forms.Form):
                     "permitir_upload_na_execucao": permitir_upload_na_execucao,
                     "pre_processar_pdf": configuracao.enable_pdf_preprocessing,
                     "reduzir_raciocinio_ia": configuracao.enable_thinking_budget_reduction,
+                    "ler_subpastas": configuracao.include_subfolders,
                     "default_output_format": configuracao.default_output_format,
                     "document_execution_mode": (
                         configuracao.document_execution_mode
@@ -357,6 +370,7 @@ class AgentePortalCreateForm(forms.Form):
             ),
             "pre_processar_pdf": self.cleaned_data.get("pre_processar_pdf", False),
             "reduzir_raciocinio_ia": self.cleaned_data.get("reduzir_raciocinio_ia", False),
+            "ler_subpastas": self.cleaned_data.get("ler_subpastas", False),
             "default_output_format": self.cleaned_data["default_output_format"],
             "default_output_destination": AgentOutputDestination.INTERNAL_MEDIA,
             "document_execution_mode": self.cleaned_data["document_execution_mode"],

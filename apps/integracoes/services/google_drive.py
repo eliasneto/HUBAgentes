@@ -90,6 +90,36 @@ def fetch_folder_metadata(folder_source) -> dict[str, Any]:
         ) from exc
 
 
+def _list_children_paginated(service, query: str, fields: str) -> list[dict[str, Any]]:
+    """Pagina sobre `service.files().list()` até esgotar `nextPageToken`.
+
+    A API do Drive devolve no máximo `pageSize` itens por chamada; sem
+    percorrer `nextPageToken`, pastas com mais de 1000 itens eram
+    truncadas silenciosamente (perdendo arquivos sem erro nenhum). Usado
+    por toda listagem de conteúdo de pasta neste módulo — o chamador
+    continua responsável por capturar exceções e traduzir a mensagem de
+    erro para o contexto dele.
+    """
+    files: list[dict[str, Any]] = []
+    page_token = None
+    while True:
+        response = (
+            service.files()
+            .list(
+                q=query,
+                fields=f"nextPageToken,{fields}",
+                pageSize=1000,
+                pageToken=page_token,
+            )
+            .execute()
+        )
+        files.extend(response.get("files", []))
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            break
+    return files
+
+
 def list_pdf_files_from_folder_source(folder_source) -> list[dict[str, Any]]:
     service = build_drive_service(folder_source.google_drive_integration)
     query = (
@@ -97,21 +127,15 @@ def list_pdf_files_from_folder_source(folder_source) -> list[dict[str, Any]]:
         f"and mimeType = '{PDF_MIME}'"
     )
     try:
-        response = (
-            service.files()
-            .list(
-                q=query,
-                fields="files(id,name,mimeType,parents,webViewLink,md5Checksum)",
-                pageSize=1000,
-            )
-            .execute()
+        return _list_children_paginated(
+            service,
+            query,
+            "files(id,name,mimeType,parents,webViewLink,md5Checksum)",
         )
     except Exception as exc:  # pragma: no cover
         raise GoogleDriveServiceError(
             f"Falha ao listar PDFs da pasta no Google Drive: {exc}"
         ) from exc
-
-    return response.get("files", [])
 
 
 def list_subfolders_from_drive_folder_id(
@@ -120,22 +144,14 @@ def list_subfolders_from_drive_folder_id(
     service = build_drive_service(google_drive_integration)
     query = f"'{folder_id}' in parents and trashed = false and mimeType = '{GOOGLE_DRIVE_FOLDER_MIME}'"
     try:
-        response = (
-            service.files()
-            .list(
-                q=query,
-                fields="files(id,name)",
-                pageSize=1000,
-            )
-            .execute()
-        )
+        files = _list_children_paginated(service, query, "files(id,name)")
     except Exception as exc:
         raise GoogleDriveServiceError(
             f"Falha ao listar subpastas no Google Drive: {exc}"
         ) from exc
 
     return sorted(
-        [{"id": f["id"], "nome": f["name"]} for f in response.get("files", [])],
+        [{"id": f["id"], "nome": f["name"]} for f in files],
         key=lambda x: x["nome"].lower(),
     )
 
@@ -148,25 +164,21 @@ def list_folder_contents_from_folder_source(folder_source) -> list[dict[str, Any
         f"mimeType = '{GOOGLE_DRIVE_FOLDER_MIME}')"
     )
     try:
-        response = (
-            service.files()
-            .list(
-                q=query,
-                fields=(
-                    "files("
-                    "id,"
-                    "name,"
-                    "mimeType,"
-                    "parents,"
-                    "webViewLink,"
-                    "md5Checksum,"
-                    "modifiedTime,"
-                    "size"
-                    ")"
-                ),
-                pageSize=1000,
-            )
-            .execute()
+        drive_items = _list_children_paginated(
+            service,
+            query,
+            (
+                "files("
+                "id,"
+                "name,"
+                "mimeType,"
+                "parents,"
+                "webViewLink,"
+                "md5Checksum,"
+                "modifiedTime,"
+                "size"
+                ")"
+            ),
         )
     except Exception as exc:  # pragma: no cover
         raise GoogleDriveServiceError(
@@ -174,7 +186,7 @@ def list_folder_contents_from_folder_source(folder_source) -> list[dict[str, Any
         ) from exc
 
     normalized_items = []
-    for drive_item in response.get("files", []):
+    for drive_item in drive_items:
         mime_type = drive_item.get("mimeType", "")
         if mime_type == GOOGLE_DRIVE_FOLDER_MIME:
             item_type = "pasta"
@@ -211,20 +223,69 @@ def list_pdf_files_from_drive_folder_id(google_drive_integration, folder_id: str
     service = build_drive_service(google_drive_integration)
     query = f"'{folder_id}' in parents and trashed = false and mimeType = '{PDF_MIME}'"
     try:
-        response = (
-            service.files()
-            .list(
-                q=query,
-                fields="files(id,name,mimeType,parents,webViewLink,md5Checksum)",
-                pageSize=1000,
-            )
-            .execute()
+        return _list_children_paginated(
+            service, query, "files(id,name,mimeType,parents,webViewLink,md5Checksum)"
         )
     except Exception as exc:  # pragma: no cover
         raise GoogleDriveServiceError(
             f"Falha ao listar PDFs da subpasta no Google Drive: {exc}"
         ) from exc
-    return response.get("files", [])
+
+
+def list_pdf_files_recursive_from_drive_folder_id(
+    google_drive_integration, root_folder_id: str, *, max_files: int | None = None
+) -> list[dict[str, Any]]:
+    """Varre `root_folder_id` e TODAS as subpastas abaixo dele, em qualquer
+    profundidade, devolvendo os PDFs encontrados.
+
+    Cada item devolvido tem os mesmos campos de `list_pdf_files_from_folder_source`
+    mais `relative_path` (caminho relativo a `root_folder_id`, com '/' como
+    separador — ex.: "2024/Janeiro/contrato.pdf") — usado para dedup,
+    ordenacao deterministica e (no modo "Lote por sub-pastas") para derivar o
+    grupo do documento a partir da pasta-mae.
+
+    `max_files`, se informado, interrompe a varredura (BFS) assim que esse
+    total de PDFs for coletado, mesmo com pastas ainda nao visitadas — evita
+    percorrer arvores muito grandes por completo quando so um lote limitado
+    de arquivos sera processado nesta execucao (ver
+    AgenteConfiguracaoOperacional.include_subfolders e
+    ConfiguracaoGeral.max_pdfs_lote_subpastas).
+    """
+    service = build_drive_service(google_drive_integration)
+    collected: list[dict[str, Any]] = []
+    pending_folders = [(root_folder_id, "")]  # (folder_id, prefixo_relativo)
+
+    while pending_folders:
+        folder_id, prefix = pending_folders.pop(0)
+        query = (
+            f"'{folder_id}' in parents and trashed = false and ("
+            f"mimeType = '{PDF_MIME}' or mimeType = '{GOOGLE_DRIVE_FOLDER_MIME}')"
+        )
+        try:
+            children = _list_children_paginated(
+                service,
+                query,
+                "files(id,name,mimeType,parents,webViewLink,md5Checksum)",
+            )
+        except Exception as exc:  # pragma: no cover
+            raise GoogleDriveServiceError(
+                f"Falha ao listar subpastas no Google Drive: {exc}"
+            ) from exc
+
+        # Subpastas primeiro (na ordem em que a API devolveu), depois PDFs —
+        # nao muda o resultado final, so a ordem em que pastas sao
+        # enfileiradas para visita.
+        for child in children:
+            if child.get("mimeType") == GOOGLE_DRIVE_FOLDER_MIME:
+                pending_folders.append((child["id"], f"{prefix}{child['name']}/"))
+
+        for child in children:
+            if child.get("mimeType") == PDF_MIME:
+                collected.append({**child, "relative_path": f"{prefix}{child['name']}"})
+                if max_files and len(collected) >= max_files:
+                    return collected
+
+    return collected
 
 
 def download_drive_file_bytes(google_drive_integration, drive_file_id: str) -> bytes:

@@ -43,6 +43,19 @@ class ConfiguracaoGeral(models.Model):
         default=2,
         help_text="Maximo de execucoes simultaneas por usuario. 0 = sem limite.",
     )
+    # Leitura recursiva de subpastas (AgenteConfiguracaoOperacional.
+    # include_subfolders): limite de PDFs novos processados por execucao
+    # para nao ultrapassar o timeout do servidor em pastas com muitos
+    # documentos. Quando a arvore tem mais PDFs pendentes que o limite, o
+    # front-end dispara automaticamente a proxima execucao (lote seguinte)
+    # ate esgotar os arquivos.
+    max_pdfs_lote_subpastas = models.PositiveSmallIntegerField(
+        default=25,
+        help_text=(
+            "Maximo de PDFs processados por lote quando um agente le "
+            "subpastas recursivamente. 0 = sem limite."
+        ),
+    )
     mascote_ativo = models.BooleanField(
         default=True,
         help_text="Quando ativo, o assistente Biel aparece flutuando no portal para todos os usuarios.",

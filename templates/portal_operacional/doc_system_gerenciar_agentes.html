@@ -122,6 +122,11 @@
             <div><code>individual</code>, <code>grupo_unico</code>, <code>lote_por_sub-pastas</code></div>
             <div>Controla se a IA analisa um arquivo por vez, todos juntos ou por sub-pasta. Veja a secao abaixo para detalhes de cada opcao.</div>
           </div>
+          <div class="doc-table-row">
+            <div><strong>Ler PDFs de todas as subpastas</strong></div>
+            <div>Marcado ou desmarcado (desligado por padrao)</div>
+            <div>So aparece para origem <code>google_drive_folder</code> ou <code>local_folder</code>. Quando ativo, le os PDFs de todas as subpastas abaixo da raiz configurada, em qualquer profundidade — nao so os arquivos soltos na raiz. Veja a secao "Leitura recursiva de subpastas" abaixo.</div>
+          </div>
         </div>
       </section>
 
@@ -465,6 +470,44 @@ Sistema destino sempre espera um ZIP         → sempre_zip</code></pre>
 Grupo único   → todos os documentos em 1 chamada → 1 saída consolidada
 Lote por pasta→ 1 chamada por subpasta → 1 saída por subpasta</code></pre>
         </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Leitura recursiva de subpastas</p>
+          <h2>Campo "Ler PDFs de todas as subpastas"</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          Por padrao, o sistema so ve os PDFs soltos direto na pasta raiz configurada — e, no modo
+          <strong>Lote por sub-pastas</strong>, so um nivel de subpastas. Ativando esta opcao, o agente passa a
+          varrer <strong>todas as subpastas abaixo da raiz, em qualquer profundidade</strong>, tanto para pasta
+          local quanto para pasta do Google Drive.
+        </p>
+
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Modo Individual / Grupo unico</span>
+            <p>Todos os PDFs encontrados em qualquer subpasta entram no mesmo fluxo, como se estivessem soltos na raiz.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Modo Lote por sub-pastas</span>
+            <p>Cada arquivo e agrupado pela sua pasta-mae (caminho completo, ex.: <code>2024/Janeiro/Contratos</code>), gerando uma saida por pasta em qualquer profundidade — nao so 1 nivel. Arquivos soltos direto na raiz continuam sendo ignorados, mesma regra do modo sem esta opcao.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Processamento em lotes automaticos</span>
+            <p>Para nao travar a execucao numa pasta com muitos documentos, cada execucao processa no maximo <strong>N PDFs novos</strong> (padrao 25, configuravel em <a href="/doc-system/configuracoes-gerais/">Configuracoes Gerais</a>). Se sobrar arquivo, o card do agente continua automaticamente para o proximo lote — o usuario nao precisa clicar de novo.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Sem perda nem repeticao</span>
+            <p>Arquivos ja processados com sucesso num lote anterior nunca entram de novo — a mesma regra de "arquivo ja processado antes" (por nome + pasta) usada no restante do sistema garante a continuidade entre lotes.</p>
+          </article>
+        </div>
+
+        <p style="font-size:12px;color:var(--muted,#7ca5b8);margin-top:16px">
+          Veja a experiencia do usuario final (indicador no modal, botao "Continuando (lote N)...") em
+          <a href="/doc-system/agentes/">Doc Sistema → Agentes</a>.
+        </p>
       </section>
 
       <section class="builder-card">

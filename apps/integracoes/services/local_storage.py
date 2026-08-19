@@ -46,7 +46,17 @@ def resolve_local_relative_path(local_storage_integration, relative_path):
     return target_path
 
 
-def list_pdf_files_from_relative_folder(local_storage_integration, relative_path):
+def list_pdf_files_from_relative_folder(
+    local_storage_integration, relative_path, *, force_recursive=False
+):
+    """Lista arquivos permitidos dentro de `relative_path`.
+
+    `force_recursive` varre todas as subpastas em qualquer profundidade
+    independente do flag `recursive_scan` da integracao — usado pelo toggle
+    por agente `AgenteConfiguracaoOperacional.include_subfolders`, que e uma
+    decisao do agente, nao da integracao (uma mesma pasta local pode ter um
+    agente que le so a raiz e outro que le tudo recursivamente).
+    """
     target_folder = resolve_local_relative_path(local_storage_integration, relative_path)
     if not target_folder.exists():
         raise LocalStorageServiceError("A pasta local informada nao existe.")
@@ -55,13 +65,10 @@ def list_pdf_files_from_relative_folder(local_storage_integration, relative_path
 
     extensoes = local_storage_integration.allowed_extensions or ["pdf"]
     patterns = [f"*.{ext}" for ext in extensoes]
+    usar_recursivo = force_recursive or local_storage_integration.recursive_scan
     files = []
     for pattern in patterns:
-        iterator = (
-            target_folder.rglob(pattern)
-            if local_storage_integration.recursive_scan
-            else target_folder.glob(pattern)
-        )
+        iterator = target_folder.rglob(pattern) if usar_recursivo else target_folder.glob(pattern)
         files.extend(iterator)
 
     normalized_files = []

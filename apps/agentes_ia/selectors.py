@@ -40,6 +40,8 @@ class AgenteLeituraResumo:
     usuario_tem_acesso: bool = True
     formato_saida: str = ""
     permite_forcar_reprocessamento: bool = False
+    caminho_origem: str = ""
+    inclui_subpastas: bool = False
 
 
 def _label_formato_saida(config) -> str:
@@ -64,6 +66,44 @@ def _label_tipo_entrada(config) -> tuple[str, str]:
     if st == "local_file":
         return "Arquivo local fixo", ""
     return "Sem origem documental", ""
+
+
+def _caminho_origem_pasta(config) -> str:
+    """Retorna o caminho completo da pasta de origem dos PDFs, para o
+    usuario conferir visualmente antes de confirmar a execucao.
+
+    So se aplica quando a origem padrao e uma pasta (local ou Google
+    Drive) — nos demais casos (upload na execucao, arquivo fixo, sem
+    origem) retorna vazio e o modal simplesmente nao exibe o campo.
+
+    Monta a string apenas concatenando o que ja esta cadastrado, sem
+    nenhum acesso a filesystem/rede — a tela de listagem nao pode
+    depender da pasta (local ou de rede) estar acessivel no momento.
+    """
+    if not config:
+        return ""
+    st = config.default_input_source_type
+    if st == AgentDefaultInputSourceType.LOCAL_FOLDER:
+        integ = config.default_local_storage_integration
+        if not integ or not integ.base_path:
+            return ""
+        base = integ.base_path.rstrip("/\\")
+        relativo = (config.default_local_relative_input_path or "").strip().strip("/\\")
+        if not relativo:
+            return base
+        separador = "\\" if "\\" in base else "/"
+        return f"{base}{separador}{relativo.replace('/', separador)}"
+    if st == AgentDefaultInputSourceType.GOOGLE_DRIVE_FOLDER:
+        fonte = config.default_folder_source
+        if not fonte:
+            return ""
+        partes = [fonte.folder_display_name or fonte.nome]
+        for item in config.default_gdrive_subfolder_path or []:
+            nome = item.get("nome") if isinstance(item, dict) else None
+            if nome:
+                partes.append(nome)
+        return " / ".join(p for p in partes if p)
+    return ""
 
 
 def _usuario_pode_usar_entrada(agente, usuario) -> bool:
@@ -122,6 +162,8 @@ def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]
         tem_acesso = _usuario_pode_usar_entrada(agente, usuario)
         formato_saida = _label_formato_saida(config)
         permite_forcar_reprocessamento = _permite_forcar_reprocessamento(config)
+        caminho_origem = _caminho_origem_pasta(config)
+        inclui_subpastas = bool(config and config.include_subfolders)
         agentes_resumo.append(
             AgenteLeituraResumo(
                 id=agente.id,
@@ -147,6 +189,8 @@ def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]
                 usuario_tem_acesso=tem_acesso,
                 formato_saida=formato_saida,
                 permite_forcar_reprocessamento=permite_forcar_reprocessamento,
+                caminho_origem=caminho_origem,
+                inclui_subpastas=inclui_subpastas,
             )
         )
     return agentes_resumo

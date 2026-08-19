@@ -205,6 +205,18 @@
               min="0" max="1000" value="{{ config.max_execucoes_por_usuario }}">
             <small>Limite individual por usuário. Padrão: 2. Tem prioridade sobre o limite global na mensagem exibida.</small>
           </div>
+
+          <div class="execution-field" style="max-width:420px;margin-top:18px">
+            <label for="id_max_pdfs_lote_subpastas">Máximo de PDFs por lote ao ler subpastas</label>
+            <input type="number" id="id_max_pdfs_lote_subpastas" name="max_pdfs_lote_subpastas"
+              min="0" max="1000" value="{{ config.max_pdfs_lote_subpastas }}">
+            <small>
+              Só vale para agentes com "Ler PDFs de todas as subpastas" ativo. Pastas com mais
+              PDFs do que esse limite são processadas em lotes automáticos (o sistema continua
+              sozinho até esgotar os arquivos). Padrão: 25. Use <strong>0</strong> para não
+              aplicar limite.
+            </small>
+          </div>
         </section>
 
         <div class="execution-actions builder-actions">

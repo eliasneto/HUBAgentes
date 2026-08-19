@@ -214,15 +214,54 @@
         data = { erro: "Resposta inesperada do servidor." };
       }
       if (data.erro) {
+        delete cardForm.dataset.autoContinueRound;
         _restoreCardButton(cardForm);
         _showToast(data.erro, data.tipo);
         return;
       }
       _startProgressTracking(cardForm, data.status_endpoint);
+      _maybeAutoContinue(cardForm, data);
     } catch (err) {
+      delete cardForm.dataset.autoContinueRound;
       _restoreCardButton(cardForm);
       _showToast("Erro ao iniciar execução: " + err.message, "erro");
     }
+  }
+
+  // ─── Continuação automática de lotes (leitura recursiva de subpastas) ───
+  // Quando o agente lê todas as subpastas (AgenteConfiguracaoOperacional.
+  // include_subfolders) e a pasta tem mais PDFs do que o limite processado
+  // por lote (ver ConfiguracaoGeral.max_pdfs_lote_subpastas), o servidor
+  // avisa via `mais_pdfs_pendentes`. Em vez de exigir um novo clique do
+  // usuário, disparamos automaticamente a próxima execução — o dedup de
+  // "já processado antes" já existente garante que ela retoma de onde a
+  // anterior parou, sem repetir nem perder arquivos.
+
+  const AUTO_CONTINUE_DELAY_MS = 1500;
+  const AUTO_CONTINUE_MAX_ROUNDS = 200;
+
+  function _maybeAutoContinue(cardForm, data) {
+    if (!data.mais_pdfs_pendentes) {
+      delete cardForm.dataset.autoContinueRound;
+      return;
+    }
+    const round = (parseInt(cardForm.dataset.autoContinueRound || "0", 10) || 0) + 1;
+    if (round > AUTO_CONTINUE_MAX_ROUNDS) {
+      // Teto de segurança contra loop infinito em caso de bug — o usuário
+      // continua podendo clicar manualmente em Executar para retomar.
+      delete cardForm.dataset.autoContinueRound;
+      _showToast(
+        "Ainda restam PDFs nas subpastas. Clique em Executar novamente para continuar.",
+        "atencao"
+      );
+      return;
+    }
+    cardForm.dataset.autoContinueRound = String(round);
+    const submitBtn = cardForm.querySelector("button[type='submit']");
+    if (submitBtn) submitBtn.textContent = "Continuando (lote " + (round + 1) + ")...";
+    setTimeout(function () {
+      _submitFormAsAjax(cardForm);
+    }, AUTO_CONTINUE_DELAY_MS);
   }
 
   function _restoreCardButton(cardForm) {
@@ -349,6 +388,16 @@
     const card = cardForm.closest(".agent-card");
     if (!card) return;
 
+    // Cancela o polling de uma rodada anterior (continuação automática de
+    // lotes chama isso várias vezes em sequência) antes de iniciar o novo,
+    // evitando que um intervalo antigo ainda vivo chame onFinish() com
+    // informação obsoleta depois que uma rodada mais nova já assumiu o
+    // botão/indicador de disponibilidade.
+    if (card._agentProgressIntervalId) {
+      clearInterval(card._agentProgressIntervalId);
+      card._agentProgressIntervalId = null;
+    }
+
     // Replace any existing progress panel
     const existing = card.querySelector("[data-agent-progress-panel]");
     if (existing) existing.remove();
@@ -407,11 +456,13 @@
     const intervalId = setInterval(() => {
       if (!IN_PROGRESS_STATUSES.has(panel.dataset.statusCode)) {
         clearInterval(intervalId);
+        card._agentProgressIntervalId = null;
         onFinish();
         return;
       }
       _pollProgress(panel);
     }, POLL_INTERVAL_MS);
+    card._agentProgressIntervalId = intervalId;
   }
 
   // ─── Confirmation modal ──────────────────────────────────────────────────
@@ -432,6 +483,22 @@
     const nomeInteg = cardForm.dataset.agentNomeIntegracao || "";
     setText("modal-exec-origem", nomeInteg ? tipoEntrada + " · " + nomeInteg : tipoEntrada);
     setText("modal-exec-formato-saida", cardForm.dataset.agentFormatoSaida);
+
+    // Caminho completo da pasta (Google Drive ou local) so aparece quando a
+    // origem do agente e uma pasta — permite o usuario conferir visualmente
+    // de onde os PDFs serao lidos antes de confirmar a execucao.
+    const caminhoWrap = document.getElementById("modal-exec-caminho-wrap");
+    const caminhoOrigem = cardForm.dataset.agentCaminhoOrigem || "";
+    if (caminhoWrap) caminhoWrap.style.display = caminhoOrigem ? "grid" : "none";
+    setText("modal-exec-caminho", caminhoOrigem);
+
+    // Aviso de leitura recursiva de subpastas (AgenteConfiguracaoOperacional.
+    // include_subfolders) — só aparece quando o toggle está ligado, para o
+    // usuário saber que o agente vai varrer todas as subpastas antes de
+    // confirmar a execução.
+    const subpastasWrap = document.getElementById("modal-exec-subpastas-wrap");
+    const incluiSubpastas = cardForm.dataset.agentIncluiSubpastas === "true";
+    if (subpastasWrap) subpastasWrap.style.display = incluiSubpastas ? "grid" : "none";
 
     // Checkbox "reprocessar" só faz sentido quando a origem é uma pasta do
     // Drive (rastreamento de já-processados não existe para arquivo pontual).

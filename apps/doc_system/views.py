@@ -45,6 +45,11 @@ _KNOWLEDGE_BASE = [
         "link": "/doc-system/agentes/",
     },
     {
+        "keywords": ["subpasta", "subpastas", "ler subpastas", "todas as subpastas", "recursivo", "recursiva", "varrer pasta", "pasta dentro de pasta", "sub-pasta", "sub-pastas", "arquivos dentro de subpastas", "lote de pdfs", "continuando lote", "proximo lote", "quantos pdfs por vez", "limite de pdfs por lote", "nao encontrou todos os arquivos", "so leu a raiz"],
+        "resposta": "**Ler PDFs de todas as subpastas:** opção por agente (em Gerenciar agentes, na seção Entrada), desligada por padrão. Quando ativa, o agente passa a ler os PDFs de **todas as subpastas abaixo da pasta raiz configurada, em qualquer profundidade** — não só os arquivos soltos na raiz (comportamento padrão) e não só 1 nível de subpastas (como no modo \"Lote por sub-pastas\" sem essa opção). Vale tanto para pasta local quanto para pasta do Google Drive.\n\n📦 **Pastas com muitos PDFs são processadas em lotes automáticos**, para não travar a execução: cada \"clique\" processa até um limite configurável (padrão 25 PDFs — ajustável em Administrador > Configurações Gerais, campo \"Máximo de PDFs por lote ao ler subpastas\"). Se sobrar arquivo, o botão do card muda para **\"Continuando (lote N)...\"** e o sistema dispara o próximo lote sozinho, sem precisar clicar de novo, até esgotar a pasta. Arquivos já processados com sucesso em lotes anteriores nunca são repetidos.\n\nNo modal de confirmação de execução, uma linha **\"Subpastas: sim...\"** avisa quando essa opção está ativa para o agente.",
+        "link": "/doc-system/agentes/",
+    },
+    {
         "keywords": ["integracao", "integracoes", "conectar", "api", "openai", "gemini", "anthropic", "modelo ia", "chave api", "validar integracao", "adicionar integracao", "nova integracao"],
         "resposta": "**Integrações** conectam o portal a serviços externos de IA e armazenamento.\n\n🔗 **Para adicionar:**\n1. Vá em Administrador > Integrações\n2. Clique em Nova integração\n3. Escolha o tipo (IA ou armazenamento)\n4. Informe a chave API\n5. Use **Validar** para testar antes de salvar\n\nSomente administradores podem gerenciar integrações.",
         "link": "/doc-system/integracoes/",
@@ -56,7 +61,7 @@ _KNOWLEDGE_BASE = [
     },
     {
         "keywords": ["gerenciar agente", "criar agente", "novo agente", "configurar agente", "editar agente", "prompt agente", "slug agente", "modo acionamento", "visibilidade agente"],
-        "resposta": "**Gerenciar agentes** é a área administrativa para criar e configurar agentes.\n\n⚙️ **Principais campos:**\n• Nome, slug e objetivo\n• Integração de IA e fonte de documentos\n• Modo de acionamento (portal, API)\n• Visibilidade (usuário ou técnico)\n• Prompt e configurações de saída\n• Máximo de tentativas por documento\n• Pré-processar PDF antes da IA (reduz custo)\n• Reduzir custo de raciocínio da IA (reduz custo)\n\nSomente administradores têm acesso.",
+        "resposta": "**Gerenciar agentes** é a área administrativa para criar e configurar agentes.\n\n⚙️ **Principais campos:**\n• Nome, slug e objetivo\n• Integração de IA e fonte de documentos\n• Modo de acionamento (portal, API)\n• Visibilidade (usuário ou técnico)\n• Prompt e configurações de saída\n• Máximo de tentativas por documento\n• Ler PDFs de todas as subpastas (para origem em pasta local ou Google Drive)\n• Pré-processar PDF antes da IA (reduz custo)\n• Reduzir custo de raciocínio da IA (reduz custo)\n\nSomente administradores têm acesso.",
         "link": "/doc-system/gerenciar-agentes/",
     },
     {
@@ -85,8 +90,8 @@ _KNOWLEDGE_BASE = [
         "link": "/doc-system/configuracao-custos/",
     },
     {
-        "keywords": ["configuracao geral", "configuracoes gerais", "parametro sistema", "pasta compartilhada"],
-        "resposta": "**Configurações gerais** centraliza parâmetros globais do sistema.\n\n🔧 **Inclui:**\n• Gerenciamento de pastas compartilhadas\n• Configurações de armazenamento\n• Parâmetros globais de operação\n\nAcesse em Administrador > Configurações Gerais.",
+        "keywords": ["configuracao geral", "configuracoes gerais", "parametro sistema", "pasta compartilhada", "maximo de pdfs por lote", "limite de execucoes simultaneas"],
+        "resposta": "**Configurações gerais** centraliza parâmetros globais do sistema.\n\n🔧 **Inclui:**\n• Gerenciamento de pastas compartilhadas\n• Limites de execuções simultâneas (global e por usuário)\n• Máximo de PDFs por lote ao ler subpastas recursivamente\n• Configurações de armazenamento\n• Parâmetros globais de operação\n\nAcesse em Administrador > Configurações Gerais.",
         "link": "/doc-system/configuracoes-gerais/",
     },
     {

@@ -225,7 +225,22 @@ def execute_processing(processamento, actor):
 
     resultado_preparo = prepare_documentos(processamento)
     processamento.total_documentos_ignorados = resultado_preparo.get("ignorados", 0)
-    processamento.save(update_fields=["total_documentos_ignorados", "updated_at"])
+    # Sinaliza para a view/front-end que a descoberta parou antes de
+    # esgotar a pasta (limite de lote atingido — ver document_sources.
+    # _LimiteLoteTracker) e ha mais PDFs pendentes nas subpastas alem
+    # desta execucao; usado para disparar a continuacao automatica do
+    # proximo lote. So pode ser True quando o agente le subpastas
+    # recursivamente (AgenteConfiguracaoOperacional.include_subfolders).
+    processamento.atingiu_limite_lote_subpastas = resultado_preparo.get(
+        "atingiu_limite_lote", False
+    )
+    processamento.save(
+        update_fields=[
+            "total_documentos_ignorados",
+            "atingiu_limite_lote_subpastas",
+            "updated_at",
+        ]
+    )
     documentos = list(_select_documentos(processamento))
     if processamento.input_source_type == ProcessingInputSourceType.NONE:
         return _execute_without_document(

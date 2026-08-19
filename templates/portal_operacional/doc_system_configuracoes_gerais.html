@@ -107,6 +107,42 @@
 
       <section class="builder-card">
         <div class="form-section-heading">
+          <p class="eyebrow">Limites de execucao</p>
+          <h2>Quantas execucoes podem rodar ao mesmo tempo e quantos PDFs por lote</h2>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          Controle quantos agentes podem rodar ao mesmo tempo e, para agentes que leem subpastas
+          recursivamente, quantos PDFs entram em cada lote automatico. Use <strong>0</strong> em qualquer um
+          desses campos para nao aplicar limite.
+        </p>
+
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo</div>
+            <div>O que controla</div>
+            <div>Padrao</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Maximo de execucoes simultaneas no sistema</strong></div>
+            <div>Limite global, somando fila + processamento de todos os usuarios.</div>
+            <div>5</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Maximo de execucoes simultaneas por usuario</strong></div>
+            <div>Limite individual por usuario — tem prioridade sobre o global na mensagem exibida.</div>
+            <div>2</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Maximo de PDFs por lote ao ler subpastas</strong></div>
+            <div>So vale para agentes com <strong>"Ler PDFs de todas as subpastas"</strong> ativo (ver <a href="/doc-system/gerenciar-agentes/">Doc Sistema → Gerenciar agentes</a>). Pastas com mais PDFs do que esse limite sao processadas em lotes automaticos, um apos o outro, sem exigir novo clique.</div>
+            <div>25</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
           <p class="eyebrow">Configuracoes avancadas</p>
           <h2>Campos disponiveis apenas no Django Admin</h2>
         </div>
