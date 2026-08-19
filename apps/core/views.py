@@ -1756,12 +1756,27 @@ class SalvarConfiguracaoGeralView(PortalAdministradorRequiredMixin, View):
             )
         except (ValueError, TypeError):
             max_pdfs_lote = 25
+        try:
+            intervalo_ia = max(
+                0,
+                min(
+                    120,
+                    int(
+                        request.POST.get(
+                            "intervalo_entre_documentos_ia_segundos", 2
+                        )
+                    ),
+                ),
+            )
+        except (ValueError, TypeError):
+            intervalo_ia = 2
         config = ConfiguracaoGeral.obter()
         config.visibilidade_dashboard = valor
         config.limpeza_automatica_ativa = "limpeza_automatica_ativa" in request.POST
         config.max_execucoes_simultaneas = max_global
         config.max_execucoes_por_usuario = max_usuario
         config.max_pdfs_lote_subpastas = max_pdfs_lote
+        config.intervalo_entre_documentos_ia_segundos = intervalo_ia
         config.atualizado_por = request.user
         config.save()
         messages.success(request, "Configurações gerais salvas com sucesso.")

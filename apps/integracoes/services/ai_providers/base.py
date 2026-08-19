@@ -91,9 +91,15 @@ class BaseAIProviderAdapter:
     # Erros transitorios costumam responder rapido, entao repetir com um
     # backoff curto resolve a maioria das falhas intermitentes sem que o
     # usuario perceba. Erros definitivos (401/403/400) nao sao repetidos.
-    max_transient_retries = 3
+    # max_transient_retries=5 e retry_max_delay_seconds=30 (antes 3/12) —
+    # aumentado apos incidente em producao (agente JHS/Licitacao,
+    # 19/08/2026) processando lotes grandes em gemini-2.5-pro: o teto de 12s
+    # era menor que a janela real de rate limit do provedor em alguns casos,
+    # entao a 3a tentativa desistia cedo demais. Continua respeitando o
+    # header Retry-After quando o provedor o envia (ver _parse_retry_after).
+    max_transient_retries = 5
     retry_base_delay_seconds = 1.5
-    retry_max_delay_seconds = 12.0
+    retry_max_delay_seconds = 30.0
 
     def __init__(self, integration):
         self.integration = integration

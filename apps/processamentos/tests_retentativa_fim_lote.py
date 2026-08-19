@@ -209,3 +209,85 @@ class RetentativaFimDeLoteTests(SimpleTestCase):
         self.assertEqual(resultado["total_success"], 2)
         self.assertEqual(resultado["total_errors"], 0)
         self.assertEqual(len(resultado["output_records"]), 2)
+
+
+@patch("apps.processamentos.services.agent_execution.time.sleep")
+@patch("apps.processamentos.services.agent_execution.obter_ou_criar_configuracao_operacional")
+@patch("apps.processamentos.services.agent_execution._log_execution_error")
+@patch("apps.processamentos.services.agent_execution._mark_document_error")
+@patch("apps.processamentos.services.agent_execution._execute_document")
+class IntervaloEntreDocumentosTests(SimpleTestCase):
+    """ConfiguracaoGeral.intervalo_entre_documentos_ia_segundos: espaca as
+    chamadas de IA em lotes grandes para reduzir a chance de estourar o
+    limite de requisicoes por minuto do provedor (ver incidente JHS/
+    Licitacao, 19/08/2026 — apps/integracoes/services/ai_providers/base.py
+    tem o mesmo motivo por tras do aumento de max_transient_retries)."""
+
+    def _config(self, max_tentativas=3):
+        config = MagicMock()
+        config.max_tentativas = max_tentativas
+        return config
+
+    def test_sem_intervalo_configurado_nao_dorme(
+        self, mock_execute, mock_mark_error, mock_log, mock_config, mock_sleep
+    ):
+        mock_config.return_value = self._config()
+        mock_execute.return_value = {"output_record": MagicMock()}
+        proc = _proc_com_contagem(0)
+
+        _execute_documents_individually(
+            processamento=proc,
+            documentos=[_documento("doc1.pdf"), _documento("doc2.pdf")],
+            integration=MagicMock(),
+            model_name="modelo",
+            execution_params={},
+            actor=MagicMock(),
+        )
+
+        mock_sleep.assert_not_called()
+
+    def test_intervalo_configurado_dorme_entre_documentos_mas_nao_antes_do_primeiro(
+        self, mock_execute, mock_mark_error, mock_log, mock_config, mock_sleep
+    ):
+        mock_config.return_value = self._config()
+        mock_execute.return_value = {"output_record": MagicMock()}
+        proc = _proc_com_contagem(0)
+
+        _execute_documents_individually(
+            processamento=proc,
+            documentos=[_documento("doc1.pdf"), _documento("doc2.pdf"), _documento("doc3.pdf")],
+            integration=MagicMock(),
+            model_name="modelo",
+            execution_params={},
+            actor=MagicMock(),
+            intervalo_entre_documentos_segundos=3,
+        )
+
+        # 3 documentos, todos sucesso de primeira: dorme so ANTES do 2o e do
+        # 3o (nunca antes do 1o) — 2 chamadas de sleep(3), nao 3.
+        self.assertEqual(mock_sleep.call_count, 2)
+        mock_sleep.assert_called_with(3)
+
+    def test_intervalo_tambem_se_aplica_na_retentativa_de_fim_de_lote(
+        self, mock_execute, mock_mark_error, mock_log, mock_config, mock_sleep
+    ):
+        mock_config.return_value = self._config()
+        mock_execute.side_effect = [
+            AIProviderServiceError("indisponivel", retryable=True),
+            {"output_record": MagicMock()},
+        ]
+        proc = _proc_com_contagem(0)
+
+        _execute_documents_individually(
+            processamento=proc,
+            documentos=[_documento("doc1.pdf")],
+            integration=MagicMock(),
+            model_name="modelo",
+            execution_params={},
+            actor=MagicMock(),
+            intervalo_entre_documentos_segundos=5,
+        )
+
+        # 1a tentativa (falha) + retentativa de fim de lote (sucesso): a
+        # espera vale entre as duas chamadas, so nao antes da 1a.
+        mock_sleep.assert_called_once_with(5)

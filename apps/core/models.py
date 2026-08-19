@@ -56,6 +56,22 @@ class ConfiguracaoGeral(models.Model):
             "subpastas recursivamente. 0 = sem limite."
         ),
     )
+    # Espaca as chamadas a IA quando um agente processa varios documentos em
+    # sequencia (modo Individual), para reduzir a chance de estourar o
+    # limite de requisicoes por minuto (RPM) do provedor em lotes grandes
+    # (ex.: cliente que as vezes envia ate 50 documentos de uma vez). 0 =
+    # sem espera entre documentos (comportamento anterior). So se aplica
+    # entre chamadas de IA de documentos diferentes, nunca dentro de uma
+    # unica chamada.
+    intervalo_entre_documentos_ia_segundos = models.PositiveSmallIntegerField(
+        default=2,
+        help_text=(
+            "Segundos de espera entre o processamento de um documento e o "
+            "proximo, quando um agente processa varios documentos em "
+            "sequencia. Reduz a chance de estourar o limite de requisicoes "
+            "por minuto do provedor de IA em lotes grandes. 0 = sem espera."
+        ),
+    )
     mascote_ativo = models.BooleanField(
         default=True,
         help_text="Quando ativo, o assistente Biel aparece flutuando no portal para todos os usuarios.",

@@ -5,6 +5,19 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.20] — 2026-08-19
+
+### Adicionado
+- **Intervalo configurável entre chamadas de IA em lotes grandes** (`ConfiguracaoGeral.intervalo_entre_documentos_ia_segundos`, migration `core/0015`, editável em Administrador > Configurações Gerais, padrão 2s, `0` = sem espera) — motivado pelo agente "JHS (Licitação)" (cliente informou que às vezes precisa enviar até 50 documentos de uma vez): processar muitos documentos grandes em sequência rápida contra `gemini-2.5-pro` aumenta a chance de esbarrar no limite de requisições por minuto do provedor. Espaça as chamadas de `_execute_documents_individually` (1ª passada e a retentativa de fim de lote), sem espera antes da primeira chamada do lote nem depois da última.
+
+### Corrigido
+- **Timeout de 120s baixo demais para `gemini-2.5-pro` em documentos grandes** — aumentado para 300s na integração "Servidor - API Gemini" (`AIProviderIntegration.timeout_seconds`, já configurável, sem precisar de deploy). Investigado como causa mais provável de "provedor de IA temporariamente indisponível" no incidente do JHS: a cota real da API (conferida no painel do Google — RPM/TPM/RPD com folga grande) descartou limite de cota; `gemini-2.5-pro` em modo thinking processando PDFs grandes de edital plausivelmente excede 120s antes de responder.
+- **Retentativa mais paciente para erros transitórios do provedor de IA** (`BaseAIProviderAdapter`, `apps/integracoes/services/ai_providers/base.py`) — `max_transient_retries` 3→5 e `retry_max_delay_seconds` 12s→30s. Continua respeitando o header `Retry-After` do provedor quando presente.
+- **Erro técnico real descartado na auditoria de falhas retryable** (`_tentar_executar_documento_individual`, `agent_execution.py`) — `_log_execution_error` guardava só a mensagem amigável ("provedor temporariamente indisponível...") em vez do `technical_message` (HTTP real, ex.: `429`/`503`/corpo da resposta) já calculado por `normalizar_erro_processamento`. Descoberto ao tentar diagnosticar o incidente do JHS e não achar o código HTTP real em lugar nenhum — agora `EventoAuditoria` (Django admin) guarda o detalhe técnico real quando disponível.
+- Cobertura: `apps/processamentos/tests_retentativa_fim_lote.py` ganhou 3 testes novos para o intervalo entre documentos (sem intervalo configurado não dorme, dorme entre documentos mas nunca antes do 1º, intervalo também vale na retentativa de fim de lote). Suite completa (110 testes), `manage.py check` e `makemigrations --check` OK.
+
+---
+
 ## [1.5.19] — 2026-08-19
 
 ### Corrigido

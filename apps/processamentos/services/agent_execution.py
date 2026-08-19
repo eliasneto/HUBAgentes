@@ -1,6 +1,7 @@
 import json
 import logging
 import threading
+import time
 from pathlib import Path
 from collections.abc import Iterable
 
@@ -276,6 +277,8 @@ def execute_processing(processamento, actor):
     )
 
     if _usa_execucao_individual(processamento):
+        from apps.core.models import ConfiguracaoGeral
+
         batch_result = _execute_documents_individually(
             processamento=processamento,
             documentos=documentos,
@@ -283,6 +286,9 @@ def execute_processing(processamento, actor):
             model_name=model_name,
             execution_params=execution_params,
             actor=actor,
+            intervalo_entre_documentos_segundos=(
+                ConfiguracaoGeral.obter().intervalo_entre_documentos_ia_segundos
+            ),
         )
     elif _usa_execucao_por_pasta(processamento):
         batch_result = _execute_documents_by_folder(
@@ -548,13 +554,18 @@ def _tentar_executar_documento_individual(
             usage_metadata=getattr(exc, "usage_metadata", None),
             retryable=retryable,
         )
+        # Guarda o detalhe tecnico (ex.: HTTP 429/503, corpo cru da resposta
+        # do provedor) na auditoria, nao so a mensagem amigavel — sem isso,
+        # diagnosticar uma falha "provedor temporariamente indisponivel"
+        # exige adivinhar se foi rate limit, timeout ou instabilidade real
+        # (caso real: JHS/Licitacao, 19/08/2026).
         _log_execution_error(
             actor=actor,
             processamento=processamento,
             documento=documento,
             integration=integration,
             model_name=model_name,
-            error_message=str(exc),
+            error_message=mensagem_tecnica or str(exc),
         )
         return {
             "sucesso": False,
@@ -574,6 +585,7 @@ def _execute_documents_individually(
     model_name,
     execution_params,
     actor,
+    intervalo_entre_documentos_segundos=0,
 ):
     output_records = []
     total_success = 0
@@ -593,6 +605,20 @@ def _execute_documents_individually(
         if resultado["mensagem_tecnica"]:
             last_technical_error_message = resultado["mensagem_tecnica"]
 
+    # Espaca as chamadas de IA (ConfiguracaoGeral.
+    # intervalo_entre_documentos_ia_segundos) para reduzir a chance de
+    # estourar o limite de requisicoes por minuto do provedor em lotes
+    # grandes (ex.: 50 documentos de uma vez). So espera ANTES de cada
+    # chamada que nao seja a primeira do lote inteiro (1a e 2a passada
+    # juntas) — nunca antes da primeira, nunca depois da ultima.
+    _chamada_ja_feita = False
+
+    def _aguardar_intervalo():
+        nonlocal _chamada_ja_feita
+        if _chamada_ja_feita and intervalo_entre_documentos_segundos:
+            time.sleep(intervalo_entre_documentos_segundos)
+        _chamada_ja_feita = True
+
     # 1a passada: tenta cada documento pendente uma vez.
     a_retentar = []
     for documento in documentos:
@@ -610,6 +636,7 @@ def _execute_documents_individually(
             )
             continue
 
+        _aguardar_intervalo()
         resultado = _tentar_executar_documento_individual(
             processamento=processamento,
             documento=documento,
@@ -645,6 +672,7 @@ def _execute_documents_individually(
     # problema permanente do documento; uma nova chamada tem boa chance de
     # dar certo. Ainda respeita max_tentativas do agente como teto.
     for documento in a_retentar:
+        _aguardar_intervalo()
         resultado = _tentar_executar_documento_individual(
             processamento=processamento,
             documento=documento,
