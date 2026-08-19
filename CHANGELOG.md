@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.19] — 2026-08-19
+
+### Corrigido
+- **Gemini rejeitava execução inteira quando "Reduzir custo de raciocínio da IA" estava ativo em modelo que exige thinking sempre ligado** (`gemini_adapter.py`) — descoberto em produção: o agente "JHS (Licitação)" (`gemini-2.5-pro`) parava com `HTTP 400 Budget 0 is invalid. This model only works in thinking mode.` em toda execução. Diferente do Gemini 2.5 Flash/Flash-Lite, o 2.5 Pro não permite `thinkingBudget: 0` — não dá pra desligar o raciocínio interno nesse modelo. O `help_text` do campo já prometia que o toggle "só tem efeito em modelos que suportam esse ajuste; em outros fica sem efeito", mas na prática ele quebrava a execução em vez de simplesmente não ter efeito. `GeminiProviderAdapter._post_json` agora detecta esse erro específico (`"budget 0 is invalid"` / `"only works in thinking mode"` no corpo da resposta) e refaz a chamada uma vez sem `thinkingConfig`, cumprindo a promessa do help_text sem exigir nenhuma mudança de configuração do agente.
+- Cobertura: `apps/integracoes/tests_gemini_thinking_budget.py` ganhou 3 testes novos (retry bem-sucedido removendo `thinkingConfig`, erro não relacionado continua propagando sem retry, payload sem `thinkingConfig` não tenta de novo). Suite completa (107 testes) e `manage.py check` OK.
+
+---
+
 ## [1.5.18] — 2026-08-19
 
 ### Corrigido

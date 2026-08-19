@@ -2,7 +2,21 @@ from urllib.parse import urlencode
 
 import base64
 
-from .base import AIProviderExecutionResult, BaseAIProviderAdapter
+from .base import AIProviderExecutionResult, AIProviderServiceError, BaseAIProviderAdapter
+
+
+# Erro que a Gemini devolve quando thinkingBudget=0 e enviado para um modelo
+# que nao permite desligar o raciocinio interno (ex.: gemini-2.5-pro, que "so
+# funciona em thinking mode" — diferente do 2.5 Flash/Flash-Lite, que aceita
+# budget 0 normalmente). Ver AgenteConfiguracaoOperacional.
+# enable_thinking_budget_reduction: a intencao documentada do toggle e nao
+# ter efeito nenhum em modelos que nao suportam o ajuste, nunca quebrar a
+# execucao — por isso, ao detectar esse erro especifico, a chamada e
+# refeita sem thinkingConfig em vez de propagar a falha ao usuario.
+_THINKING_BUDGET_INVALIDO_PATTERNS = (
+    "budget 0 is invalid",
+    "only works in thinking mode",
+)
 
 
 class GeminiProviderAdapter(BaseAIProviderAdapter):
@@ -277,14 +291,36 @@ class GeminiProviderAdapter(BaseAIProviderAdapter):
         return generation_config
 
     def _post_json(self, request_url, payload):
-        response_payload, _ = self._post_json_request(
-            request_url,
-            payload,
-            http_error_prefix="Falha HTTP {code} ao executar o agente no provedor: {body}",
-            connection_error_prefix="Falha de conexao ao executar o agente no provedor: {reason}",
-            invalid_json_message="O provedor retornou uma resposta invalida para a execucao.",
-        )
-        return response_payload
+        try:
+            response_payload, _ = self._post_json_request(
+                request_url,
+                payload,
+                http_error_prefix="Falha HTTP {code} ao executar o agente no provedor: {body}",
+                connection_error_prefix="Falha de conexao ao executar o agente no provedor: {reason}",
+                invalid_json_message="O provedor retornou uma resposta invalida para a execucao.",
+            )
+            return response_payload
+        except AIProviderServiceError as exc:
+            thinking_config = payload.get("generationConfig", {}).get("thinkingConfig")
+            if thinking_config is None or not self._eh_erro_thinking_budget_invalido(exc):
+                raise
+            # Modelo nao aceita desligar o raciocinio: refaz a chamada sem
+            # thinkingConfig, para o toggle ficar sem efeito (como
+            # documentado) em vez de quebrar a execucao inteira.
+            payload["generationConfig"].pop("thinkingConfig", None)
+            response_payload, _ = self._post_json_request(
+                request_url,
+                payload,
+                http_error_prefix="Falha HTTP {code} ao executar o agente no provedor: {body}",
+                connection_error_prefix="Falha de conexao ao executar o agente no provedor: {reason}",
+                invalid_json_message="O provedor retornou uma resposta invalida para a execucao.",
+            )
+            return response_payload
+
+    @staticmethod
+    def _eh_erro_thinking_budget_invalido(exc):
+        mensagem = str(exc).lower()
+        return any(pattern in mensagem for pattern in _THINKING_BUDGET_INVALIDO_PATTERNS)
 
     def _extract_output_text(self, response_payload):
         texts = []
