@@ -190,6 +190,14 @@ def executar_rotinas_automaticas_agentes():
     maximo 6 documentos por agente, por seguranca, ignorando o lote
     global configurado.
 
+    A primeira rodada apos essa configuracao ser salva respeita
+    ConfiguracaoGeral.rotina_automatica_inicio_em, se configurado (ex.:
+    "20/08/2026 as 19:20") — antes desse horario, a rotina nao roda. A
+    partir da primeira rodada, as demais seguem so o intervalo, ignorando
+    o horario de inicio (ver SalvarRotinaAutomaticaConfigView, que reseta
+    rotina_automatica_proxima_execucao_em sempre que o inicio agendado
+    muda, para o novo horario valer).
+
     Para cada agente participante ativo cuja proxima rodada ja chegou,
     dispara uma execucao normal (mesmo caminho de "Executar" manual). Se
     nao houver nada novo (tudo ja processado antes - mesma regra de
@@ -207,7 +215,15 @@ def executar_rotinas_automaticas_agentes():
 
     agora = timezone.now()
     proxima_execucao = configuracao_geral.rotina_automatica_proxima_execucao_em
-    if proxima_execucao is not None and proxima_execucao > agora:
+    if proxima_execucao is None:
+        # Nunca rodou desde a ultima vez que essa configuracao foi salva —
+        # respeita o horario de inicio agendado (se houver e ainda nao
+        # tiver chegado). Sem inicio configurado, ou com o horario ja no
+        # passado, fica elegivel imediatamente (comportamento anterior).
+        inicio_agendado = configuracao_geral.rotina_automatica_inicio_em
+        if inicio_agendado is not None and inicio_agendado > agora:
+            return []
+    elif proxima_execucao > agora:
         return []
 
     intervalo_minutos = configuracao_geral.rotina_automatica_intervalo_minutos

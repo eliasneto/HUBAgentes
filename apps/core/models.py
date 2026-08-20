@@ -111,9 +111,27 @@ class ConfiguracaoGeral(models.Model):
             "intervalo entre rodadas for menor que 30 minutos."
         ),
     )
+    # Editavel — agenda a PRIMEIRA rodada apos essa configuracao ser salva
+    # (ex.: "20/08/2026 as 19:20"). So tem efeito ate a primeira rodada
+    # rodar; a partir dai, as rodadas seguintes usam so
+    # rotina_automatica_intervalo_minutos (ver executar_rotinas_
+    # automaticas_agentes). Em branco = elegivel na proxima checagem do
+    # worker, sem agendamento especifico.
+    rotina_automatica_inicio_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Data e hora em que a primeira rodada apos salvar essa "
+            "configuracao deve acontecer (ex.: 20/08/2026 as 19:20). "
+            "Depois dessa primeira rodada, as demais seguem so o "
+            "intervalo configurado acima. Deixe em branco para nao "
+            "agendar um inicio especifico."
+        ),
+    )
     # Calculado automaticamente (nao editavel) — quando a proxima rodada da
     # rotina automatica pode rodar. Nulo = elegivel imediatamente na
-    # proxima checagem do worker.
+    # proxima checagem do worker (ou respeita rotina_automatica_inicio_em,
+    # se configurado).
     rotina_automatica_proxima_execucao_em = models.DateTimeField(null=True, blank=True)
     atualizado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,

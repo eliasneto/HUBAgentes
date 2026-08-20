@@ -1854,6 +1854,10 @@ class RotinaAutomaticaAgentesView(PortalAdministradorRequiredMixin, TemplateView
 
 class SalvarRotinaAutomaticaConfigView(PortalAdministradorRequiredMixin, View):
     def post(self, request):
+        from datetime import datetime
+
+        from django.utils import timezone as django_timezone
+
         from apps.core.models import ConfiguracaoGeral
 
         try:
@@ -1869,7 +1873,27 @@ class SalvarRotinaAutomaticaConfigView(PortalAdministradorRequiredMixin, View):
         except (ValueError, TypeError):
             lote_tamanho = 10
 
+        # Campo <input type="datetime-local">, formato "AAAA-MM-DDTHH:MM",
+        # sem fuso — interpretado no fuso configurado do sistema (America/
+        # Sao_Paulo), igual ao restante das datas exibidas no portal.
+        inicio_raw = request.POST.get("rotina_automatica_inicio_em", "").strip()
+        inicio_em = None
+        if inicio_raw:
+            try:
+                inicio_naive = datetime.strptime(inicio_raw, "%Y-%m-%dT%H:%M")
+                inicio_em = django_timezone.make_aware(
+                    inicio_naive, django_timezone.get_current_timezone()
+                )
+            except ValueError:
+                inicio_em = None
+
         config = ConfiguracaoGeral.obter()
+        if inicio_em != config.rotina_automatica_inicio_em:
+            # Horario de inicio novo, alterado ou removido — reseta o
+            # agendamento para o novo horario valer na proxima checagem do
+            # worker (ver executar_rotinas_automaticas_agentes).
+            config.rotina_automatica_proxima_execucao_em = None
+        config.rotina_automatica_inicio_em = inicio_em
         config.rotina_automatica_agentes_ativa = (
             "rotina_automatica_agentes_ativa" in request.POST
         )

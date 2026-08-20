@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.22] — 2026-08-20
+
+### Adicionado
+- **Data e hora de início para a rotina automática** (`ConfiguracaoGeral.rotina_automatica_inicio_em`, migration `core/0018`, campo em Administrador > Rotina automática) — permite agendar a **primeira** rodada para um momento exato (ex.: 20/08/2026 às 19:20), em vez de ficar elegível já na próxima checagem do worker. Depois dessa primeira rodada, as demais seguem só o intervalo configurado — o horário de início não se repete. Alterar ou remover esse horário reagenda a próxima rodada para respeitar o novo valor; salvar de novo com o mesmo horário preserva o agendamento já calculado (evita resetar sem querer ao só ajustar o intervalo ou o lote). Deixar em branco mantém o comportamento anterior.
+- Cobertura: 7 testes novos em `apps/processamentos/tests_rotina_automatica_agentes.py` (elegibilidade antes/depois do horário agendado, horário ignorado após a primeira rodada, parse e reset do agendamento ao salvar, horário inválido não quebra). Suite completa (187 testes), `manage.py check` e `makemigrations --check --dry-run` OK.
+
+---
+
 ## [1.5.21] — 2026-08-20
 
 ### Adicionado

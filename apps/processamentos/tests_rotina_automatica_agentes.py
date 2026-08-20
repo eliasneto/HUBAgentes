@@ -337,6 +337,49 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
         mock_rodar.assert_called_once()
 
     @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    def test_nao_considera_antes_do_horario_de_inicio_agendado(self, mock_rodar):
+        # rotina_automatica_proxima_execucao_em ainda None (nunca rodou) —
+        # respeita o horario de inicio configurado.
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_inicio_em = timezone.now() + timedelta(hours=1)
+        config.save(update_fields=["rotina_automatica_inicio_em"])
+        _criar_agente(criado_por=self.user, execucao_automatica_ativa=True)
+
+        executar_rotinas_automaticas_agentes()
+
+        mock_rodar.assert_not_called()
+
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    def test_considera_quando_horario_de_inicio_agendado_ja_passou(self, mock_rodar):
+        mock_rodar.return_value = {"agente": "x", "status": "executada"}
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_inicio_em = timezone.now() - timedelta(minutes=1)
+        config.save(update_fields=["rotina_automatica_inicio_em"])
+        _criar_agente(criado_por=self.user, execucao_automatica_ativa=True)
+
+        executar_rotinas_automaticas_agentes()
+
+        mock_rodar.assert_called_once()
+
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    def test_horario_de_inicio_e_ignorado_apos_a_primeira_rodada(self, mock_rodar):
+        # Uma vez que rotina_automatica_proxima_execucao_em ja foi
+        # calculado (rodou pelo menos uma vez), o horario de inicio nao
+        # importa mais — so o intervalo entre rodadas vale.
+        mock_rodar.return_value = {"agente": "x", "status": "executada"}
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_inicio_em = timezone.now() + timedelta(hours=1)
+        config.rotina_automatica_proxima_execucao_em = timezone.now() - timedelta(minutes=1)
+        config.save(
+            update_fields=["rotina_automatica_inicio_em", "rotina_automatica_proxima_execucao_em"]
+        )
+        _criar_agente(criado_por=self.user, execucao_automatica_ativa=True)
+
+        executar_rotinas_automaticas_agentes()
+
+        mock_rodar.assert_called_once()
+
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
     def test_agente_inativo_nao_e_considerado_mesmo_com_rotina_ativa(self, mock_rodar):
         agente, configuracao = _criar_agente(
             criado_por=self.user, execucao_automatica_ativa=True
@@ -656,6 +699,93 @@ class RotinaAutomaticaAgentesViewTests(TestCase):
         )
         config = ConfiguracaoGeral.obter()
         self.assertEqual(config.rotina_automatica_lote_tamanho, 100)
+
+    def test_salvar_com_horario_de_inicio_agenda_a_primeira_rodada(self):
+        self.client.post(
+            reverse("portal_rotina_automatica_salvar"),
+            {
+                "rotina_automatica_agentes_ativa": "1",
+                "rotina_automatica_intervalo_minutos": "60",
+                "rotina_automatica_lote_tamanho": "10",
+                "rotina_automatica_inicio_em": "2026-08-20T19:20",
+            },
+        )
+        config = ConfiguracaoGeral.obter()
+        self.assertIsNotNone(config.rotina_automatica_inicio_em)
+        inicio_local = timezone.localtime(config.rotina_automatica_inicio_em)
+        self.assertEqual(inicio_local.hour, 19)
+        self.assertEqual(inicio_local.minute, 20)
+        # Novo horario de inicio (era None) — reseta o agendamento para o
+        # novo horario valer na proxima checagem do worker.
+        self.assertIsNone(config.rotina_automatica_proxima_execucao_em)
+
+    def test_salvar_com_mesmo_horario_de_inicio_preserva_proxima_rodada(self):
+        config = ConfiguracaoGeral.obter()
+        proxima_original = timezone.now() + timedelta(minutes=45)
+        config.rotina_automatica_proxima_execucao_em = proxima_original
+        config.save(update_fields=["rotina_automatica_proxima_execucao_em"])
+        # Primeiro save fixa o horario de inicio...
+        self.client.post(
+            reverse("portal_rotina_automatica_salvar"),
+            {
+                "rotina_automatica_agentes_ativa": "1",
+                "rotina_automatica_intervalo_minutos": "60",
+                "rotina_automatica_lote_tamanho": "10",
+                "rotina_automatica_inicio_em": "2026-08-20T19:20",
+            },
+        )
+        config.refresh_from_db()
+        config.rotina_automatica_proxima_execucao_em = proxima_original
+        config.save(update_fields=["rotina_automatica_proxima_execucao_em"])
+
+        # ...segundo save com o MESMO horario nao deve resetar o
+        # agendamento ja calculado (ex.: admin so ajustando o intervalo).
+        self.client.post(
+            reverse("portal_rotina_automatica_salvar"),
+            {
+                "rotina_automatica_agentes_ativa": "1",
+                "rotina_automatica_intervalo_minutos": "90",
+                "rotina_automatica_lote_tamanho": "10",
+                "rotina_automatica_inicio_em": "2026-08-20T19:20",
+            },
+        )
+        config.refresh_from_db()
+        self.assertEqual(config.rotina_automatica_proxima_execucao_em, proxima_original)
+
+    def test_salvar_removendo_horario_de_inicio_reseta_proxima_rodada(self):
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_inicio_em = timezone.now() + timedelta(hours=1)
+        config.rotina_automatica_proxima_execucao_em = timezone.now() + timedelta(minutes=45)
+        config.save(
+            update_fields=["rotina_automatica_inicio_em", "rotina_automatica_proxima_execucao_em"]
+        )
+
+        self.client.post(
+            reverse("portal_rotina_automatica_salvar"),
+            {
+                "rotina_automatica_agentes_ativa": "1",
+                "rotina_automatica_intervalo_minutos": "60",
+                "rotina_automatica_lote_tamanho": "10",
+                # rotina_automatica_inicio_em ausente do POST = removido
+            },
+        )
+        config.refresh_from_db()
+        self.assertIsNone(config.rotina_automatica_inicio_em)
+        self.assertIsNone(config.rotina_automatica_proxima_execucao_em)
+
+    def test_salvar_com_horario_de_inicio_invalido_nao_quebra(self):
+        resp = self.client.post(
+            reverse("portal_rotina_automatica_salvar"),
+            {
+                "rotina_automatica_agentes_ativa": "1",
+                "rotina_automatica_intervalo_minutos": "60",
+                "rotina_automatica_lote_tamanho": "10",
+                "rotina_automatica_inicio_em": "isso-nao-e-uma-data",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        config = ConfiguracaoGeral.obter()
+        self.assertIsNone(config.rotina_automatica_inicio_em)
 
     def test_salvar_sem_marcar_o_toggle_desliga(self):
         config = ConfiguracaoGeral.obter()
