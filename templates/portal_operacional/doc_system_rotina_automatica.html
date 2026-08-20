@@ -1,0 +1,181 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Sistema - Rotina Automatica</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260820-doc-rotina-automatica-1">
+</head>
+<body class="agent-builder-page">
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="doc_rotina_automatica" %}
+
+    <section class="portal-main" aria-label="Documentacao da Rotina Automatica">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Doc Sistema</p>
+          <h1>Rotina Automatica de Agentes</h1>
+        </div>
+      </header>
+
+      <section class="agent-builder-hero">
+        <div>
+          <p class="eyebrow">Guia operacional</p>
+          <h2>Processe lotes grandes de documentos sem depender de cliques manuais.</h2>
+          <p>
+            A rotina automatica processa um lote pequeno de documentos pendentes de tempos em
+            tempos, em vez de tentar tudo numa unica execucao sincrona — pensada para pastas com
+            muitos arquivos de uma vez (ex.: 40-50 editais), que nao cabem no tempo limite do
+            servidor numa unica chamada.
+          </p>
+        </div>
+        <div class="builder-orb" aria-hidden="true">
+          <span>ROT</span>
+          <small>auto</small>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo 1 — por agente</p>
+          <h2>Cada agente decide se participa</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          Em <strong>Gerenciar agentes</strong>, na secao de entrada de cada agente (so aparece
+          para origem em pasta local ou Google Drive), existe o toggle <strong>"Ativar rotina
+          automatica"</strong>. Só agentes com esse toggle ligado entram na rotina — todos os
+          outros continuam funcionando exatamente como antes, so pelo botao Executar manual.
+          Esse toggle e a UNICA configuracao que fica no agente — quantos documentos e a
+          frequencia das rodadas sao definidos uma vez, no Administrador, e valem para todos.
+        </p>
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Campo (no agente)</div>
+            <div>O que controla</div>
+            <div>Padrao</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Ativar rotina automatica</strong></div>
+            <div>Se este agente participa das rodadas automaticas.</div>
+            <div>Desligado</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Passo 2 — Administrador</p>
+          <h2>Interruptor, intervalo e lote sao globais</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          Em <strong>Administrador &gt; Rotina automatica</strong>, um unico interruptor, um
+          unico intervalo e uma unica quantidade de documentos por rodada valem para
+          <strong>todos</strong> os agentes participantes — nao ha nada disso configuravel por
+          agente.
+        </p>
+        <div class="doc-guide-grid">
+          <article class="doc-guide-card">
+            <span class="doc-chip">Interruptor geral</span>
+            <p>Quando desligado, a rotina nao roda para <strong>nenhum</strong> agente, mesmo que
+            ele tenha a participacao ativada individualmente. Util para pausar tudo de uma vez
+            (ex.: manutencao, investigar um problema).</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Intervalo entre rodadas</span>
+            <p>Minimo 10 minutos, maximo 1440 (24h). Vale para todos os agentes com a rotina
+            ativada.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Documentos por rodada</span>
+            <p>Quantos documentos pendentes cada agente participante processa por rodada
+            (padrao 10). O restante fica pendente para a rodada seguinte.</p>
+          </article>
+          <article class="doc-guide-card">
+            <span class="doc-chip">Regra de seguranca</span>
+            <p>Se o intervalo global for <strong>menor que 30 minutos</strong>, cada rodada
+            processa no maximo <strong>6 documentos</strong> por agente, ignorando o valor
+            configurado — protege contra excesso de chamadas ao provedor de IA em janelas
+            curtas.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Como funciona por dentro</p>
+          <h2>Uma rodada, passo a passo</h2>
+        </div>
+        <div class="doc-code-panel">
+          <strong>Exemplo: intervalo global de 60 minutos, 10 documentos por rodada (padrao global)</strong>
+          <pre><code>09:00 → rotina roda → pega os 10 documentos pendentes mais antigos → processa
+10:00 → rotina roda de novo → pega os proximos 10 pendentes → processa
+11:00 → nao ha nenhum documento novo (tudo ja processado) → rotina nao faz nada
+12:00 → cliente adiciona 5 documentos novos na pasta
+13:00 → rotina roda → pega os 5 novos → processa</code></pre>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-top:16px;line-height:1.6">
+          A rotina reaproveita a mesma regra de duplicidade que ja existe no sistema: um
+          documento so e processado de novo se <strong>"Reprocessar arquivos ja executados"</strong>
+          for marcado manualmente. Isso garante que rodar a rotina varias vezes nunca duplica
+          trabalho nem custo de IA. Ela tambem respeita a trava de concorrencia por agente — se
+          alguem clicar em Executar manualmente enquanto a rotina roda o mesmo agente, a segunda
+          tentativa e adiada, nunca disputa os mesmos documentos.
+        </p>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Historico de execucoes</p>
+          <h2>Acompanhe cada rodada</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          A mesma tela <strong>Administrador &gt; Rotina automatica</strong> lista o historico de
+          tentativas, com filtro por agente e por situacao.
+        </p>
+        <div class="doc-table">
+          <div class="doc-table-row doc-table-head">
+            <div>Situacao</div>
+            <div>O que significa</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Executada</strong></div>
+            <div>Rodou de fato — mostra quantos documentos, quantos com sucesso e quantos com erro.</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Sem documentos novos</strong></div>
+            <div>Nao havia nada pendente pra esse agente nessa rodada (situacao normal, nao e falha).</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Agente ja em execucao</strong></div>
+            <div>A trava de concorrencia estava ocupada (execucao manual ou outra rodada disputando o mesmo agente).</div>
+          </div>
+          <div class="doc-table-row">
+            <div><strong>Erro ao iniciar</strong></div>
+            <div>Falha antes de conseguir comecar (ex.: agente sem usuario responsavel para a execucao).</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
+          <p class="eyebrow">Observacoes importantes</p>
+          <h2>Pontos de atencao</h2>
+        </div>
+        <ul class="doc-note-list">
+          <li>Apenas administradores acessam a tela Administrador &gt; Rotina automatica.</li>
+          <li>A rotina roda em segundo plano (worker), verificada periodicamente — nao depende de nenhuma aba aberta no navegador.</li>
+          <li>Executar manualmente continua funcionando normalmente mesmo com a rotina ativa, respeitando a mesma trava de concorrencia.</li>
+          <li>Alterar o interruptor ou o intervalo global tem efeito imediato na proxima verificacao do worker.</li>
+        </ul>
+      </section>
+
+      <div class="execution-actions builder-actions">
+        <a class="secondary-action" href="{% url 'portal_rotina_automatica' %}">Abrir Rotina automatica</a>
+        <a class="start-button" href="/doc-system/rotina-automatica/">Recarregar esta documentacao</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

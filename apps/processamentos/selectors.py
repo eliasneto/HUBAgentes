@@ -10,10 +10,12 @@ from django.utils import timezone
 from apps.processamentos.models import (
     DocumentStatus,
     ExecutionScopeType,
+    OutputDocumentStatus,
     Processamento,
     ProcessamentoExecucaoIA,
     ProcessingOutputFormat,
     ProcessingStatus,
+    RotinaAutomaticaExecucao,
 )
 from apps.processamentos.services.error_handling import (
     ERRO_TECNICO_OPERACIONAL,
@@ -30,6 +32,13 @@ class DocumentoTokensResumo:
     status: str
     total_tokens: int
     mensagem_erro: str = ""
+    # Preenchido so no modo de entrada Individual (1 documento = 1 saida) e
+    # so quando ESSE documento especifico ja foi processado com sucesso —
+    # deixa o usuario baixar documentos prontos sem esperar o processamento
+    # inteiro terminar. Vazio nos demais casos (Grupo/Lote por pasta, onde
+    # a saida e consolidada e nao existe arquivo por documento; ou o
+    # documento ainda nao processou/deu erro).
+    download_url: str = ""
 
 
 @dataclass(frozen=True)
@@ -210,8 +219,20 @@ def _tokens_por_documento(processamento: Processamento) -> list[DocumentoTokensR
     automatica de fim de lote (ver agent_execution._execute_documents_individually)
     aparece aqui sem mensagem, com status "Processado", refletindo so o
     resultado que realmente importa para quem esta acompanhando.
+
+    `download_url` deixa baixar o arquivo de UM documento individual assim
+    que ele termina, sem esperar o processamento inteiro (que pode ter
+    dezenas de outros documentos ainda rodando) — usa
+    `processamento.documentos_saida.all()`, que tambem precisa vir
+    prefetched. So se aplica ao modo Individual: em "Grupo"/"Lote por
+    pasta" a saida e consolidada, sem arquivo por documento.
     """
     status_labels = dict(DocumentStatus.choices)
+    saida_por_documento = {
+        saida.documento_id: saida
+        for saida in processamento.documentos_saida.all()
+        if saida.documento_id and saida.status == OutputDocumentStatus.GERADO
+    }
     individuais: dict[int, dict] = {}
     grupos = []
 
@@ -219,6 +240,14 @@ def _tokens_por_documento(processamento: Processamento) -> list[DocumentoTokensR
         tokens = execucao.total_tokens or 0
         if execucao.scope_type == ExecutionScopeType.INDIVIDUAL and execucao.documento_id:
             documento = execucao.documento
+            download_url = ""
+            if documento.status == DocumentStatus.PROCESSADO:
+                saida = saida_por_documento.get(documento.id)
+                if saida and saida.arquivo:
+                    download_url = reverse(
+                        "portal_processamento_download_documento",
+                        kwargs={"codigo": processamento.codigo, "saida_id": saida.id},
+                    )
             acumulado = individuais.setdefault(
                 documento.id,
                 {
@@ -230,6 +259,7 @@ def _tokens_por_documento(processamento: Processamento) -> list[DocumentoTokensR
                         if documento.status == DocumentStatus.ERRO
                         else ""
                     ),
+                    "download_url": download_url,
                 },
             )
             acumulado["total_tokens"] += tokens
@@ -562,3 +592,115 @@ def _possivel_travamento(processamento: Processamento) -> bool:
     return (
         timezone.now() - processamento.ultima_atividade_em
     ).total_seconds() >= STALL_SECONDS_THRESHOLD
+
+
+@dataclass(frozen=True)
+class RotinaAutomaticaExecucaoResumo:
+    id: int
+    agente_nome: str
+    status: str
+    status_label: str
+    iniciado_em_formatado: str
+    finalizado_em_formatado: str
+    total_documentos: int
+    total_sucesso: int
+    total_erro: int
+    motivo: str
+    processamento_codigo: str
+
+
+@dataclass(frozen=True)
+class RotinaAutomaticaHistoricoResumo:
+    execucoes: list[RotinaAutomaticaExecucaoResumo]
+    total: int
+    pagina_atual: int
+    total_paginas: int
+    itens_por_pagina: int
+    primeiro_item: int
+    ultimo_item: int
+    tem_pagina_anterior: bool
+    tem_proxima_pagina: bool
+    pagina_anterior: int | None
+    proxima_pagina: int | None
+    paginas: list
+    agentes_disponiveis: list
+    filtro_agente: str
+    filtro_status: str
+
+
+def listar_historico_rotina_automatica(
+    *,
+    page_number: int | str | None = 1,
+    per_page: int = 25,
+    filtro_agente: str = "",
+    filtro_status: str = "",
+) -> RotinaAutomaticaHistoricoResumo:
+    """Historico de tentativas da rotina automatica (ver
+    executar_rotinas_automaticas_agentes), para a tela Administrador >
+    Rotina automatica de agentes."""
+    queryset = RotinaAutomaticaExecucao.objects.select_related(
+        "agente", "processamento"
+    ).order_by("-iniciado_em")
+
+    if filtro_agente:
+        queryset = queryset.filter(agente_id=filtro_agente)
+    if filtro_status:
+        queryset = queryset.filter(status=filtro_status)
+
+    agentes_disponiveis = list(
+        RotinaAutomaticaExecucao.objects.select_related("agente")
+        .values_list("agente_id", "agente__nome")
+        .distinct()
+        .order_by("agente__nome")
+    )
+
+    paginator = Paginator(queryset, per_page)
+    page_obj = paginator.get_page(page_number)
+
+    status_labels = dict(RotinaAutomaticaExecucao._meta.get_field("status").choices)
+
+    execucoes = [
+        RotinaAutomaticaExecucaoResumo(
+            id=execucao.id,
+            agente_nome=execucao.agente.nome,
+            status=execucao.status,
+            status_label=status_labels.get(execucao.status, execucao.status),
+            iniciado_em_formatado=_format_datetime(execucao.iniciado_em),
+            finalizado_em_formatado=_format_datetime(execucao.finalizado_em),
+            total_documentos=execucao.total_documentos,
+            total_sucesso=execucao.total_sucesso,
+            total_erro=execucao.total_erro,
+            motivo=execucao.motivo,
+            processamento_codigo=(
+                execucao.processamento.codigo if execucao.processamento_id else ""
+            ),
+        )
+        for execucao in page_obj.object_list
+    ]
+
+    return RotinaAutomaticaHistoricoResumo(
+        execucoes=execucoes,
+        total=paginator.count,
+        pagina_atual=page_obj.number,
+        total_paginas=paginator.num_pages,
+        itens_por_pagina=per_page,
+        primeiro_item=page_obj.start_index() if paginator.count else 0,
+        ultimo_item=page_obj.end_index() if paginator.count else 0,
+        tem_pagina_anterior=page_obj.has_previous(),
+        tem_proxima_pagina=page_obj.has_next(),
+        pagina_anterior=page_obj.previous_page_number()
+        if page_obj.has_previous()
+        else None,
+        proxima_pagina=page_obj.next_page_number() if page_obj.has_next() else None,
+        paginas=[
+            "..." if isinstance(page, str) else page
+            for page in paginator.get_elided_page_range(
+                page_obj.number,
+                on_each_side=2,
+                on_ends=1,
+            )
+        ],
+        agentes_disponiveis=agentes_disponiveis,
+        filtro_agente=filtro_agente,
+        filtro_status=filtro_status,
+    )

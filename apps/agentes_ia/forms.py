@@ -142,6 +142,21 @@ class AgentePortalCreateForm(forms.Form):
             "origem é 'Google Drive - pasta' ou 'Pasta local'."
         ),
     )
+    rotina_automatica_ativa = forms.BooleanField(
+        label="Ativar rotina automática",
+        required=False,
+        help_text=(
+            "Processa automaticamente um lote pequeno de documentos "
+            "pendentes a cada X minutos, em vez de depender de alguém "
+            "clicar Executar. Útil para pastas com muitos documentos "
+            "(ex.: 40-50 de uma vez), que não cabem numa única execução "
+            "sem estourar o tempo limite do servidor. O intervalo entre "
+            "rodadas e quantos documentos cada rodada processa são "
+            "definidos em Administrador > Rotina automática, valendo "
+            "para todos os agentes participantes. Continua podendo "
+            "executar manualmente quando quiser, mesmo com a rotina ativa."
+        ),
+    )
     default_output_format = forms.ChoiceField(
         label="Formato padrao de saida",
         choices=AgentDefaultOutputFormat.choices,
@@ -254,6 +269,7 @@ class AgentePortalCreateForm(forms.Form):
                     "reduzir_raciocinio_ia": configuracao.enable_thinking_budget_reduction,
                     "ler_subpastas": configuracao.include_subfolders,
                     "filtro_nome_arquivo": configuracao.allowed_filename_pattern,
+                    "rotina_automatica_ativa": configuracao.execucao_automatica_ativa,
                     "default_output_format": configuracao.default_output_format,
                     "document_execution_mode": (
                         configuracao.document_execution_mode
@@ -386,6 +402,9 @@ class AgentePortalCreateForm(forms.Form):
             "reduzir_raciocinio_ia": self.cleaned_data.get("reduzir_raciocinio_ia", False),
             "ler_subpastas": self.cleaned_data.get("ler_subpastas", False),
             "filtro_nome_arquivo": self.cleaned_data.get("filtro_nome_arquivo", ""),
+            "rotina_automatica_ativa": self.cleaned_data.get(
+                "rotina_automatica_ativa", False
+            ),
             "default_output_format": self.cleaned_data["default_output_format"],
             "default_output_destination": AgentOutputDestination.INTERNAL_MEDIA,
             "document_execution_mode": self.cleaned_data["document_execution_mode"],

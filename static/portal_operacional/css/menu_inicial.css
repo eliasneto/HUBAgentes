@@ -2052,16 +2052,29 @@ button.danger-action:hover {
   color: #cfe9f5;
 }
 
-.processing-tokens-list li span:first-child {
+.processing-tokens-list li .processing-tokens-nome {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.processing-tokens-list li span:last-child {
+.processing-tokens-list li .processing-tokens-total {
   color: var(--neon, #00d8ff);
   font-weight: 700;
   white-space: nowrap;
+}
+
+.processing-tokens-list li .processing-tokens-download {
+  color: var(--neon, #00d8ff);
+  text-decoration: none;
+  font-size: 15px;
+  line-height: 1;
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+
+.processing-tokens-list li .processing-tokens-download:hover {
+  opacity: 1;
 }
 
 .processing-tokens-list li.processing-tokens-erro-msg {
@@ -3672,6 +3685,12 @@ button.danger-action:hover {
 .audit-module-processamentos { border-color: rgba(61, 255, 159, 0.4);  background: rgba(61, 255, 159, 0.08); color: #3dff9f; }
 .audit-module-agentes_ia    { border-color: rgba(255, 209, 102, 0.4); background: rgba(255, 209, 102, 0.08); color: #ffd166; }
 .audit-module-usuarios      { border-color: rgba(180, 140, 255, 0.4); background: rgba(180, 140, 255, 0.08); color: #b48cff; }
+
+/* Situacoes da tela Administrador > Rotina automatica de agentes */
+.audit-module-executada      { border-color: rgba(61, 255, 159, 0.4);  background: rgba(61, 255, 159, 0.08); color: #3dff9f; }
+.audit-module-sem_documentos { border-color: rgba(124, 165, 184, 0.4); background: rgba(124, 165, 184, 0.08); color: #7ca5b8; }
+.audit-module-bloqueada      { border-color: rgba(255, 209, 102, 0.4); background: rgba(255, 209, 102, 0.08); color: #ffd166; }
+.audit-module-erro           { border-color: rgba(255, 107, 107, 0.4); background: rgba(255, 107, 107, 0.08); color: #ff6b6b; }
 
 .audit-action {
   font-size: 12px;

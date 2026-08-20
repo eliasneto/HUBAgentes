@@ -45,11 +45,12 @@ from apps.integracoes.services.validation import (
 )
 from apps.processamentos.forms import AgenteExecucaoForm
 from apps.processamentos.selectors import (
+    listar_historico_rotina_automatica,
     listar_processamentos_ativos_do_usuario,
     listar_processamentos_para_portal,
     obter_status_processamento_para_portal,
 )
-from apps.processamentos.models import Processamento
+from apps.processamentos.models import Processamento, RotinaAutomaticaExecucaoStatus
 from apps.processamentos.services.operational_execution import (
     OperationalExecutionError,
     _e_situacao_atencao,
@@ -1423,6 +1424,7 @@ class ProcessamentoStatusView(LoginRequiredMixin, View):
                         "nome_arquivo": doc.nome_arquivo,
                         "status": doc.status,
                         "total_tokens": doc.total_tokens,
+                        "download_url": doc.download_url,
                     }
                     for doc in status.documentos_tokens
                 ],
@@ -1506,6 +1508,48 @@ class ProcessamentoSaidaDownloadView(LoginRequiredMixin, View):
         source_name = processamento.arquivo_saida_nome or processamento.arquivo_saida.name
         extension = Path(source_name).suffix or ""
         return f"saida_{processamento.codigo}{extension}"
+
+
+class ProcessamentoDocumentoDownloadView(LoginRequiredMixin, View):
+    """Baixa a saida de UM documento individual, assim que ele processa com
+    sucesso — sem esperar o processamento inteiro (que pode ter dezenas de
+    outros documentos ainda rodando) terminar para liberar o download geral.
+    So existe saida por documento no modo de entrada Individual (ver
+    selectors._tokens_por_documento); nos demais modos essa URL nunca e
+    gerada, entao nunca aparece um link para chegar aqui."""
+
+    login_url = reverse_lazy("portal_login")
+
+    def get(self, request, codigo, saida_id):
+        from apps.processamentos.models import DocumentoSaidaProcessamento
+
+        user = request.user
+        is_admin = user.is_superuser or user.groups.filter(name="administrador").exists()
+        filtro = {} if is_admin else {"processamento__iniciado_por": user}
+        saida = get_object_or_404(
+            DocumentoSaidaProcessamento,
+            pk=saida_id,
+            processamento__codigo=codigo,
+            **filtro,
+        )
+        if not saida.arquivo:
+            raise Http404("Este documento ainda nao possui arquivo de saida.")
+
+        saida.arquivo.open("rb")
+        return FileResponse(
+            saida.arquivo,
+            as_attachment=True,
+            filename=self._build_download_filename(saida),
+        )
+
+    def _build_download_filename(self, saida):
+        source_name = saida.arquivo.name
+        extension = Path(source_name).suffix or ""
+        if saida.documento_id and saida.documento:
+            base = Path(saida.documento.nome_arquivo).stem
+        else:
+            base = Path(source_name).stem
+        return f"{base}{extension}"
 
 
 def _proxima_data_limpeza(dia: int):
@@ -1781,6 +1825,60 @@ class SalvarConfiguracaoGeralView(PortalAdministradorRequiredMixin, View):
         config.save()
         messages.success(request, "Configurações gerais salvas com sucesso.")
         return redirect("portal_configuracao_geral")
+
+
+class RotinaAutomaticaAgentesView(PortalAdministradorRequiredMixin, TemplateView):
+    template_name = "portal_operacional/rotina_automatica.html"
+
+    def get_context_data(self, **kwargs):
+        from apps.agentes_ia.models import AgenteConfiguracaoOperacional, AgentStatus
+        from apps.core.models import ConfiguracaoGeral
+
+        context = super().get_context_data(**kwargs)
+        context["config"] = ConfiguracaoGeral.obter()
+        context["total_agentes_participantes"] = (
+            AgenteConfiguracaoOperacional.objects.filter(
+                execucao_automatica_ativa=True,
+                agente__status=AgentStatus.ATIVO,
+            ).count()
+        )
+        context["historico"] = listar_historico_rotina_automatica(
+            page_number=self.request.GET.get("page"),
+            filtro_agente=self.request.GET.get("agente", ""),
+            filtro_status=self.request.GET.get("status", ""),
+            per_page=25,
+        )
+        context["status_choices"] = RotinaAutomaticaExecucaoStatus.choices
+        return context
+
+
+class SalvarRotinaAutomaticaConfigView(PortalAdministradorRequiredMixin, View):
+    def post(self, request):
+        from apps.core.models import ConfiguracaoGeral
+
+        try:
+            intervalo = max(
+                10, min(1440, int(request.POST.get("rotina_automatica_intervalo_minutos", 60)))
+            )
+        except (ValueError, TypeError):
+            intervalo = 60
+        try:
+            lote_tamanho = max(
+                1, min(100, int(request.POST.get("rotina_automatica_lote_tamanho", 10)))
+            )
+        except (ValueError, TypeError):
+            lote_tamanho = 10
+
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_agentes_ativa = (
+            "rotina_automatica_agentes_ativa" in request.POST
+        )
+        config.rotina_automatica_intervalo_minutos = intervalo
+        config.rotina_automatica_lote_tamanho = lote_tamanho
+        config.atualizado_por = request.user
+        config.save()
+        messages.success(request, "Configurações da rotina automática salvas com sucesso.")
+        return redirect("portal_rotina_automatica")
 
 
 class ConfiguracaoTelaLoginView(PortalAdministradorRequiredMixin, TemplateView):

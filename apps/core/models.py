@@ -76,6 +76,45 @@ class ConfiguracaoGeral(models.Model):
         default=True,
         help_text="Quando ativo, o assistente Biel aparece flutuando no portal para todos os usuarios.",
     )
+    # Rotina automatica de agentes (AgenteConfiguracaoOperacional.
+    # execucao_automatica_ativa): interruptor e intervalo sao globais —
+    # cada agente so decide SE participa, o QUANDO e o mesmo para todos.
+    # Quando rotina_automatica_agentes_ativa=False, a rotina nao roda para
+    # nenhum agente, mesmo que ele tenha a participacao ativada
+    # individualmente.
+    rotina_automatica_agentes_ativa = models.BooleanField(
+        default=True,
+        help_text=(
+            "Liga ou desliga a rotina automatica de execucao de agentes em "
+            "todo o sistema. Quando desligada, nenhum agente processa "
+            "documentos automaticamente, mesmo que tenha a rotina ativada "
+            "individualmente nas suas configuracoes."
+        ),
+    )
+    rotina_automatica_intervalo_minutos = models.PositiveSmallIntegerField(
+        default=60,
+        help_text=(
+            "Intervalo entre rodadas da rotina automatica, em minutos "
+            "(minimo 10, maximo 1440 = 24h). Vale para todos os agentes "
+            "com a rotina ativada. Se for menor que 30 minutos, cada "
+            "rodada processa no maximo 6 documentos por agente, "
+            "ignorando rotina_automatica_lote_tamanho."
+        ),
+    )
+    rotina_automatica_lote_tamanho = models.PositiveSmallIntegerField(
+        default=10,
+        help_text=(
+            "Quantos documentos pendentes cada agente participante da "
+            "rotina automatica processa por rodada. Os demais ficam "
+            "pendentes para a rodada seguinte. Vale para todos os agentes "
+            "com a rotina ativada. Ignorado (fixo em 6) quando o "
+            "intervalo entre rodadas for menor que 30 minutos."
+        ),
+    )
+    # Calculado automaticamente (nao editavel) — quando a proxima rodada da
+    # rotina automatica pode rodar. Nulo = elegivel imediatamente na
+    # proxima checagem do worker.
+    rotina_automatica_proxima_execucao_em = models.DateTimeField(null=True, blank=True)
     atualizado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

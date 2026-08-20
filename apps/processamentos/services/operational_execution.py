@@ -1,9 +1,11 @@
+from datetime import timedelta
 from secrets import token_hex
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
+from apps.agentes_ia.models import AgenteConfiguracaoOperacional
 from apps.agentes_ia.services import calcular_disponibilidade_agente
 from apps.agentes_ia.services import obter_ou_criar_configuracao_operacional
 from apps.agentes_ia.services import renderizar_prompt_com_parametros
@@ -11,9 +13,12 @@ from apps.integracoes.services.ai_providers import AIProviderServiceError
 from apps.integracoes.services.google_drive import GoogleDriveServiceError
 from apps.integracoes.services.local_storage import LocalStorageServiceError
 from apps.processamentos.models import (
+    DocumentStatus,
     Processamento,
     ProcessingInputSourceType,
     ProcessingStatus,
+    RotinaAutomaticaExecucao,
+    RotinaAutomaticaExecucaoStatus,
 )
 from apps.processamentos.services.agent_execution import (
     ProcessamentoExecutionError,
@@ -29,66 +34,329 @@ class OperationalExecutionError(Exception):
     pass
 
 
-def criar_e_iniciar_processamento_para_agente(*, agente, actor, cleaned_data):
+# Trava de concorrencia por agente ficando presa (ex.: processo morto pelo
+# timeout do gunicorn no meio de uma execucao, sem chance de rodar o
+# finally) nao pode bloquear o agente para sempre — destrava sozinha apos
+# esse tempo. Generoso o bastante para um lote normal (mesmo com
+# retentativas) terminar antes, mas nao tão longo que um agente fique
+# preso o dia inteiro por um unico crash.
+LIMITE_TRAVA_EXECUCAO_MINUTOS = 20
+
+
+def _bloqueia_execucao_paralela(agente):
+    configuracao = getattr(agente, "configuracao_operacional", None)
+    if configuracao is None:
+        return True
+    policy = configuracao.concurrency_policy or {}
+    return bool(policy.get("block_parallel_per_agent", True))
+
+
+def _tentar_adquirir_trava_execucao(configuracao):
+    """Marca o agente como 'em execucao' de forma atomica (UPDATE
+    condicional — nao precisa manter transacao aberta pelo tempo todo da
+    execucao, que pode levar minutos). Devolve True se conseguiu (ninguem
+    mais estava executando este agente), False se ja tinha alguem rodando.
+    Considera a trava liberável se estiver presa ha mais de
+    LIMITE_TRAVA_EXECUCAO_MINUTOS (auto-recuperacao de crash)."""
+    agora = timezone.now()
+    limite = agora - timedelta(minutes=LIMITE_TRAVA_EXECUCAO_MINUTOS)
+    linhas = (
+        AgenteConfiguracaoOperacional.objects.filter(pk=configuracao.pk)
+        .filter(
+            models.Q(execucao_em_andamento=False)
+            | models.Q(execucao_em_andamento_desde__lt=limite)
+        )
+        .update(execucao_em_andamento=True, execucao_em_andamento_desde=agora)
+    )
+    return linhas == 1
+
+
+def _liberar_trava_execucao(configuracao):
+    AgenteConfiguracaoOperacional.objects.filter(pk=configuracao.pk).update(
+        execucao_em_andamento=False, execucao_em_andamento_desde=None
+    )
+
+
+def criar_e_iniciar_processamento_para_agente(
+    *, agente, actor, cleaned_data, limite_documentos_por_execucao=None
+):
     disponibilidade = calcular_disponibilidade_agente(agente, actor)
     if not disponibilidade.pode_executar:
         raise OperationalExecutionError(disponibilidade.motivo)
 
-    processamento = _criar_processamento(
-        agente=agente,
-        actor=actor,
-        cleaned_data=cleaned_data,
-    )
-
-    processamento.status = ProcessingStatus.EM_FILA
-    processamento.mensagem_erro = ""
-    processamento.mensagem_erro_tecnico = ""
-    processamento.etapa_atual = "Aguardando inicio da execucao"
-    processamento.documento_atual_nome = ""
-    processamento.ultima_atividade_em = timezone.now()
-    processamento.save(
-        update_fields=[
-            "status",
-            "mensagem_erro",
-            "mensagem_erro_tecnico",
-            "etapa_atual",
-            "documento_atual_nome",
-            "ultima_atividade_em",
-            "updated_at",
-        ]
-    )
+    configuracao = obter_ou_criar_configuracao_operacional(agente)
+    trava_exige_verificacao = _bloqueia_execucao_paralela(agente)
+    if trava_exige_verificacao and not _tentar_adquirir_trava_execucao(configuracao):
+        # Alguem ja esta executando este agente agora (clique manual e a
+        # rotina automatica coincidindo, por exemplo) — nao enfileira uma
+        # segunda execucao disputando os mesmos documentos pendentes e
+        # duplicando custo de IA.
+        raise OperationalExecutionError(
+            "Este agente ja esta em execucao agora. Aguarde terminar antes "
+            "de executar de novo."
+        )
 
     try:
-        execute_processing(processamento, actor)
-    except (
-        AIProviderServiceError,
-        GoogleDriveServiceError,
-        LocalStorageServiceError,
-        DocumentSourcePreparationError,
-        ProcessamentoExecutionError,
-        OutputRendererError,
-        OutputPackagingError,
-    ) as exc:
-        mensagem_operacional, mensagem_tecnica = normalizar_erro_processamento(exc)
-        if getattr(exc, "sem_trabalho", False):
-            _finalizar_processamento_sem_trabalho(processamento, mensagem_operacional, mensagem_tecnica)
-        else:
-            _finalizar_processamento_com_erro(processamento, mensagem_operacional, mensagem_tecnica)
-        raise OperationalExecutionError(mensagem_operacional) from exc
-    except Exception as exc:
-        # Fallback para exceções não mapeadas (DatabaseError, MemoryError, etc.)
-        # Garante que o processamento nunca fica preso em EM_PROCESSAMENTO.
-        _finalizar_processamento_com_erro(
-            processamento,
-            "Ocorreu um erro inesperado durante a execucao do agente.",
-            str(exc),
+        processamento = _criar_processamento(
+            agente=agente,
+            actor=actor,
+            cleaned_data=cleaned_data,
         )
-        raise OperationalExecutionError(
-            "Ocorreu um erro inesperado durante a execucao do agente."
-        ) from exc
+
+        processamento.status = ProcessingStatus.EM_FILA
+        processamento.mensagem_erro = ""
+        processamento.mensagem_erro_tecnico = ""
+        processamento.etapa_atual = "Aguardando inicio da execucao"
+        processamento.documento_atual_nome = ""
+        processamento.ultima_atividade_em = timezone.now()
+        processamento.save(
+            update_fields=[
+                "status",
+                "mensagem_erro",
+                "mensagem_erro_tecnico",
+                "etapa_atual",
+                "documento_atual_nome",
+                "ultima_atividade_em",
+                "updated_at",
+            ]
+        )
+
+        try:
+            execute_processing(
+                processamento,
+                actor,
+                limite_documentos_por_execucao=limite_documentos_por_execucao,
+            )
+        except (
+            AIProviderServiceError,
+            GoogleDriveServiceError,
+            LocalStorageServiceError,
+            DocumentSourcePreparationError,
+            ProcessamentoExecutionError,
+            OutputRendererError,
+            OutputPackagingError,
+        ) as exc:
+            mensagem_operacional, mensagem_tecnica = normalizar_erro_processamento(exc)
+            erro_operacional = OperationalExecutionError(mensagem_operacional)
+            if getattr(exc, "sem_trabalho", False):
+                _finalizar_processamento_sem_trabalho(processamento, mensagem_operacional, mensagem_tecnica)
+                # Processamento foi soft-deleted acima — nao anexa (ver
+                # SoftDeleteModel), so sinaliza a condicao. Quem chama
+                # (ex.: executar_rotinas_automaticas_agentes) usa isso pra
+                # registrar "sem documentos novos" no historico, sem tentar
+                # acessar um Processamento ja soft-deleted.
+                erro_operacional.sem_trabalho = True
+            else:
+                _finalizar_processamento_com_erro(processamento, mensagem_operacional, mensagem_tecnica)
+                # Processamento chegou a rodar (mesmo terminando em erro) —
+                # anexa pra quem chama poder contar documentos/motivos sem
+                # precisar re-buscar (ex.: historico da rotina automatica).
+                erro_operacional.processamento = processamento
+            raise erro_operacional from exc
+        except Exception as exc:
+            # Fallback para exceções não mapeadas (DatabaseError, MemoryError, etc.)
+            # Garante que o processamento nunca fica preso em EM_PROCESSAMENTO.
+            _finalizar_processamento_com_erro(
+                processamento,
+                "Ocorreu um erro inesperado durante a execucao do agente.",
+                str(exc),
+            )
+            erro_operacional = OperationalExecutionError(
+                "Ocorreu um erro inesperado durante a execucao do agente."
+            )
+            erro_operacional.processamento = processamento
+            raise erro_operacional from exc
+    finally:
+        if trava_exige_verificacao:
+            _liberar_trava_execucao(configuracao)
 
     processamento.refresh_from_db()
     return processamento
+
+
+def executar_rotinas_automaticas_agentes():
+    """Ponto de entrada chamado periodicamente pelo worker (ver management
+    command executar_rotinas_automaticas_agentes e docker-compose.yml).
+
+    O interruptor geral, o intervalo entre rodadas e quantos documentos
+    cada rodada processa sao todos GLOBAIS (ver ConfiguracaoGeral.
+    rotina_automatica_agentes_ativa/rotina_automatica_intervalo_minutos/
+    rotina_automatica_lote_tamanho, editaveis em Administrador > Rotina
+    automatica) — cada agente so decide, individualmente, SE participa
+    (AgenteConfiguracaoOperacional.execucao_automatica_ativa). Quando o
+    interruptor geral esta desligado, a rotina nao roda para nenhum
+    agente, mesmo que ele tenha a participacao ativada. Quando o
+    intervalo global e menor que 30 minutos, cada rodada processa no
+    maximo 6 documentos por agente, por seguranca, ignorando o lote
+    global configurado.
+
+    Para cada agente participante ativo cuja proxima rodada ja chegou,
+    dispara uma execucao normal (mesmo caminho de "Executar" manual). Se
+    nao houver nada novo (tudo ja processado antes - mesma regra de
+    duplicidade que ja existe) ou o agente ja estiver em execucao agora
+    (trava de concorrencia), simplesmente nao roda nada nessa rodada — sem
+    gerar processamento visivel de erro. Cada tentativa (rodou ou nao) fica
+    registrada em RotinaAutomaticaExecucao, para a tela de historico."""
+    from apps.agentes_ia.models import AgentStatus
+    from apps.agentes_ia.services import montar_payload_execucao_padrao
+    from apps.core.models import ConfiguracaoGeral
+
+    configuracao_geral = ConfiguracaoGeral.obter()
+    if not configuracao_geral.rotina_automatica_agentes_ativa:
+        return []
+
+    agora = timezone.now()
+    proxima_execucao = configuracao_geral.rotina_automatica_proxima_execucao_em
+    if proxima_execucao is not None and proxima_execucao > agora:
+        return []
+
+    intervalo_minutos = configuracao_geral.rotina_automatica_intervalo_minutos
+    # Reagenda a proxima rodada global JA, antes de executar qualquer
+    # agente — assim, se o worker cair no meio da rodada, a proxima
+    # checagem (a cada poucos minutos) nao martela a rotina de novo em vez
+    # de respeitar o intervalo configurado.
+    ConfiguracaoGeral.objects.filter(pk=configuracao_geral.pk).update(
+        rotina_automatica_proxima_execucao_em=agora + timedelta(minutes=intervalo_minutos)
+    )
+
+    # Regra de seguranca: intervalos curtos (< 30min) rodam com mais
+    # frequencia, entao cada rodada processa um lote bem menor, para nao
+    # acumular custo/risco de RPM do provedor de IA — ignora o lote
+    # global configurado nesse caso.
+    lote_tamanho = (
+        6 if intervalo_minutos < 30 else configuracao_geral.rotina_automatica_lote_tamanho
+    )
+
+    configuracoes = AgenteConfiguracaoOperacional.objects.filter(
+        execucao_automatica_ativa=True,
+        agente__status=AgentStatus.ATIVO,
+    ).select_related("agente")
+
+    resultados = []
+    for configuracao in configuracoes:
+        resultados.append(
+            _executar_rotina_automatica_agente(
+                configuracao,
+                montar_payload=montar_payload_execucao_padrao,
+                lote_tamanho=lote_tamanho,
+            )
+        )
+    return resultados
+
+
+def _executar_rotina_automatica_agente(configuracao, *, montar_payload, lote_tamanho):
+    agente = configuracao.agente
+    iniciado_em = timezone.now()
+
+    actor = agente.created_by or agente.updated_by
+    if actor is None:
+        return _registrar_historico_rotina(
+            agente,
+            iniciado_em=iniciado_em,
+            status=RotinaAutomaticaExecucaoStatus.ERRO,
+            motivo=(
+                "Agente sem usuario responsavel (created_by/updated_by) "
+                "para executar a rotina automatica."
+            ),
+        )
+
+    try:
+        cleaned_data = montar_payload(agente)
+    except ValueError as exc:
+        return _registrar_historico_rotina(
+            agente,
+            iniciado_em=iniciado_em,
+            status=RotinaAutomaticaExecucaoStatus.ERRO,
+            motivo=str(exc),
+        )
+
+    try:
+        processamento = criar_e_iniciar_processamento_para_agente(
+            agente=agente,
+            actor=actor,
+            cleaned_data=cleaned_data,
+            limite_documentos_por_execucao=lote_tamanho,
+        )
+    except OperationalExecutionError as exc:
+        processamento_tentado = getattr(exc, "processamento", None)
+        if processamento_tentado is not None:
+            # Chegou a rodar (mesmo que tenha terminado em erro/atencao) —
+            # conta como "executada", com os detalhes vindos do
+            # processamento (ver _registrar_historico_rotina).
+            return _registrar_historico_rotina(
+                agente,
+                iniciado_em=iniciado_em,
+                status=RotinaAutomaticaExecucaoStatus.EXECUTADA,
+                processamento=processamento_tentado,
+            )
+        if getattr(exc, "sem_trabalho", False):
+            return _registrar_historico_rotina(
+                agente,
+                iniciado_em=iniciado_em,
+                status=RotinaAutomaticaExecucaoStatus.SEM_DOCUMENTOS,
+                motivo=str(exc),
+            )
+        # Sobrou a trava de concorrencia ocupada (execucao manual ou outra
+        # rodada da rotina disputando o mesmo agente) ou o agente
+        # indisponivel para execucao (ex.: integracao inativa).
+        return _registrar_historico_rotina(
+            agente,
+            iniciado_em=iniciado_em,
+            status=RotinaAutomaticaExecucaoStatus.BLOQUEADA,
+            motivo=str(exc),
+        )
+
+    return _registrar_historico_rotina(
+        agente,
+        iniciado_em=iniciado_em,
+        status=RotinaAutomaticaExecucaoStatus.EXECUTADA,
+        processamento=processamento,
+    )
+
+
+def _registrar_historico_rotina(agente, *, iniciado_em, status, processamento=None, motivo=""):
+    """Persiste o resultado de uma tentativa da rotina automatica (rodou
+    ou nao, quantos documentos, quantos com sucesso/erro e os motivos),
+    para alimentar a tela Administrador > Rotina automatica de agentes."""
+    total_documentos = total_sucesso = total_erro = 0
+    if processamento is not None:
+        contagem = processamento.documentos.aggregate(
+            total=models.Count("id"),
+            sucesso=models.Count("id", filter=models.Q(status=DocumentStatus.PROCESSADO)),
+            erro=models.Count("id", filter=models.Q(status=DocumentStatus.ERRO)),
+        )
+        total_documentos = contagem["total"]
+        total_sucesso = contagem["sucesso"]
+        total_erro = contagem["erro"]
+        if total_erro and not motivo:
+            motivos_erro = list(
+                processamento.documentos.filter(status=DocumentStatus.ERRO)
+                .exclude(mensagem_erro="")
+                .values_list("mensagem_erro", flat=True)
+                .distinct()[:5]
+            )
+            motivo = "; ".join(motivos_erro)
+
+    historico = RotinaAutomaticaExecucao.objects.create(
+        agente=agente,
+        processamento=processamento,
+        status=status,
+        iniciado_em=iniciado_em,
+        finalizado_em=timezone.now(),
+        total_documentos=total_documentos,
+        total_sucesso=total_sucesso,
+        total_erro=total_erro,
+        motivo=motivo,
+    )
+    return {
+        "agente": agente.nome,
+        "status": historico.status,
+        "processamento": processamento.codigo if processamento else None,
+        "total_documentos": total_documentos,
+        "total_sucesso": total_sucesso,
+        "total_erro": total_erro,
+        "motivo": motivo,
+    }
 
 
 _MENSAGENS_ATENCAO = (

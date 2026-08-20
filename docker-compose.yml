@@ -97,6 +97,8 @@ services:
         ULTIMO_MES_LIMPEZA='';
         while true; do
           python manage.py reconciliar_processamentos_orfaos;
+          python manage.py retentar_processamentos_sobrecarga_provedor;
+          python manage.py executar_rotinas_automaticas_agentes;
           HORA_ATUAL=$(date +%H);
           DIA_ATUAL=$(date +%d);
           MES_ATUAL=$(date +%Y-%m);

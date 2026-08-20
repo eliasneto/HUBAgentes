@@ -1,6 +1,8 @@
+import http.client
 import json
 import logging
 import random
+import re
 import time
 from dataclasses import dataclass
 from urllib import error, request
@@ -12,6 +14,26 @@ logger = logging.getLogger(__name__)
 # 408 timeout, 409 conflito momentaneo, 425 too early, 429 rate limit,
 # 500/502/503/504 instabilidade do servidor, 529 overloaded (Anthropic).
 _RETRYABLE_HTTP_STATUS = {408, 409, 425, 429, 500, 502, 503, 504, 529}
+
+# Alguns provedores (Gemini) autenticam via query string na URL (?key=...)
+# em vez de header — diferente de OpenAI/Anthropic/Groq, que usam
+# Authorization/x-api-key. Sem mascarar, essa chave real acaba em lugares
+# persistidos/visiveis: log de retentativa (_log_retry), EventoAuditoria.
+# payload (auditoria, Django admin) e AIProviderValidationResult.request_url
+# (tambem exibido no admin de integracoes). Descoberto testando localmente
+# (20/08/2026): a chave real do Gemini apareceu em texto puro no log de
+# retentativa.
+_URL_CREDENTIAL_PATTERN = re.compile(r"([?&](?:key|api_key|token|access_token)=)[^&]+", re.IGNORECASE)
+
+
+def redact_url_credentials(url):
+    """Mascara valores de credencial em query string (?key=..., ?token=...
+    etc.) para uso em logs, auditoria e qualquer lugar que persista ou
+    exiba a URL da requisicao. Nunca usar o resultado para montar a
+    requisicao real — so para exibicao/registro."""
+    if not url:
+        return url
+    return _URL_CREDENTIAL_PATTERN.sub(r"\1***", url)
 
 
 class AIProviderServiceError(Exception):
@@ -241,9 +263,17 @@ class BaseAIProviderAdapter:
                         technical_message=detalhe_tecnico,
                     ) from exc
                 raise AIProviderServiceError(detalhe_tecnico) from exc
-            except (error.URLError, TimeoutError) as exc:
+            except (error.URLError, TimeoutError, http.client.HTTPException) as exc:
                 # URLError cobre falhas de conexao/DNS; TimeoutError cobre
-                # estouro do timeout da requisicao. Ambos sao transitorios.
+                # estouro do timeout da requisicao; http.client.HTTPException
+                # cobre falhas na camada HTTP em si — ex.: RemoteDisconnected
+                # ("Remote end closed connection without response"), quando o
+                # servidor fecha a conexao sem devolver nenhuma resposta.
+                # Descoberto testando localmente (20/08/2026): sem essa
+                # terceira classe, esse erro especifico nao caia em nenhum
+                # except aqui e quebrava o lote inteiro sem tentar de novo,
+                # mesmo sendo uma falha de rede tao transitoria quanto as
+                # outras duas. Todas as tres sao transitorias.
                 reason = getattr(exc, "reason", exc)
                 if attempt < self.max_transient_retries:
                     delay = self._retry_delay_seconds(attempt)
@@ -259,7 +289,10 @@ class BaseAIProviderAdapter:
                 ) from exc
 
         try:
-            return json.loads(raw_body), request_url
+            # request_url mascarado: quem chama pode persistir/exibir esse
+            # valor (ex.: AIProviderValidationResult.request_url, mostrado
+            # no admin de integracoes) — nunca deve levar a credencial real.
+            return json.loads(raw_body), redact_url_credentials(request_url)
         except json.JSONDecodeError as exc:
             raise AIProviderServiceError(invalid_json_message) from exc
 
@@ -304,7 +337,7 @@ class BaseAIProviderAdapter:
             "Tentativa %d de %d; repetindo em %.1fs.",
             getattr(self.integration, "provider_type", "?"),
             reason,
-            request_url,
+            redact_url_credentials(request_url),
             attempt + 1,
             self.max_transient_retries,
             delay,

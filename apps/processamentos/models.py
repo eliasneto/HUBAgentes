@@ -195,6 +195,24 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     # nesta pasta; o dedup de "ja processado antes" garante que a proxima
     # execucao retoma de onde parou, sem repetir nem perder arquivos.
     atingiu_limite_lote_subpastas = models.BooleanField(default=False)
+    # Loop de retentativa automatica quando o PROVEDOR de IA (nao o nosso
+    # sistema) esta sobrecarregado — ex.: Gemini "This model is currently
+    # experiencing high demand" (HTTP 503) — ver
+    # agent_execution._eh_erro_modelo_sobrecarregado e o management command
+    # retentar_processamentos_sobrecarga_provedor (chamado periodicamente
+    # pelo worker, ver docker-compose.yml). Enquanto ativo, o status
+    # continua em_processamento (nao vira erro/atencao) e o front-end mostra
+    # "aguardando reenvio automatico" em vez de falha — os documentos ja
+    # foram enviados, so o provedor ainda nao respondeu com sucesso. Cada
+    # rodada tenta de novo so os documentos com erro_reprocessavel=True,
+    # aumentando o intervalo entre tentativas, ate um teto de 2h a partir de
+    # retentativa_sobrecarga_iniciada_em — depois disso desiste e finaliza
+    # normalmente (sucesso parcial vira concluido_atencao, erro total vira
+    # concluido_erro). Caso real: agente JHS/Licitacao, 19/08/2026.
+    retentativa_sobrecarga_ativa = models.BooleanField(default=False)
+    retentativa_sobrecarga_iniciada_em = models.DateTimeField(null=True, blank=True)
+    retentativa_sobrecarga_proxima_em = models.DateTimeField(null=True, blank=True)
+    retentativa_sobrecarga_tentativas = models.PositiveIntegerField(default=0)
     arquivo_saida = models.FileField(
         upload_to=processamento_output_path,
         max_length=255,
@@ -657,3 +675,59 @@ class DocumentoSaidaProcessamento(TimestampedModel):
     def __str__(self):
         documento_nome = self.documento.nome_arquivo if self.documento else "saida agrupada"
         return f"{self.processamento.codigo} - {documento_nome}"
+
+
+class RotinaAutomaticaExecucaoStatus(models.TextChoices):
+    EXECUTADA = "executada", "Executada"
+    SEM_DOCUMENTOS = "sem_documentos", "Sem documentos novos"
+    BLOQUEADA = "bloqueada", "Agente ja em execucao"
+    ERRO = "erro", "Erro ao iniciar"
+
+
+class RotinaAutomaticaExecucao(TimestampedModel):
+    """
+    Registro historico de cada tentativa da rotina automatica (ver
+    executar_rotinas_automaticas_agentes, management command chamado
+    periodicamente pelo worker) para um agente, numa rodada do interruptor
+    global. Alimenta a tela Administrador > Rotina automatica de agentes,
+    que mostra se cada rodada rodou ou nao, quantos documentos, quantos com
+    sucesso/erro e os motivos de erro.
+    """
+    agente = models.ForeignKey(
+        AgenteIA,
+        on_delete=models.CASCADE,
+        related_name="execucoes_rotina_automatica",
+    )
+    # Nulo quando a rodada nao chegou a criar um processamento (sem
+    # documentos novos, agente bloqueado por execucao em andamento, etc).
+    processamento = models.OneToOneField(
+        Processamento,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="execucao_rotina_automatica_origem",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=RotinaAutomaticaExecucaoStatus.choices,
+    )
+    iniciado_em = models.DateTimeField(default=timezone.now)
+    finalizado_em = models.DateTimeField(null=True, blank=True)
+    total_documentos = models.PositiveSmallIntegerField(default=0)
+    total_sucesso = models.PositiveSmallIntegerField(default=0)
+    total_erro = models.PositiveSmallIntegerField(default=0)
+    # Motivo quando status != executada (ex.: "agente ja em execucao"), ou
+    # um resumo dos erros tecnicos quando total_erro > 0.
+    motivo = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Execucao da rotina automatica"
+        verbose_name_plural = "Execucoes da rotina automatica"
+        indexes = [
+            models.Index(fields=["agente", "-iniciado_em"]),
+            models.Index(fields=["status"]),
+        ]
+        ordering = ["-iniciado_em"]
+
+    def __str__(self):
+        return f"{self.agente.nome} - {self.iniciado_em:%d/%m/%Y %H:%M} ({self.status})"

@@ -27,6 +27,7 @@ from .models import (
     ProcessingInputSourceType,
     ProcessingOutputFormat,
     ProcessingStatus,
+    RotinaAutomaticaExecucao,
 )
 
 
@@ -489,6 +490,37 @@ class ProcessamentoExecucaoIAAdmin(ReadOnlyForOperatorsMixin, UserStampedAdmin):
         if obj.duracao_ms is None:
             return "-"
         return round(obj.duracao_ms / 60000, 2)
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(RotinaAutomaticaExecucao)
+class RotinaAutomaticaExecucaoAdmin(ReadOnlyForOperatorsMixin, UserStampedAdmin):
+    list_display = (
+        "agente",
+        "status",
+        "iniciado_em",
+        "finalizado_em",
+        "total_documentos",
+        "total_sucesso",
+        "total_erro",
+    )
+    list_filter = ("status", "agente")
+    search_fields = ("agente__nome", "motivo", "processamento__codigo")
+    readonly_fields = (
+        "agente",
+        "processamento",
+        "status",
+        "iniciado_em",
+        "finalizado_em",
+        "total_documentos",
+        "total_sucesso",
+        "total_erro",
+        "motivo",
+        "created_at",
+        "updated_at",
+    )
 
     def has_add_permission(self, request):
         return False

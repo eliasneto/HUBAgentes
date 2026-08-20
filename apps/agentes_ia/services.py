@@ -341,6 +341,7 @@ def criar_agente_portal(
     reduzir_raciocinio_ia=False,
     ler_subpastas=False,
     filtro_nome_arquivo="",
+    rotina_automatica_ativa=False,
 ):
     with transaction.atomic():
         agente = AgenteIA(
@@ -376,6 +377,7 @@ def criar_agente_portal(
             default_local_relative_input_path=default_local_relative_input_path,
             allowed_input_extensions=["pdf"],
             allowed_filename_pattern=filtro_nome_arquivo,
+            execucao_automatica_ativa=rotina_automatica_ativa,
             allow_runtime_input_choice=False,
             allow_runtime_file_upload=permitir_upload_na_execucao,
             output_policy=AgentOutputPolicy.FIXA,
@@ -434,6 +436,7 @@ def atualizar_agente_portal(
     reduzir_raciocinio_ia=False,
     ler_subpastas=False,
     filtro_nome_arquivo="",
+    rotina_automatica_ativa=False,
 ):
     with transaction.atomic():
         agente.nome = nome
@@ -463,6 +466,7 @@ def atualizar_agente_portal(
             configuracao.allowed_input_extensions or ["pdf"]
         )
         configuracao.allowed_filename_pattern = filtro_nome_arquivo
+        configuracao.execucao_automatica_ativa = rotina_automatica_ativa
         configuracao.allow_runtime_input_choice = False
         configuracao.allow_runtime_file_upload = permitir_upload_na_execucao
         configuracao.output_policy = AgentOutputPolicy.FIXA
@@ -541,6 +545,7 @@ def clonar_agente(*, agente, actor, novo_nome=None):
             ),
             allowed_input_extensions=configuracao_origem.allowed_input_extensions,
             allowed_filename_pattern=configuracao_origem.allowed_filename_pattern,
+            execucao_automatica_ativa=configuracao_origem.execucao_automatica_ativa,
             allow_runtime_input_choice=(
                 configuracao_origem.allow_runtime_input_choice
             ),

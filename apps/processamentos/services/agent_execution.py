@@ -2,6 +2,7 @@ import json
 import logging
 import threading
 import time
+from datetime import timedelta
 from pathlib import Path
 from collections.abc import Iterable
 
@@ -87,6 +88,51 @@ class ProcessamentoExecutionError(Exception):
         # no Portal como uma execucao "concluida com atencao": nada foi
         # tentado de fato, entao nao ha o que o usuario acompanhar.
         self.sem_trabalho = sem_trabalho
+
+
+# Loop de retentativa automatica quando o PROVEDOR de IA esta sobrecarregado
+# (nao um erro nosso) — ver Processamento.retentativa_sobrecarga_ativa e o
+# management command retentar_processamentos_sobrecarga_provedor (chamado
+# periodicamente pelo worker, ver docker-compose.yml). Caso real: agente
+# JHS/Licitacao, 19/08/2026 — Gemini devolvendo HTTP 503 "This model is
+# currently experiencing high demand" para gemini-2.5-pro.
+LIMITE_RETENTATIVA_SOBRECARGA = timedelta(hours=2)
+
+# Intervalo (minutos) antes de cada nova rodada de retentativa, crescente
+# ate estabilizar em 30min — depois disso repete 30min ate o teto de 2h.
+# Ex.: tentativas 0,1,2,3,4,5+ -> espera 2,5,10,15,20,30min respectivamente.
+_INTERVALOS_RETENTATIVA_SOBRECARGA_MINUTOS = [2, 5, 10, 15, 20, 30]
+
+# Trechos que identificam o provedor recusando a chamada por estar
+# sobrecarregado (nao e erro de configuracao, timeout de rede nem cota
+# esgotada — e o MODELO em si sem capacidade no momento). Hoje cobre o
+# padrao observado na Gemini; outros provedores podem ser adicionados aqui
+# conforme surgirem casos reais.
+_PADROES_MODELO_SOBRECARREGADO = (
+    "currently experiencing high demand",
+    "model is overloaded",
+)
+
+
+def _eh_erro_modelo_sobrecarregado(mensagem_tecnica):
+    """True quando o detalhe tecnico do erro indica que o PROVEDOR recusou
+    a chamada por sobrecarga momentanea do modelo (ex.: Gemini HTTP 503
+    "This model is currently experiencing high demand") — situacao
+    genuinamente temporaria do lado de fora, elegivel para o loop de
+    retentativa de ate 2h em vez de desistir depois de 1-2 tentativas."""
+    if not mensagem_tecnica:
+        return False
+    normalizado = mensagem_tecnica.lower()
+    if any(padrao in normalizado for padrao in _PADROES_MODELO_SOBRECARREGADO):
+        return True
+    return "503" in normalizado and "unavailable" in normalizado
+
+
+def _proximo_intervalo_retentativa_sobrecarga(tentativas_ja_feitas):
+    indice = min(
+        tentativas_ja_feitas, len(_INTERVALOS_RETENTATIVA_SOBRECARGA_MINUTOS) - 1
+    )
+    return timedelta(minutes=_INTERVALOS_RETENTATIVA_SOBRECARGA_MINUTOS[indice])
 
 
 AI_DEFINED_OUTPUT_INSTRUCTION_MARKER = "FORMATO DE SAIDA DEFINIDO PELA IA"
@@ -200,7 +246,7 @@ class _AtividadeHeartbeat:
         return False
 
 
-def execute_processing(processamento, actor):
+def execute_processing(processamento, actor, *, limite_documentos_por_execucao=None):
     integration = (
         processamento.ai_provider_integration_snapshot
         or processamento.agente.ai_provider_integration
@@ -243,6 +289,15 @@ def execute_processing(processamento, actor):
         ]
     )
     documentos = list(_select_documentos(processamento))
+    if limite_documentos_por_execucao is not None:
+        # Rotina automatica (ver AgenteConfiguracaoOperacional.
+        # execucao_automatica_ativa): processa so os N mais antigos
+        # (_select_documentos ja ordena por created_at) nesta rodada — o
+        # resto continua PENDENTE, selecionavel na proxima rodada (ou num
+        # clique manual em "Executar" entre uma rodada e outra). Evita
+        # lotes grandes (ex.: 40-50 documentos) estourarem o timeout do
+        # gunicorn (600s) numa unica requisicao sincrona.
+        documentos = documentos[:limite_documentos_por_execucao]
     if processamento.input_source_type == ProcessingInputSourceType.NONE:
         return _execute_without_document(
             processamento=processamento,
@@ -309,6 +364,24 @@ def execute_processing(processamento, actor):
             actor=actor,
         )
 
+    if (
+        _usa_execucao_individual(processamento)
+        and batch_result["total_errors"]
+        and _eh_erro_modelo_sobrecarregado(batch_result["last_technical_error_message"])
+    ):
+        # Provedor sobrecarregado (nao erro nosso, nao erro do documento) —
+        # em vez de concluir com erro/atencao de cara, entra no loop de
+        # retentativa automatica de ate 2h (ver retentar_processamentos_
+        # sobrecarga_provedor). Os documentos ja processados com sucesso
+        # aqui permanecem PROCESSADO; so os que falharam por sobrecarga
+        # continuam ERRO+erro_reprocessavel=True, elegveis para o loop.
+        _iniciar_retentativa_sobrecarga(processamento)
+        return {
+            "documentos_processados": batch_result["total_success"],
+            "documentos_com_erro": batch_result["total_errors"],
+            "aguardando_retentativa_sobrecarga": True,
+        }
+
     finished_at = timezone.now()
     telemetry = _aggregate_processing_telemetry(processamento)
 
@@ -372,6 +445,240 @@ def execute_processing(processamento, actor):
         "formato_saida": processamento.output_format,
         "batch_started_at": batch_started_at,
     }
+
+
+def _iniciar_retentativa_sobrecarga(processamento):
+    """Liga o loop de retentativa por sobrecarga do provedor: o
+    processamento fica EM_PROCESSAMENTO (nao erro/atencao) enquanto o
+    management command retentar_processamentos_sobrecarga_provedor tenta de
+    novo, periodicamente, so os documentos que falharam por sobrecarga.
+
+    Nao seta mensagem_erro aqui de proposito: o painel "Ver erro" do
+    front-end (agente_execucao.js/processamentos.js) aparece sempre que
+    mensagem_erro nao esta vazio, independente do status — setar essa
+    mensagem enquanto status continua em_processamento mostraria um painel
+    de erro vermelho durante algo que nao e um erro, so uma espera. O
+    indicativo "em andamento" (nao alarmante) vem de etapa_atual, ja exibido
+    normalmente na tela para qualquer execucao em processamento."""
+    agora = timezone.now()
+    processamento.retentativa_sobrecarga_ativa = True
+    processamento.retentativa_sobrecarga_iniciada_em = agora
+    processamento.retentativa_sobrecarga_tentativas = 0
+    processamento.retentativa_sobrecarga_proxima_em = (
+        agora + _proximo_intervalo_retentativa_sobrecarga(0)
+    )
+    processamento.status = ProcessingStatus.EM_PROCESSAMENTO
+    _registrar_atividade_processamento(
+        processamento,
+        etapa_atual="Aguardando reenvio automatico (modelo de IA sobrecarregado)",
+    )
+    processamento.save(
+        update_fields=[
+            "retentativa_sobrecarga_ativa",
+            "retentativa_sobrecarga_iniciada_em",
+            "retentativa_sobrecarga_tentativas",
+            "retentativa_sobrecarga_proxima_em",
+            "status",
+            "etapa_atual",
+            "documento_atual_nome",
+            "progresso_etapa_percentual",
+            "ultima_atividade_em",
+            "updated_at",
+        ]
+    )
+
+
+def _ultimo_erro_tecnico_auditoria(processamento):
+    """Busca o detalhe tecnico real (HTTP/corpo cru) da falha mais recente
+    deste processamento, guardado por _tentar_executar_documento_individual
+    via _log_execution_error. Usado ao finalizar o loop de retentativa por
+    sobrecarga, quando nao ha um batch_result em memoria para consultar."""
+    evento_model = django_apps.get_model("auditoria", "EventoAuditoria")
+    if evento_model is None:
+        return ""
+    evento = (
+        evento_model.objects.filter(
+            processamento=processamento,
+            acao="erro_execucao_agente_documento",
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if not evento:
+        return ""
+    return (evento.payload or {}).get("erro", "")
+
+
+def _finalizar_loop_sobrecarga(processamento, *, desistiu_por_timeout=False):
+    """Encerra o loop de retentativa por sobrecarga — chamado quando todos
+    os documentos elegveis finalmente processaram (sucesso ou erro
+    definitivo) ou quando o teto de LIMITE_RETENTATIVA_SOBRECARGA (2h) foi
+    atingido. Espelha a finalizacao de execute_processing, mas le o estado
+    direto do banco em vez de um batch_result em memoria, ja que as
+    tentativas aconteceram em chamadas separadas ao longo do tempo."""
+    finished_at = timezone.now()
+    telemetry = _aggregate_processing_telemetry(processamento)
+
+    erro_docs = list(
+        processamento.documentos.filter(status=DocumentStatus.ERRO).order_by(
+            "-updated_at"
+        )
+    )
+    total_errors = len(erro_docs)
+    last_error_message = erro_docs[0].mensagem_erro if erro_docs else ""
+    last_technical_error_message = _ultimo_erro_tecnico_auditoria(processamento)
+
+    output_records = list(
+        DocumentoSaidaProcessamento.objects.filter(processamento=processamento)
+    )
+
+    with transaction.atomic():
+        processamento.recalcular_totais()
+        processamento.execucao_finalizada_em = finished_at
+        processamento.finalizado_em = finished_at
+        processamento.input_tokens = telemetry["input_tokens"]
+        processamento.processing_tokens = telemetry["processing_tokens"]
+        processamento.output_tokens = telemetry["output_tokens"]
+        processamento.total_tokens = telemetry["total_tokens"]
+        processamento.custo_usd = telemetry.get("custo_usd")
+        processamento.custo_brl = telemetry.get("custo_brl")
+        processamento.retentativa_sobrecarga_ativa = False
+        if total_errors:
+            if desistiu_por_timeout:
+                msg_erro = (
+                    f"O modelo de IA continuou sobrecarregado mesmo apos "
+                    f"tentar por 2 horas. {total_errors} documento(s) nao "
+                    "puderam ser processados — tente executar o agente "
+                    "novamente mais tarde."
+                )
+            else:
+                msg_erro = last_error_message or "Uma ou mais execucoes terminaram com erro."
+            # Root cause desta finalizacao e sempre sobrecarga do provedor
+            # (so entra no loop por causa dela) — trata como "atencao", nao
+            # como falha tecnica critica, mesmo apos desistir do loop.
+            processamento.status = ProcessingStatus.CONCLUIDO_ATENCAO
+            processamento.mensagem_erro = msg_erro
+            processamento.mensagem_erro_tecnico = last_technical_error_message
+        else:
+            processamento.status = ProcessingStatus.CONCLUIDO_SUCESSO
+            processamento.mensagem_erro = ""
+            processamento.mensagem_erro_tecnico = ""
+        _registrar_atividade_processamento(
+            processamento,
+            etapa_atual=(
+                "Processamento concluido com erro"
+                if total_errors
+                else "Processamento concluido com sucesso"
+            ),
+        )
+        if output_records:
+            publicar_saida_final(
+                processamento=processamento,
+                output_records=output_records,
+                output_packaging_mode=processamento.output_packaging_mode_snapshot,
+                output_assembly_mode=processamento.output_assembly_mode_snapshot,
+                source_document_count=processamento.total_documentos or len(output_records),
+            )
+        processamento.save()
+
+
+def _processar_rodada_retentativa_sobrecarga(processamento, *, agora):
+    """Uma rodada do loop: decide desistir (2h estourado), finalizar (nada
+    mais pendente) ou tentar de novo so os documentos elegveis, adiando a
+    proxima rodada com intervalo crescente. Chamado pelo management command
+    retentar_processamentos_sobrecarga_provedor, uma vez por processamento
+    elegvel a cada execucao do comando (cadencia real definida pelo
+    agendamento do worker — ver docker-compose.yml)."""
+    if (
+        processamento.retentativa_sobrecarga_iniciada_em is not None
+        and agora - processamento.retentativa_sobrecarga_iniciada_em
+        >= LIMITE_RETENTATIVA_SOBRECARGA
+    ):
+        _finalizar_loop_sobrecarga(processamento, desistiu_por_timeout=True)
+        return "desistiu_apos_2h"
+
+    integration = (
+        processamento.ai_provider_integration_snapshot
+        or processamento.agente.ai_provider_integration
+    )
+    model_name = processamento.modelo_snapshot or integration.default_model
+    execution_params = _build_execution_params(processamento)
+    actor = processamento.iniciado_por
+
+    documentos = list(
+        processamento.documentos.filter(
+            status=DocumentStatus.ERRO, erro_reprocessavel=True
+        )
+    )
+    if not documentos:
+        # Nada mais elegvel — ou tudo ja resolveu, ou o que sobrou e erro
+        # definitivo (nao relacionado a sobrecarga). Finaliza de qualquer
+        # forma; o estado real de cada documento decide sucesso/atencao.
+        _finalizar_loop_sobrecarga(processamento)
+        return "concluido_sem_pendentes"
+
+    for documento in documentos:
+        _tentar_executar_documento_individual(
+            processamento=processamento,
+            documento=documento,
+            integration=integration,
+            model_name=model_name,
+            execution_params=execution_params,
+            actor=actor,
+        )
+
+    ainda_pendente = processamento.documentos.filter(
+        status=DocumentStatus.ERRO, erro_reprocessavel=True
+    ).exists()
+    if not ainda_pendente:
+        _finalizar_loop_sobrecarga(processamento)
+        return "concluido"
+
+    processamento.refresh_from_db(fields=["retentativa_sobrecarga_tentativas"])
+    processamento.retentativa_sobrecarga_tentativas += 1
+    processamento.retentativa_sobrecarga_proxima_em = timezone.now() + (
+        _proximo_intervalo_retentativa_sobrecarga(
+            processamento.retentativa_sobrecarga_tentativas
+        )
+    )
+    _registrar_atividade_processamento(
+        processamento,
+        etapa_atual=(
+            "Aguardando reenvio automatico (tentativa "
+            f"{processamento.retentativa_sobrecarga_tentativas})"
+        ),
+    )
+    processamento.save(
+        update_fields=[
+            "retentativa_sobrecarga_tentativas",
+            "retentativa_sobrecarga_proxima_em",
+            "etapa_atual",
+            "documento_atual_nome",
+            "progresso_etapa_percentual",
+            "ultima_atividade_em",
+            "updated_at",
+        ]
+    )
+    return "tentando_de_novo"
+
+
+def retentar_processamentos_com_sobrecarga():
+    """Ponto de entrada chamado periodicamente pelo worker (ver management
+    command retentar_processamentos_sobrecarga_provedor) para avancar o
+    loop de retentativa de todo processamento elegvel no momento. Uma
+    rodada por processamento por chamada — a cadencia real de novas
+    tentativas depende de com que frequencia o worker chama este comando."""
+    agora = timezone.now()
+    elegveis = Processamento.objects.filter(
+        retentativa_sobrecarga_ativa=True,
+        retentativa_sobrecarga_proxima_em__lte=agora,
+    ).select_related("agente", "ai_provider_integration_snapshot")
+
+    resultados = []
+    for processamento in elegveis:
+        resultado = _processar_rodada_retentativa_sobrecarga(processamento, agora=agora)
+        resultados.append({"codigo": processamento.codigo, "resultado": resultado})
+    return resultados
 
 
 def _start_processing_batch(*, processamento, batch_started_at, integration, model_name):

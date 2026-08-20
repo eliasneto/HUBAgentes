@@ -43,6 +43,10 @@ urlpatterns = [
         include("apps.doc_system.configuracoes_gerais.urls"),
     ),
     path(
+        "rotina-automatica/",
+        include("apps.doc_system.rotina_automatica.urls"),
+    ),
+    path(
         "guia-google-drive-api/",
         include("apps.doc_system.guia_google_drive.urls"),
     ),

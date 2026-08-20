@@ -5,6 +5,26 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.21] — 2026-08-20
+
+### Adicionado
+- **Rotina automática de execução por agente** — cada agente ganha um toggle "Ativar rotina automática" (Gerenciar agentes): quando ligado, o agente processa sozinho um lote pequeno de documentos pendentes de tempos em tempos, sem depender de alguém clicar em Executar. Motivado por clientes que às vezes precisam enviar 40-50 documentos de uma vez, o que não cabe numa única execução síncrona sem estourar o timeout do servidor (gunicorn 600s).
+  - **Interruptor, intervalo e lote são globais**, definidos em uma nova tela **Administrador > Rotina automática** (`ConfiguracaoGeral.rotina_automatica_agentes_ativa` / `rotina_automatica_intervalo_minutos` / `rotina_automatica_lote_tamanho`) — valem para **todos** os agentes participantes, não configuráveis por agente. O interruptor geral desligado para a rotina para todos, mesmo que um agente tenha a participação ativada individualmente. O intervalo aceita de 10 minutos a 24h; se for menor que 30 minutos, cada rodada processa no máximo 6 documentos por agente, por segurança, ignorando o lote configurado.
+  - **Histórico de execuções** (novo model `RotinaAutomaticaExecucao`, migration `processamentos/0032`) — a mesma tela mostra, com paginação e filtro por agente/situação, se cada rodada rodou ou não, início/fim, quantos documentos, quantos com sucesso/erro e os motivos.
+  - **Trava de concorrência por agente** (`AgenteConfiguracaoOperacional.execucao_em_andamento`, migrations `agentes_ia/0020-0023`) — nada impedia antes a rotina automática e um clique manual em "Executar" rodarem o mesmo agente ao mesmo tempo, disputando os mesmos documentos pendentes e duplicando custo de IA. A trava se autorrecupera se ficar presa por mais de 20 minutos (ex.: processo morto por timeout do gunicorn).
+  - `execute_processing(..., limite_documentos_por_execucao=N)` — cada rodada processa só os N documentos pendentes mais antigos, deixando o resto pendente para a próxima (reaproveita a regra de duplicidade já existente: se não houver nada novo, a rotina não roda nada).
+  - Disponível também via management command `executar_rotinas_automaticas_agentes`, chamado periodicamente pelo worker (`docker-compose.yml`).
+  - Documentado no assistente Biel e em nova página `/doc-system/rotina-automatica/`.
+- **Loop de retentativa automática de 2h para sobrecarga do provedor de IA** (`Processamento.retentativa_sobrecarga_*`, migration `processamentos/0031`) — quando o provedor (não o sistema) está sobrecarregado (ex.: Gemini "This model is currently experiencing high demand", HTTP 503), o processamento não vira erro imediatamente: entra num loop que tenta de novo automaticamente os documentos com falha transitória, em intervalos crescentes (2, 5, 10, 15, 20, 30 min), até um teto de 2h — depois disso desiste e finaliza normalmente. O front-end mostra "aguardando reenvio automático" em vez de falha. Caso real motivador: agente JHS (Licitação), 19/08/2026. Disponível via management command `retentar_processamentos_sobrecarga_provedor`, chamado periodicamente pelo worker.
+- **Download individual por documento** (modo de execução Individual) — cada linha de "Ver tokens por documento" ganha um link de download próprio, sem precisar esperar o lote inteiro terminar. Nova view `ProcessamentoDocumentoDownloadView` e URL `portal_processamento_download_documento`.
+
+### Corrigido
+- **`RemoteDisconnected` não era retentado** (`BaseAIProviderAdapter`, `apps/integracoes/services/ai_providers/base.py`) — descoberto testando localmente: quando o provedor fecha a conexão sem devolver resposta, a exceção (`http.client.HTTPException`) não caía em nenhum `except` da retentativa e quebrava o lote inteiro sem tentar de novo, mesmo sendo uma falha de rede tão transitória quanto timeout/DNS. Adicionada ao except já existente.
+- **Chave de API exposta em texto puro em logs e auditoria** (`apps/integracoes/services/ai_providers/base.py`, `gemini_adapter.py`) — o Gemini autentica via query string na URL (`?key=...`), diferente de OpenAI/Anthropic/Groq (headers). Sem mascarar, a chave real aparecia no log de retentativa e em `EventoAuditoria.payload["request_url"]` (Django admin). Descoberto testando localmente (20/08/2026) ao investigar um `RemoteDisconnected` real. Nova função `redact_url_credentials()` mascara `key=`/`api_key=`/`token=`/`access_token=` em qualquer URL antes de logar ou persistir.
+- Cobertura: `apps/processamentos/tests_rotina_automatica_agentes.py` (37 testes), `apps/processamentos/tests_retentativa_sobrecarga_provedor.py` (16 testes), `apps/integracoes/tests_retry_conexao.py` (3 testes), `apps/integracoes/tests_redacao_url_credenciais.py` (5 testes), `apps/processamentos/tests_tokens_por_documento.py` (+9 testes de download por documento). Suite completa (180 testes), `manage.py check` e `makemigrations --check --dry-run` OK.
+
+---
+
 ## [1.5.20] — 2026-08-19
 
 ### Adicionado

@@ -1,0 +1,247 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rotina Automática - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260820-rotina-automatica-1">
+</head>
+<body>
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="rotina_automatica" %}
+
+    <section class="portal-main" aria-label="Rotina automática de agentes">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Administrador</p>
+          <h1>Rotina automática de agentes</h1>
+        </div>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if 'success' in message.tags %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <form method="post" action="{% url 'portal_rotina_automatica_salvar' %}" class="agent-builder-form" autocomplete="off">
+        {% csrf_token %}
+
+        <section class="builder-card">
+          <div class="form-section-heading">
+            <p class="eyebrow">Interruptor geral</p>
+            <h2>Ligar ou desligar a rotina automática</h2>
+          </div>
+          <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:24px;line-height:1.6">
+            Cada agente decide, nas suas próprias configurações, se participa da rotina
+            automática. Este interruptor manda em todos eles: quando desligado, a rotina não
+            roda para <strong>nenhum</strong> agente, mesmo que ele tenha a participação
+            ativada individualmente.
+          </p>
+
+          <label class="toggle-line" for="id_rotina_toggle" style="max-width:480px">
+            <input type="checkbox" id="id_rotina_toggle" name="rotina_automatica_agentes_ativa" value="1"
+              {% if config.rotina_automatica_agentes_ativa %}checked{% endif %}>
+            <span class="toggle-switch" aria-hidden="true"></span>
+            <span>
+              <strong>{% if config.rotina_automatica_agentes_ativa %}Rotina automática ativa{% else %}Rotina automática desligada{% endif %}</strong>
+              <small>{% if config.rotina_automatica_agentes_ativa %}{{ total_agentes_participantes }} agente(s) participando desta rotina.{% else %}Nenhum agente processa automaticamente enquanto estiver desligada.{% endif %}</small>
+            </span>
+          </label>
+
+          <div class="execution-field" style="max-width:420px;margin-top:24px">
+            <label for="id_rotina_intervalo">Intervalo entre rodadas (minutos)</label>
+            <input type="number" id="id_rotina_intervalo" name="rotina_automatica_intervalo_minutos"
+              min="10" max="1440" value="{{ config.rotina_automatica_intervalo_minutos }}">
+            <small>
+              Vale para todos os agentes com a rotina ativada. Mínimo 10 minutos, máximo 1440
+              (24h). Se o intervalo for <strong>menor que 30 minutos</strong>, cada rodada
+              processa no máximo <strong>6 documentos</strong> por agente, independente do
+              campo abaixo — uma proteção extra para intervalos curtos.
+            </small>
+          </div>
+
+          <div class="execution-field" style="max-width:420px;margin-top:18px">
+            <label for="id_rotina_lote_tamanho">Documentos por rodada</label>
+            <input type="number" id="id_rotina_lote_tamanho" name="rotina_automatica_lote_tamanho"
+              min="1" max="100" value="{{ config.rotina_automatica_lote_tamanho }}">
+            <small>
+              Quantos documentos pendentes cada agente participante processa por rodada. Os
+              demais ficam pendentes para a rodada seguinte. Vale para todos os agentes com a
+              rotina ativada — não é mais configurável por agente.
+            </small>
+          </div>
+
+          {% if config.rotina_automatica_proxima_execucao_em %}
+          <div style="display:flex;gap:24px;margin-top:18px;flex-wrap:wrap">
+            <span style="font-size:12px;color:var(--muted,#7ca5b8)">
+              <strong style="color:var(--neon-1,#00d8ff)">Próxima rodada:</strong>
+              {{ config.rotina_automatica_proxima_execucao_em|date:"d/m/Y H:i" }}
+            </span>
+          </div>
+          {% endif %}
+        </section>
+
+        <div class="execution-actions builder-actions">
+          <button type="submit" class="start-button">Salvar configurações</button>
+        </div>
+      </form>
+
+      <section class="audit-hero" style="margin-top:1.5rem">
+        <div>
+          <p class="eyebrow">Histórico de execuções</p>
+          <h2>Acompanhe cada rodada da rotina automática.</h2>
+          <p>
+            Toda tentativa fica registrada aqui: se rodou ou não, quantos documentos foram
+            processados, quantos deram certo ou erro e os motivos.
+          </p>
+        </div>
+        <div class="audit-metrics" aria-label="Resumo do histórico">
+          <article>
+            <strong>{{ historico.total }}</strong>
+            <span>Tentativas registradas</span>
+          </article>
+          <article>
+            <strong>{{ total_agentes_participantes }}</strong>
+            <span>Agentes participando</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="audit-filters" aria-label="Filtros">
+        <form method="get" action="" class="audit-filter-form">
+          <div class="execution-field">
+            <label for="filtro-agente">Agente</label>
+            <select id="filtro-agente" name="agente">
+              <option value="">Todos os agentes</option>
+              {% for agente_id, agente_nome in historico.agentes_disponiveis %}
+                <option value="{{ agente_id }}" {% if historico.filtro_agente == agente_id|stringformat:"s" %}selected{% endif %}>
+                  {{ agente_nome }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="execution-field">
+            <label for="filtro-status">Situação</label>
+            <select id="filtro-status" name="status">
+              <option value="">Todas as situações</option>
+              {% for valor, label in status_choices %}
+                <option value="{{ valor }}" {% if historico.filtro_status == valor %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="start-button audit-filter-btn">Filtrar</button>
+          {% if historico.filtro_agente or historico.filtro_status %}
+            <a href="{% url 'portal_rotina_automatica' %}" class="secondary-action audit-filter-btn">Limpar</a>
+          {% endif %}
+        </form>
+      </section>
+
+      <section class="audit-list" aria-label="Lista de execuções da rotina">
+        {% for execucao in historico.execucoes %}
+          <article class="audit-card">
+            <div class="audit-card-left">
+              <span class="audit-module-badge audit-module-{{ execucao.status }}">{{ execucao.status_label }}</span>
+              <span class="audit-action">{{ execucao.agente_nome }}</span>
+            </div>
+
+            <div class="audit-card-body">
+              <p class="audit-descricao">
+                {% if execucao.total_documentos %}
+                  {{ execucao.total_documentos }} documento(s) &middot;
+                  {{ execucao.total_sucesso }} com sucesso &middot;
+                  {{ execucao.total_erro }} com erro
+                {% else %}
+                  Nenhum documento processado nesta rodada.
+                {% endif %}
+              </p>
+              {% if execucao.motivo %}
+                <small class="audit-objeto">{{ execucao.motivo }}</small>
+              {% endif %}
+              {% if execucao.processamento_codigo %}
+                <small class="audit-objeto">Processamento &middot; #{{ execucao.processamento_codigo }}</small>
+              {% endif %}
+            </div>
+
+            <dl class="audit-card-meta">
+              <div>
+                <dt>Início</dt>
+                <dd title="{{ execucao.iniciado_em_formatado }}">{{ execucao.iniciado_em_formatado }}</dd>
+              </div>
+              <div>
+                <dt>Fim</dt>
+                <dd title="{{ execucao.finalizado_em_formatado }}">{{ execucao.finalizado_em_formatado|default:"—" }}</dd>
+              </div>
+            </dl>
+          </article>
+        {% empty %}
+          <article class="empty-agents">
+            <span class="empty-icon" aria-hidden="true">RA</span>
+            <p class="eyebrow">Estado vazio</p>
+            <h2>Nenhuma execução registrada ainda</h2>
+            <p>
+              {% if historico.filtro_agente or historico.filtro_status %}
+                Nenhuma execução corresponde aos filtros aplicados.
+              {% else %}
+                As tentativas da rotina automática aparecerão aqui conforme forem acontecendo.
+              {% endif %}
+            </p>
+          </article>
+        {% endfor %}
+      </section>
+
+      {% if historico.total_paginas > 1 %}
+        <nav class="portal-pagination" aria-label="Paginação do histórico">
+          <div>
+            <span>
+              {{ historico.primeiro_item }}-{{ historico.ultimo_item }}
+              de {{ historico.total }}
+            </span>
+            <small>{{ historico.itens_por_pagina }} por pagina</small>
+          </div>
+
+          <div class="pagination-actions">
+            {% if historico.tem_pagina_anterior %}
+              <a
+                class="pagination-button"
+                href="?page={{ historico.pagina_anterior }}{% if historico.filtro_agente %}&agente={{ historico.filtro_agente }}{% endif %}{% if historico.filtro_status %}&status={{ historico.filtro_status }}{% endif %}"
+                aria-label="Pagina anterior"
+              >&lsaquo;</a>
+            {% else %}
+              <span class="pagination-button disabled" aria-hidden="true">&lsaquo;</span>
+            {% endif %}
+
+            {% for pagina in historico.paginas %}
+              {% if pagina == "..." %}
+                <span class="pagination-ellipsis">...</span>
+              {% elif pagina == historico.pagina_atual %}
+                <span class="pagination-button active" aria-current="page">{{ pagina }}</span>
+              {% else %}
+                <a
+                  class="pagination-button"
+                  href="?page={{ pagina }}{% if historico.filtro_agente %}&agente={{ historico.filtro_agente }}{% endif %}{% if historico.filtro_status %}&status={{ historico.filtro_status }}{% endif %}"
+                >{{ pagina }}</a>
+              {% endif %}
+            {% endfor %}
+
+            {% if historico.tem_proxima_pagina %}
+              <a
+                class="pagination-button"
+                href="?page={{ historico.proxima_pagina }}{% if historico.filtro_agente %}&agente={{ historico.filtro_agente }}{% endif %}{% if historico.filtro_status %}&status={{ historico.filtro_status }}{% endif %}"
+                aria-label="Proxima pagina"
+              >&rsaquo;</a>
+            {% else %}
+              <span class="pagination-button disabled" aria-hidden="true">&rsaquo;</span>
+            {% endif %}
+          </div>
+        </nav>
+      {% endif %}
+
+    </section>
+  </main>
+</body>
+</html>

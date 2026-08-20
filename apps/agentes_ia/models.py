@@ -390,6 +390,45 @@ class AgenteConfiguracaoOperacional(UserStampedModel):
             "quando a origem padrão é uma pasta (Google Drive ou local)."
         ),
     )
+    # Rotina automatica (AgentTriggerMode.AGENDADO ja existia como opcao no
+    # model mas nunca tinha logica de execucao por tras — ver management
+    # command executar_rotinas_automaticas_agentes, chamado periodicamente
+    # pelo worker). Quando ativa, processa um lote pequeno de documentos
+    # pendentes automaticamente, de tempos em tempos, em vez de depender de
+    # alguem clicar Executar - motivado por lotes grandes (ex.: 50
+    # documentos de uma vez) que nao cabem numa unica requisicao sincrona
+    # (gunicorn --timeout 600s). O intervalo entre rodadas e quantos
+    # documentos cada rodada processa sao GLOBAIS (ConfiguracaoGeral.
+    # rotina_automatica_intervalo_minutos/rotina_automatica_lote_tamanho,
+    # editaveis em Administrador > Rotina automatica) — cada agente so
+    # decide, aqui, se PARTICIPA da rotina. Se nao houver nada novo (tudo
+    # ja processado antes — mesma regra de duplicidade que ja existe), a
+    # rotina simplesmente nao roda nada.
+    execucao_automatica_ativa = models.BooleanField(
+        default=False,
+        help_text=(
+            "Processa automaticamente um lote pequeno de documentos "
+            "pendentes a cada X minutos, em vez de depender de alguém "
+            "clicar Executar. Útil para pastas com muitos documentos "
+            "(ex.: 40-50 de uma vez), que não cabem numa única execução "
+            "sem estourar o tempo limite do servidor. O intervalo entre "
+            "rodadas e quantos documentos cada rodada processa são "
+            "definidos em Administrador > Rotina automática, valendo "
+            "para todos os agentes participantes. Se não houver nada "
+            "novo, a rotina não faz nada nessa rodada."
+        ),
+    )
+    # Trava de concorrencia por agente (concurrency_policy.
+    # block_parallel_per_agent ja existia como campo configuravel, mas
+    # nunca era checado em lugar nenhum — nada impedia a rotina automatica
+    # e um clique manual em "Executar" rodarem o mesmo agente ao mesmo
+    # tempo, disputando os mesmos documentos pendentes e duplicando custo
+    # de IA. execucao_em_andamento_desde permite destravar sozinho se uma
+    # execucao anterior travou sem liberar (ex.: processo morto por
+    # timeout do gunicorn) — ver operational_execution.
+    # LIMITE_TRAVA_EXECUCAO_MINUTOS.
+    execucao_em_andamento = models.BooleanField(default=False)
+    execucao_em_andamento_desde = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Configuracao operacional do agente"

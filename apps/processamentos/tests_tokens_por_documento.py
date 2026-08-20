@@ -5,13 +5,17 @@ tela de Processamentos.
 """
 
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
 from django.test import TestCase
+from django.urls import reverse
 
 from apps.processamentos.models import (
     AIExecutionStatus,
     DocumentoEntrada,
+    DocumentoSaidaProcessamento,
     DocumentStatus,
     ExecutionScopeType,
+    OutputDocumentStatus,
     Processamento,
     ProcessamentoExecucaoIA,
     ProcessingInputSourceType,
@@ -164,3 +168,178 @@ class TokensPorDocumentoTests(TestCase):
         linhas = _tokens_por_documento(self.processamento)
 
         self.assertEqual([linha.nome_arquivo for linha in linhas], ["a.pdf", "b.pdf"])
+
+
+class DownloadUrlPorDocumentoTests(TestCase):
+    """download_url deixa baixar o arquivo de UM documento individual assim
+    que ele termina, sem esperar o processamento inteiro (que pode ter
+    dezenas de outros documentos ainda rodando)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="operador2", password="x")
+        self.processamento = Processamento.objects.create(
+            codigo="PROC-TESTE-DOWNLOAD",
+            iniciado_por=self.user,
+        )
+
+    def _documento(self, nome, **extra):
+        defaults = {
+            "processamento": self.processamento,
+            "nome_arquivo": nome,
+            "drive_file_id": "drive-id-" + nome,
+            "source_type": ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER,
+            "source_reference": "drive-id-" + nome,
+        }
+        defaults.update(extra)
+        return DocumentoEntrada.objects.create(**defaults)
+
+    def test_documento_processado_com_saida_ganha_download_url(self):
+        documento = self._documento("relatorio.pdf", status=DocumentStatus.PROCESSADO)
+        execucao = ProcessamentoExecucaoIA.objects.create(
+            processamento=self.processamento,
+            documento=documento,
+            tentativa_numero=1,
+            status=AIExecutionStatus.SUCESSO,
+            scope_type=ExecutionScopeType.INDIVIDUAL,
+            total_tokens=50,
+        )
+        execucao.documentos_entrada.set([documento])
+        saida = DocumentoSaidaProcessamento(
+            processamento=self.processamento,
+            documento=documento,
+            execucao_ia=execucao,
+            status=OutputDocumentStatus.GERADO,
+        )
+        saida.arquivo.save("relatorio.json", ContentFile(b'{"ok": true}'), save=False)
+        saida.save()
+
+        linhas = _tokens_por_documento(self.processamento)
+
+        self.assertEqual(len(linhas), 1)
+        self.assertEqual(
+            linhas[0].download_url,
+            reverse(
+                "portal_processamento_download_documento",
+                kwargs={"codigo": self.processamento.codigo, "saida_id": saida.id},
+            ),
+        )
+
+    def test_documento_com_erro_nao_tem_download_url(self):
+        documento = self._documento(
+            "com_erro.pdf",
+            status=DocumentStatus.ERRO,
+            mensagem_erro="falhou",
+        )
+        ProcessamentoExecucaoIA.objects.create(
+            processamento=self.processamento,
+            documento=documento,
+            tentativa_numero=1,
+            status=AIExecutionStatus.ERRO,
+            scope_type=ExecutionScopeType.INDIVIDUAL,
+            total_tokens=10,
+        )
+
+        linhas = _tokens_por_documento(self.processamento)
+
+        self.assertEqual(len(linhas), 1)
+        self.assertEqual(linhas[0].download_url, "")
+
+    def test_documento_processado_sem_saida_ainda_nao_tem_download_url(self):
+        # Estado transitorio possivel entre marcar PROCESSADO e persistir a
+        # saida (mesma transacao no codigo real, mas o seletor nao deve
+        # quebrar se checado nesse meio-tempo).
+        documento = self._documento("sem_saida.pdf", status=DocumentStatus.PROCESSADO)
+        execucao = ProcessamentoExecucaoIA.objects.create(
+            processamento=self.processamento,
+            documento=documento,
+            tentativa_numero=1,
+            status=AIExecutionStatus.SUCESSO,
+            scope_type=ExecutionScopeType.INDIVIDUAL,
+            total_tokens=10,
+        )
+        execucao.documentos_entrada.set([documento])
+
+        linhas = _tokens_por_documento(self.processamento)
+
+        self.assertEqual(linhas[0].download_url, "")
+
+    def test_grupo_nunca_tem_download_url(self):
+        doc_c = self._documento("c.pdf")
+        doc_d = self._documento("d.pdf")
+        execucao_grupo = ProcessamentoExecucaoIA.objects.create(
+            processamento=self.processamento,
+            tentativa_numero=1,
+            status=AIExecutionStatus.SUCESSO,
+            scope_type=ExecutionScopeType.GRUPO,
+            total_tokens=300,
+        )
+        execucao_grupo.documentos_entrada.set([doc_c, doc_d])
+
+        linhas = _tokens_por_documento(self.processamento)
+
+        self.assertEqual(linhas[0].download_url, "")
+
+
+class ProcessamentoDocumentoDownloadViewTests(TestCase):
+    def setUp(self):
+        self.dono = User.objects.create_user(username="dono", password="x")
+        self.outro_usuario = User.objects.create_user(username="outro", password="x")
+        self.admin = User.objects.create_user(
+            username="admin_teste", password="x", is_superuser=True
+        )
+        self.processamento = Processamento.objects.create(
+            codigo="PROC-TESTE-DOWNLOAD-VIEW",
+            iniciado_por=self.dono,
+        )
+        self.documento = DocumentoEntrada.objects.create(
+            processamento=self.processamento,
+            nome_arquivo="relatorio.pdf",
+            drive_file_id="drive-id",
+            source_type=ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER,
+            source_reference="drive-id",
+            status=DocumentStatus.PROCESSADO,
+        )
+        self.saida = DocumentoSaidaProcessamento(
+            processamento=self.processamento,
+            documento=self.documento,
+            status=OutputDocumentStatus.GERADO,
+        )
+        self.saida.arquivo.save(
+            "relatorio.json", ContentFile(b'{"ok": true}'), save=False
+        )
+        self.saida.save()
+
+    def _url(self):
+        return reverse(
+            "portal_processamento_download_documento",
+            kwargs={"codigo": self.processamento.codigo, "saida_id": self.saida.id},
+        )
+
+    def test_dono_consegue_baixar(self):
+        self.client.force_login(self.dono)
+        resp = self.client.get(self._url())
+        self.assertEqual(resp.status_code, 200)
+
+    def test_admin_consegue_baixar_de_qualquer_usuario(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(self._url())
+        self.assertEqual(resp.status_code, 200)
+
+    def test_outro_usuario_nao_consegue_baixar(self):
+        self.client.force_login(self.outro_usuario)
+        resp = self.client.get(self._url())
+        self.assertEqual(resp.status_code, 404)
+
+    def test_sem_login_redireciona(self):
+        resp = self.client.get(self._url())
+        self.assertEqual(resp.status_code, 302)
+
+    def test_saida_sem_arquivo_devolve_404(self):
+        self.saida.arquivo.delete(save=False)
+        self.saida.arquivo = None
+        self.saida.save()
+        self.client.force_login(self.dono)
+
+        resp = self.client.get(self._url())
+
+        self.assertEqual(resp.status_code, 404)

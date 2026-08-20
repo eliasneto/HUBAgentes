@@ -166,7 +166,14 @@ document.addEventListener("DOMContentLoaded", function () {
           const nome = doc.status
             ? `${doc.nome_arquivo} — ${doc.status}`
             : doc.nome_arquivo;
-          return `<li><span>${escapeHtml(nome)}</span><span>${escapeHtml(doc.total_tokens)}</span></li>`;
+          const download = doc.download_url
+            ? `<a href="${escapeHtml(doc.download_url)}" class="processing-tokens-download" title="Baixar este documento">⭳</a>`
+            : "";
+          return (
+            `<li><span class="processing-tokens-nome">${escapeHtml(nome)}</span>` +
+            `<span class="processing-tokens-total">${escapeHtml(doc.total_tokens)}</span>` +
+            `${download}</li>`
+          );
         })
         .join("");
     }

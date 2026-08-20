@@ -2,7 +2,12 @@ from urllib.parse import urlencode
 
 import base64
 
-from .base import AIProviderExecutionResult, AIProviderServiceError, BaseAIProviderAdapter
+from .base import (
+    AIProviderExecutionResult,
+    AIProviderServiceError,
+    BaseAIProviderAdapter,
+    redact_url_credentials,
+)
 
 
 # Erro que a Gemini devolve quando thinkingBudget=0 e enviado para um modelo
@@ -87,7 +92,7 @@ class GeminiProviderAdapter(BaseAIProviderAdapter):
             output_text=output_text,
             response_payload=response_payload,
             usage_metadata=response_payload.get("usageMetadata", {}),
-            request_url=request_url,
+            request_url=redact_url_credentials(request_url),
             response_mime_type=response_mime_type,
             summary=self.extract_summary(response_payload),
         )
@@ -115,7 +120,7 @@ class GeminiProviderAdapter(BaseAIProviderAdapter):
             output_text=output_text,
             response_payload=response_payload,
             usage_metadata=response_payload.get("usageMetadata", {}),
-            request_url=request_url,
+            request_url=redact_url_credentials(request_url),
             response_mime_type=response_mime_type,
             summary=self.extract_summary(response_payload),
         )
@@ -145,7 +150,7 @@ class GeminiProviderAdapter(BaseAIProviderAdapter):
             output_text=output_text,
             response_payload=response_payload,
             usage_metadata=response_payload.get("usageMetadata", {}),
-            request_url=request_url,
+            request_url=redact_url_credentials(request_url),
             response_mime_type=response_mime_type,
             summary=self.extract_summary(response_payload),
         )

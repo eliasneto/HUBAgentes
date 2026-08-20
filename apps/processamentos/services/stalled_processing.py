@@ -73,6 +73,13 @@ def reconciliar_processamento_orfao(processamento: Processamento) -> Processamen
 
 
 def _is_candidate(processamento: Processamento) -> bool:
+    # Loop de retentativa por sobrecarga do provedor (ver agent_execution.
+    # retentar_processamentos_com_sobrecarga) fica intencionalmente parado
+    # por ate ~30min entre tentativas — bem mais que os 5min deste timeout.
+    # Sem essa exclusao, o orfao-detector mataria a espera antes de dar uma
+    # chance real do provedor se recuperar.
+    if processamento.retentativa_sobrecarga_ativa:
+        return False
     return processamento.status in {
         ProcessingStatus.CRIADO,
         ProcessingStatus.EM_FILA,

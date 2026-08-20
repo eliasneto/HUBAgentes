@@ -189,8 +189,11 @@
               <ul class="processing-tokens-list" data-tokens-list>
                 {% for doc in processamento.documentos_tokens %}
                   <li>
-                    <span>{{ doc.nome_arquivo }}{% if doc.status %} — {{ doc.status }}{% endif %}</span>
-                    <span>{{ doc.total_tokens }}</span>
+                    <span class="processing-tokens-nome">{{ doc.nome_arquivo }}{% if doc.status %} — {{ doc.status }}{% endif %}</span>
+                    <span class="processing-tokens-total">{{ doc.total_tokens }}</span>
+                    {% if doc.download_url %}
+                      <a href="{{ doc.download_url }}" class="processing-tokens-download" title="Baixar este documento">⭳</a>
+                    {% endif %}
                   </li>
                   {% if doc.mensagem_erro %}
                     <li class="processing-tokens-erro-msg">{{ doc.mensagem_erro }}</li>

@@ -17,6 +17,7 @@ PAGINAS = [
     ("configuracao_custos", "Configuração de Custos",   "Precificação e configuração financeira",  9),
     ("tela_login",          "Tela de Login",            "Personalizar tela de login",              10),
     ("configuracao_geral",  "Configurações Gerais",     "Configurações gerais do sistema",         11),
+    ("rotina_automatica",   "Rotina automática",        "Liga/desliga e acompanha o historico da rotina automatica de agentes", 12),
 ]
 
 GRUPOS = {
