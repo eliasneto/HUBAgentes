@@ -98,10 +98,21 @@ class ProcessamentoExecutionError(Exception):
 # periodicamente pelo worker, ver docker-compose.yml). Caso real: agente
 # JHS/Licitacao, 19/08/2026 — Gemini devolvendo HTTP 503 "This model is
 # currently experiencing high demand" para gemini-2.5-pro.
-LIMITE_RETENTATIVA_SOBRECARGA = timedelta(hours=2)
+#
+# Teto reduzido de 2h para 45min (1.5.25): o backoff abaixo ja estabiliza em
+# ciclos fixos de 30min a partir de ~52min, entao o teto original comprava
+# pouca chance adicional de recuperacao depois disso — so alongava o tempo
+# em que um documento fica "em espera" sem que nada externo (novo clique
+# manual, nova rodada da rotina automatica) reconheca que ele ja esta sendo
+# tratado aqui (ver _arquivo_ja_processado_em_outra_execucao, no
+# document_sources.py, que agora cobre esse estado — mas quanto maior o
+# teto, maior a janela em que uma execucao concorrente ainda poderia
+# duplicar o processamento do mesmo arquivo antes dessa checagem existir).
+LIMITE_RETENTATIVA_SOBRECARGA = timedelta(minutes=45)
 
 # Intervalo (minutos) antes de cada nova rodada de retentativa, crescente
-# ate estabilizar em 30min — depois disso repete 30min ate o teto de 2h.
+# ate estabilizar em 30min — depois disso repete 30min ate o teto configurado
+# em LIMITE_RETENTATIVA_SOBRECARGA.
 # Ex.: tentativas 0,1,2,3,4,5+ -> espera 2,5,10,15,20,30min respectivamente.
 _INTERVALOS_RETENTATIVA_SOBRECARGA_MINUTOS = [2, 5, 10, 15, 20, 30]
 
@@ -121,7 +132,8 @@ def _eh_erro_modelo_sobrecarregado(mensagem_tecnica):
     a chamada por sobrecarga momentanea do modelo (ex.: Gemini HTTP 503
     "This model is currently experiencing high demand") — situacao
     genuinamente temporaria do lado de fora, elegivel para o loop de
-    retentativa de ate 2h em vez de desistir depois de 1-2 tentativas."""
+    retentativa (ver LIMITE_RETENTATIVA_SOBRECARGA) em vez de desistir
+    depois de 1-2 tentativas."""
     if not mensagem_tecnica:
         return False
     normalizado = mensagem_tecnica.lower()
@@ -272,6 +284,7 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
     if not processamento.modelo_snapshot:
         processamento.modelo_snapshot = model_name
 
+    limite_novos_documentos = None
     if limite_documentos_por_execucao is not None:
         # So a rotina automatica (unico call site que preenche esse limite —
         # ver operational_execution._executar_rotina_automatica_agente)
@@ -281,12 +294,28 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
         # ANTES de prepare_documentos: como eles passam a pertencer a este
         # processamento, _select_documentos ja os inclui e, por serem mais
         # antigos (created_at), entram na frente dos arquivos novos no corte
-        # de limite_documentos_por_execucao logo abaixo — prioridade "de
-        # graca", sem precisar reduzir a descoberta de arquivos novos.
+        # de limite_documentos_por_execucao logo abaixo.
         adotar_documentos_pendentes_de_retentativa(
             processamento, limite_documentos_por_execucao
         )
-    resultado_preparo = prepare_documentos(processamento)
+        # Desconta os ja readotados do teto de NOVOS documentos que a
+        # descoberta pode criar (ver prepare_documentos), pra garantir que
+        # o total (readotados + novos) nunca passe de
+        # limite_documentos_por_execucao — sem isso, a descoberta criava um
+        # DocumentoEntrada pra CADA arquivo da pasta de uma vez (sem teto,
+        # exceto quando o agente le subpastas recursivamente), e so a
+        # EXECUCAO (corte abaixo) respeitava o limite da rodada: o
+        # processamento acabava "descobrindo" mais documentos do que de
+        # fato executava, sobrando pendente(s) dentro de um processamento
+        # ja concluido em vez de ficar de fora pra proxima rodada descobrir
+        # do zero. Caso real: pasta com 11 PDFs, lote=10 — processamento
+        # concluido_sucesso com 10 processados e 1 pendente esquecido dentro
+        # dele mesmo.
+        ja_existentes = processamento.documentos.count()
+        limite_novos_documentos = max(0, limite_documentos_por_execucao - ja_existentes)
+    resultado_preparo = prepare_documentos(
+        processamento, limite_novos_documentos=limite_novos_documentos
+    )
     processamento.total_documentos_ignorados = resultado_preparo.get("ignorados", 0)
     # Sinaliza para a view/front-end que a descoberta parou antes de
     # esgotar a pasta (limite de lote atingido — ver document_sources.
@@ -391,10 +420,11 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
     ):
         # Provedor sobrecarregado (nao erro nosso, nao erro do documento) —
         # em vez de concluir com erro/atencao de cara, entra no loop de
-        # retentativa automatica de ate 2h (ver retentar_processamentos_
-        # sobrecarga_provedor). Os documentos ja processados com sucesso
-        # aqui permanecem PROCESSADO; so os que falharam por sobrecarga
-        # continuam ERRO+erro_reprocessavel=True, elegveis para o loop.
+        # retentativa automatica (ver LIMITE_RETENTATIVA_SOBRECARGA e
+        # retentar_processamentos_sobrecarga_provedor). Os documentos ja
+        # processados com sucesso aqui permanecem PROCESSADO; so os que
+        # falharam por sobrecarga continuam ERRO+erro_reprocessavel=True,
+        # elegveis para o loop.
         _iniciar_retentativa_sobrecarga(processamento)
         return {
             "documentos_processados": batch_result["total_success"],
@@ -532,7 +562,7 @@ def _ultimo_erro_tecnico_auditoria(processamento):
 def _finalizar_loop_sobrecarga(processamento, *, desistiu_por_timeout=False):
     """Encerra o loop de retentativa por sobrecarga — chamado quando todos
     os documentos elegveis finalmente processaram (sucesso ou erro
-    definitivo) ou quando o teto de LIMITE_RETENTATIVA_SOBRECARGA (2h) foi
+    definitivo) ou quando o teto de LIMITE_RETENTATIVA_SOBRECARGA foi
     atingido. Espelha a finalizacao de execute_processing, mas le o estado
     direto do banco em vez de um batch_result em memoria, ja que as
     tentativas aconteceram em chamadas separadas ao longo do tempo."""
@@ -565,9 +595,17 @@ def _finalizar_loop_sobrecarga(processamento, *, desistiu_por_timeout=False):
         processamento.retentativa_sobrecarga_ativa = False
         if total_errors:
             if desistiu_por_timeout:
+                # Duracao calculada a partir da constante (nao hardcoded) pra
+                # nunca destoar se LIMITE_RETENTATIVA_SOBRECARGA for ajustado.
+                minutos_teto = int(LIMITE_RETENTATIVA_SOBRECARGA.total_seconds() // 60)
+                duracao_legivel = (
+                    f"{minutos_teto} minutos"
+                    if minutos_teto < 60
+                    else f"{minutos_teto // 60} hora(s)"
+                )
                 msg_erro = (
                     f"O modelo de IA continuou sobrecarregado mesmo apos "
-                    f"tentar por 2 horas. {total_errors} documento(s) nao "
+                    f"tentar por {duracao_legivel}. {total_errors} documento(s) nao "
                     "puderam ser processados — tente executar o agente "
                     "novamente mais tarde."
                 )
@@ -603,7 +641,7 @@ def _finalizar_loop_sobrecarga(processamento, *, desistiu_por_timeout=False):
 
 
 def _processar_rodada_retentativa_sobrecarga(processamento, *, agora):
-    """Uma rodada do loop: decide desistir (2h estourado), finalizar (nada
+    """Uma rodada do loop: decide desistir (teto estourado), finalizar (nada
     mais pendente) ou tentar de novo so os documentos elegveis, adiando a
     proxima rodada com intervalo crescente. Chamado pelo management command
     retentar_processamentos_sobrecarga_provedor, uma vez por processamento

@@ -441,6 +441,52 @@ class PrepararDocumentosSubpastasLocalTests(TestCase):
         self.assertEqual(resultado["created"], 5)
         self.assertFalse(resultado["atingiu_limite_lote"])
 
+    def test_limite_novos_documentos_e_respeitado_sem_include_subfolders(self):
+        # Caso real do bug (23/08/2026): pasta com 5 PDFs soltos na raiz,
+        # SEM include_subfolders — antes desta correcao a descoberta nao
+        # tinha limite algum nesse caso (so a EXECUCAO respeitava o lote da
+        # rotina automatica), entao o processamento acabava "descobrindo"
+        # os 5 e so executando o lote, sobrando pendente(s) dentro dele
+        # mesmo. limite_novos_documentos e o parametro que agora fecha essa
+        # lacuna, so preenchido pela rotina automatica.
+        agente = self._criar_agente(include_subfolders=False)
+        for i in range(5):
+            (self.base_path / f"solto{i}.pdf").write_bytes(b"pdf")
+        processamento = self._criar_processamento(agente)
+
+        resultado = prepare_documentos(processamento, limite_novos_documentos=3)
+
+        self.assertEqual(resultado["created"], 3)
+        self.assertEqual(resultado["ignorados"], 0)
+        self.assertEqual(processamento.documentos.count(), 3)
+
+    def test_sem_limite_novos_documentos_continua_descobrindo_tudo(self):
+        # Execucao manual (nunca preenche limite_novos_documentos) preserva
+        # o comportamento de sempre: descobre a pasta inteira de uma vez.
+        agente = self._criar_agente(include_subfolders=False)
+        for i in range(5):
+            (self.base_path / f"solto{i}.pdf").write_bytes(b"pdf")
+        processamento = self._criar_processamento(agente)
+
+        resultado = prepare_documentos(processamento)
+
+        self.assertEqual(resultado["created"], 5)
+
+    def test_limite_novos_documentos_combina_com_teto_de_subpastas(self):
+        # Com include_subfolders=True os dois tetos coexistem — vale o
+        # menor: aqui max_pdfs_lote_subpastas=4 (seguranca contra arvore
+        # grande) e limite_novos_documentos=2 (lote da rotina automatica).
+        agente = self._criar_agente(include_subfolders=True)
+        self._montar_arvore(5)
+        config_geral = ConfiguracaoGeral.obter()
+        config_geral.max_pdfs_lote_subpastas = 4
+        config_geral.save()
+        processamento = self._criar_processamento(agente)
+
+        resultado = prepare_documentos(processamento, limite_novos_documentos=2)
+
+        self.assertEqual(resultado["created"], 2)
+
     def test_modo_lote_por_pasta_ignora_arquivos_soltos_na_raiz(self):
         agente = self._criar_agente(
             include_subfolders=True,

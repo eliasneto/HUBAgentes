@@ -271,6 +271,8 @@ class PortalPainelView(LoginRequiredMixin, TemplateView):
     login_url = reverse_lazy("portal_login")
 
     def get_context_data(self, **kwargs):
+        from django.utils import timezone
+
         from apps.core.models import ConfiguracaoGeral
         context = super().get_context_data(**kwargs)
         config = ConfiguracaoGeral.obter()
@@ -298,6 +300,28 @@ class PortalPainelView(LoginRequiredMixin, TemplateView):
             context["dashboard"] = _obter_dados_dashboard(mes=mes)
             context["meses_disponiveis"] = _meses_disponiveis_dashboard()
             context["mes_selecionado"] = mes_param if mes else ""
+
+        # Horario da proxima rotina automatica de agentes, exibido no topo da
+        # tela inicial pra todo mundo (independe de exibir_dashboard — nao e
+        # dado analitico, e so "quando os documentos pendentes serao
+        # verificados de novo"). So mostra quando o interruptor geral esta
+        # ligado (ver Administrador > Rotina automatica); com o interruptor
+        # desligado, rotina_automatica_proxima_execucao_em pode estar
+        # desatualizado (executar_rotinas_automaticas_agentes nao toca esse
+        # campo enquanto desligado — ver operational_execution.py) e nao deve
+        # ser mostrado como se fosse um horario real.
+        proxima_rotina_automatica_em = None
+        if config.rotina_automatica_agentes_ativa:
+            proxima_rotina_automatica_em = config.rotina_automatica_proxima_execucao_em
+            if proxima_rotina_automatica_em is None:
+                # Ainda nao rodou desde que a configuracao foi salva — se ha
+                # um horario de inicio agendado no futuro, mostra ele; senao
+                # (sem inicio configurado, ou worker ainda nao fez a 1a
+                # checagem) fica sem valor, e o bloco nao aparece.
+                inicio_agendado = config.rotina_automatica_inicio_em
+                if inicio_agendado and inicio_agendado > timezone.now():
+                    proxima_rotina_automatica_em = inicio_agendado
+        context["proxima_rotina_automatica_em"] = proxima_rotina_automatica_em
         return context
 
 
@@ -1201,6 +1225,8 @@ class LocalStorageArquivosView(AnalistaOuAdminRequiredMixin, View):
         return arquivos
 
     def get(self, request, integracao_id):
+        from django.conf import settings
+
         integration = self._get_integration(integracao_id)
         base_path = Path(integration.base_path)
         arquivos = self._listar_arquivos(base_path)
@@ -1208,6 +1234,7 @@ class LocalStorageArquivosView(AnalistaOuAdminRequiredMixin, View):
             "integration": integration,
             "arquivos": arquivos,
             "total": len(arquivos),
+            "upload_chunk_size_kb": settings.LOCAL_UPLOAD_CHUNK_SIZE_KB,
         })
 
 

@@ -572,9 +572,18 @@ class RegistrarHistoricoRotinaTests(TestCase):
 @patch("apps.processamentos.services.agent_execution._execute_document")
 class LimiteDocumentosPorExecucaoTests(TestCase):
     """execute_processing(..., limite_documentos_por_execucao=N) — o
-    coracao da rotina automatica: processa so os N documentos pendentes
-    mais antigos nesta chamada, deixando o resto PENDENTE para a proxima
-    (rotina automatica de novo, ou um clique manual em "Executar")."""
+    coracao da rotina automatica: cada rodada so DESCOBRE (cria
+    DocumentoEntrada) e executa os N documentos mais antigos, deixando o
+    resto de fora do processamento desta rodada — nao descoberto, disponivel
+    pra proxima rodada (novo Processamento) descobrir do zero.
+
+    Ate a correcao de 23/08/2026 (caso real: pasta com 11 PDFs, lote=10 —
+    a rodada descobria os 11 de uma vez e so executava 10, deixando 1
+    pendente esquecido dentro de um processamento ja concluido_sucesso), a
+    descoberta nao respeitava esse limite — so a selecao pra execucao
+    (_select_documentos()[:limite]) respeitava, entao o processamento
+    acabava com mais documentos "descobertos" do que executados. Ver
+    document_sources.prepare_documentos(limite_novos_documentos=...)."""
 
     def setUp(self):
         self.user = User.objects.create_user(username="dono5", password="x")
@@ -641,19 +650,25 @@ class LimiteDocumentosPorExecucaoTests(TestCase):
         documento.save(update_fields=["status"])
         return {"output_record": output_record}
 
-    def test_processa_so_o_limite_e_deixa_o_resto_pendente(self, mock_execute_document):
+    def test_processa_so_o_limite_sem_descobrir_o_resto_da_pasta(
+        self, mock_execute_document
+    ):
         mock_execute_document.side_effect = self._fake_execute_document
         processamento = self._processamento()
 
         execute_processing(processamento, self.user, limite_documentos_por_execucao=3)
 
         documentos = processamento.documentos.all()
-        self.assertEqual(documentos.count(), 5)
+        # So os 3 do limite sao descobertos por este processamento — os
+        # outros 2 arquivos da pasta nem geram DocumentoEntrada aqui (ficam
+        # disponiveis pra proxima rodada descobrir do zero, sem sobrar
+        # pendente esquecido dentro deste processamento ja concluido).
+        self.assertEqual(documentos.count(), 3)
         self.assertEqual(
             documentos.filter(status=DocumentStatus.PROCESSADO).count(), 3
         )
         self.assertEqual(
-            documentos.filter(status=DocumentStatus.PENDENTE).count(), 2
+            documentos.filter(status=DocumentStatus.PENDENTE).count(), 0
         )
         self.assertEqual(mock_execute_document.call_count, 3)
 
@@ -669,16 +684,26 @@ class LimiteDocumentosPorExecucaoTests(TestCase):
         )
         self.assertEqual(mock_execute_document.call_count, 5)
 
-    def test_segunda_chamada_pega_os_que_sobraram(self, mock_execute_document):
+    def test_segunda_rodada_pega_os_que_sobraram(self, mock_execute_document):
+        # Cada rodada da rotina automatica e um Processamento NOVO (ver
+        # operational_execution.criar_e_iniciar_processamento_para_agente) —
+        # nao a mesma instancia chamada de novo. rodada_2 descobre so os
+        # arquivos que rodada_1 nao pegou (dedup por nome — ver
+        # document_sources._arquivo_local_ja_processado_anteriormente).
         mock_execute_document.side_effect = self._fake_execute_document
-        processamento = self._processamento()
+        rodada_1 = self._processamento()
+        rodada_2 = self._processamento()
 
-        execute_processing(processamento, self.user, limite_documentos_por_execucao=3)
-        execute_processing(processamento, self.user, limite_documentos_por_execucao=3)
+        execute_processing(rodada_1, self.user, limite_documentos_por_execucao=3)
+        execute_processing(rodada_2, self.user, limite_documentos_por_execucao=3)
 
-        documentos = processamento.documentos.all()
+        self.assertEqual(rodada_1.documentos.count(), 3)
+        self.assertEqual(rodada_2.documentos.count(), 2)
         self.assertEqual(
-            documentos.filter(status=DocumentStatus.PROCESSADO).count(), 5
+            rodada_1.documentos.filter(status=DocumentStatus.PROCESSADO).count(), 3
+        )
+        self.assertEqual(
+            rodada_2.documentos.filter(status=DocumentStatus.PROCESSADO).count(), 2
         )
         self.assertEqual(mock_execute_document.call_count, 5)
 

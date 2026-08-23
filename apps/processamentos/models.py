@@ -205,7 +205,8 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     # "aguardando reenvio automatico" em vez de falha — os documentos ja
     # foram enviados, so o provedor ainda nao respondeu com sucesso. Cada
     # rodada tenta de novo so os documentos com erro_reprocessavel=True,
-    # aumentando o intervalo entre tentativas, ate um teto de 2h a partir de
+    # aumentando o intervalo entre tentativas, ate o teto definido em
+    # agent_execution.LIMITE_RETENTATIVA_SOBRECARGA a partir de
     # retentativa_sobrecarga_iniciada_em — depois disso desiste e finaliza
     # normalmente (sucesso parcial vira concluido_atencao, erro total vira
     # concluido_erro). Caso real: agente JHS/Licitacao, 19/08/2026.

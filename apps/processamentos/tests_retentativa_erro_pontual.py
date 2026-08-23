@@ -2,8 +2,9 @@
 Retentativa de erro pontual do provedor de IA ENTRE RODADAS da rotina
 automatica — diferente do loop de retentativa por sobrecarga (ver
 tests_retentativa_sobrecarga_provedor.py, que mantem o MESMO Processamento
-vivo por ate 2h) e da retentativa de fim de lote (ver
-tests_retentativa_fim_lote.py, que tenta de novo dentro da MESMA rodada).
+vivo ate o teto de agent_execution.LIMITE_RETENTATIVA_SOBRECARGA) e da
+retentativa de fim de lote (ver tests_retentativa_fim_lote.py, que tenta de
+novo dentro da MESMA rodada).
 
 Aqui: um documento que falha por qualquer AIProviderServiceError na rotina
 automatica fica PENDENTE (nao ERRO) em vez de finalizar na hora, e e

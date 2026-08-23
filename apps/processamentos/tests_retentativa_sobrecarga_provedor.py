@@ -46,7 +46,7 @@ class EhErroModeloSobrecarregadoTests(SimpleTestCase):
 
     def test_budget_invalido_nao_e_sobrecarga(self):
         # HTTP 400, erro de configuracao (ver correcao 1.5.19) - nao deve
-        # entrar no loop de 2h, e um erro definitivo diferente.
+        # entrar no loop de retentativa, e um erro definitivo diferente.
         msg = 'Falha HTTP 400 ao executar o agente no provedor: {"message": "Budget 0 is invalid."}'
         self.assertFalse(_eh_erro_modelo_sobrecarregado(msg))
 
@@ -132,11 +132,11 @@ class ProcessarRodadaRetentativaSobrecargaTests(SimpleTestCase):
         p.documentos.filter.return_value = _queryset_mock(documentos_erro_reprocessavel)
         return p
 
-    def test_desiste_apos_2h_sem_tentar_de_novo(
+    def test_desiste_apos_estourar_teto_sem_tentar_de_novo(
         self, mock_params, mock_tentar, mock_finalizar
     ):
         processamento = self._processamento(
-            iniciada_ha=timedelta(hours=2, minutes=1),
+            iniciada_ha=LIMITE_RETENTATIVA_SOBRECARGA + timedelta(minutes=1),
             documentos_erro_reprocessavel=[MagicMock()],
         )
 

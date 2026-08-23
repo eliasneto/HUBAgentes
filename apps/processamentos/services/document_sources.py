@@ -152,7 +152,20 @@ def _resolver_pasta_raiz_efetiva_drive(processamento):
     return processamento.folder_source.folder_id
 
 
-def prepare_documentos(processamento):
+def prepare_documentos(processamento, limite_novos_documentos=None):
+    """`limite_novos_documentos`: teto de DocumentoEntrada NOVOS que esta
+    chamada pode criar (None = sem teto) — preenchido so pela rotina
+    automatica (ver agent_execution.execute_processing), com o que resta do
+    limite_documentos_por_execucao da rodada depois de descontar documentos
+    ja readotados de rodadas anteriores. Sem isso, a descoberta criava um
+    DocumentoEntrada pra CADA arquivo da pasta de uma vez (sem limite,
+    exceto quando o agente le subpastas recursivamente — ver
+    _limite_documentos_novos_por_lote), e so a EXECUCAO respeitava o limite
+    da rodada — o processamento ficava com mais documentos "descobertos" do
+    que realmente executados, sobrando pendente(s) dentro de um
+    processamento ja concluido em vez de ficar de fora pra proxima rodada
+    descobrir do zero. Execucao manual nunca passa esse parametro
+    (None) — continua descobrindo a pasta inteira de uma vez, como antes."""
     is_lote_por_pasta = (
         processamento.document_execution_mode_snapshot
         == AgentDocumentExecutionMode.LOTE_POR_PASTA
@@ -161,12 +174,20 @@ def prepare_documentos(processamento):
         return {"created": 0, "updated": 0, "total": 0}
     if processamento.input_source_type == ProcessingInputSourceType.GOOGLE_DRIVE_FOLDER:
         if is_lote_por_pasta:
-            return _prepare_google_drive_documents_por_pasta(processamento)
-        return _prepare_google_drive_documents(processamento)
+            return _prepare_google_drive_documents_por_pasta(
+                processamento, limite_novos_documentos=limite_novos_documentos
+            )
+        return _prepare_google_drive_documents(
+            processamento, limite_novos_documentos=limite_novos_documentos
+        )
     if processamento.input_source_type == ProcessingInputSourceType.LOCAL_FOLDER:
         if is_lote_por_pasta:
-            return _prepare_local_folder_documents_por_pasta(processamento)
-        return _prepare_local_folder_documents(processamento)
+            return _prepare_local_folder_documents_por_pasta(
+                processamento, limite_novos_documentos=limite_novos_documentos
+            )
+        return _prepare_local_folder_documents(
+            processamento, limite_novos_documentos=limite_novos_documentos
+        )
     if processamento.input_source_type == ProcessingInputSourceType.LOCAL_FILE:
         return _prepare_local_file_document(processamento)
     if processamento.input_source_type == ProcessingInputSourceType.UPLOAD_AT_EXECUTION:
@@ -213,7 +234,7 @@ def load_document_bytes(processamento, documento):
     raise DocumentSourcePreparationError("Nao foi possivel carregar o documento selecionado.")
 
 
-def _prepare_google_drive_documents(processamento):
+def _prepare_google_drive_documents(processamento, limite_novos_documentos=None):
     if not processamento.folder_source_id:
         raise DocumentSourcePreparationError(
             "Selecione a pasta do Google Drive antes de materializar os documentos."
@@ -270,6 +291,16 @@ def _prepare_google_drive_documents(processamento):
             continue
         if documento is None and not tracker.pode_criar_mais():
             break
+        # Teto da rodada da rotina automatica (ver prepare_documentos) —
+        # independente do teto de seguranca de subpastas acima. So para de
+        # CRIAR; nao afeta atingiu_limite_lote/atingiu_limite_lote_subpastas,
+        # que continuam so sobre o teto de seguranca de subpastas.
+        if (
+            documento is None
+            and limite_novos_documentos is not None
+            and created >= limite_novos_documentos
+        ):
+            break
         defaults = {
             "nome_arquivo": drive_file["name"],
             "drive_file_id": drive_file["id"],
@@ -299,7 +330,7 @@ def _prepare_google_drive_documents(processamento):
     }
 
 
-def _prepare_local_folder_documents(processamento):
+def _prepare_local_folder_documents(processamento, limite_novos_documentos=None):
     if not processamento.local_storage_integration_id:
         raise DocumentSourcePreparationError(
             "Selecione a integracao local autorizada antes de materializar os documentos."
@@ -343,6 +374,22 @@ def _prepare_local_folder_documents(processamento):
             continue
         if documento is None and not tracker.pode_criar_mais():
             break
+        # Teto da rodada da rotina automatica (ver prepare_documentos) —
+        # independente do teto de seguranca de subpastas acima. So para de
+        # CRIAR; nao afeta atingiu_limite_lote/atingiu_limite_lote_subpastas,
+        # que continuam so sobre o teto de seguranca de subpastas. Sem isso,
+        # um agente sem "incluir subpastas" descobria TODOS os arquivos da
+        # pasta de uma vez (sem teto algum) e so a execucao respeitava o
+        # limite da rodada — o processamento ficava com mais documentos
+        # "descobertos" do que executados, sobrando pendente(s) dentro de um
+        # processamento ja concluido (caso real: 11 descobertos, 10
+        # executados, 1 pendente perdido dentro do concluido_sucesso).
+        if (
+            documento is None
+            and limite_novos_documentos is not None
+            and created >= limite_novos_documentos
+        ):
+            break
         defaults = {
             "nome_arquivo": local_file["name"],
             "drive_file_id": "",
@@ -369,13 +416,15 @@ def _prepare_local_folder_documents(processamento):
     }
 
 
-def _prepare_local_folder_documents_por_pasta(processamento):
+def _prepare_local_folder_documents_por_pasta(processamento, limite_novos_documentos=None):
     if not processamento.local_storage_integration_id:
         raise DocumentSourcePreparationError(
             "Selecione a integracao local autorizada antes de materializar os documentos."
         )
     if _deve_incluir_subpastas(processamento):
-        return _prepare_local_folder_documents_por_pasta_recursivo(processamento)
+        return _prepare_local_folder_documents_por_pasta_recursivo(
+            processamento, limite_novos_documentos=limite_novos_documentos
+        )
     try:
         subpastas = list_subfolders_from_relative_folder(
             processamento.local_storage_integration,
@@ -399,6 +448,10 @@ def _prepare_local_folder_documents_por_pasta(processamento):
     updated = 0
     ignorados = 0
     for subpasta in subpastas:
+        # Teto da rodada da rotina automatica (ver prepare_documentos) —
+        # este modo nunca teve limite algum antes.
+        if limite_novos_documentos is not None and created >= limite_novos_documentos:
+            break
         try:
             files = list_pdf_files_from_subfolder(
                 processamento.local_storage_integration,
@@ -421,6 +474,12 @@ def _prepare_local_folder_documents_por_pasta(processamento):
             ):
                 ignorados += 1
                 continue
+            if (
+                documento is None
+                and limite_novos_documentos is not None
+                and created >= limite_novos_documentos
+            ):
+                break
             defaults = {
                 "nome_arquivo": local_file["name"],
                 "drive_file_id": "",
@@ -446,7 +505,9 @@ def _prepare_local_folder_documents_por_pasta(processamento):
     }
 
 
-def _prepare_local_folder_documents_por_pasta_recursivo(processamento):
+def _prepare_local_folder_documents_por_pasta_recursivo(
+    processamento, limite_novos_documentos=None
+):
     """Variante de `_prepare_local_folder_documents_por_pasta` para
     AgenteConfiguracaoOperacional.include_subfolders=True: em vez de
     enumerar so 1 nivel de subpastas, varre a arvore inteira e agrupa cada
@@ -494,6 +555,14 @@ def _prepare_local_folder_documents_por_pasta_recursivo(processamento):
             continue
         if documento is None and not tracker.pode_criar_mais():
             break
+        # Teto da rodada da rotina automatica (ver prepare_documentos) —
+        # independente do teto de seguranca de subpastas acima.
+        if (
+            documento is None
+            and limite_novos_documentos is not None
+            and created >= limite_novos_documentos
+        ):
+            break
         defaults = {
             "nome_arquivo": local_file["name"],
             "drive_file_id": "",
@@ -521,13 +590,15 @@ def _prepare_local_folder_documents_por_pasta_recursivo(processamento):
     }
 
 
-def _prepare_google_drive_documents_por_pasta(processamento):
+def _prepare_google_drive_documents_por_pasta(processamento, limite_novos_documentos=None):
     if not processamento.folder_source_id:
         raise DocumentSourcePreparationError(
             "Selecione a pasta do Google Drive antes de materializar os documentos."
         )
     if _deve_incluir_subpastas(processamento):
-        return _prepare_google_drive_documents_por_pasta_recursivo(processamento)
+        return _prepare_google_drive_documents_por_pasta_recursivo(
+            processamento, limite_novos_documentos=limite_novos_documentos
+        )
     try:
         items = list_folder_contents_from_folder_source(processamento.folder_source)
     except GoogleDriveServiceError as exc:
@@ -546,6 +617,12 @@ def _prepare_google_drive_documents_por_pasta(processamento):
     drive_integration = processamento.folder_source.google_drive_integration
 
     for subpasta in subpastas:
+        # Teto da rodada da rotina automatica (ver prepare_documentos) — este
+        # modo nunca teve limite algum antes; checa a cada subpasta e a cada
+        # arquivo (abaixo) pra parar de criar assim que atingir o teto, sem
+        # depender de esgotar a subpasta atual primeiro.
+        if limite_novos_documentos is not None and created >= limite_novos_documentos:
+            break
         try:
             files = list_pdf_files_from_drive_folder_id(
                 drive_integration,
@@ -567,6 +644,12 @@ def _prepare_google_drive_documents_por_pasta(processamento):
             ):
                 ignorados += 1
                 continue
+            if (
+                documento is None
+                and limite_novos_documentos is not None
+                and created >= limite_novos_documentos
+            ):
+                break
             defaults = {
                 "nome_arquivo": drive_file["name"],
                 "drive_file_id": drive_file["id"],
@@ -592,7 +675,9 @@ def _prepare_google_drive_documents_por_pasta(processamento):
     }
 
 
-def _prepare_google_drive_documents_por_pasta_recursivo(processamento):
+def _prepare_google_drive_documents_por_pasta_recursivo(
+    processamento, limite_novos_documentos=None
+):
     """Variante de `_prepare_google_drive_documents_por_pasta` para
     AgenteConfiguracaoOperacional.include_subfolders=True: varre a arvore
     inteira a partir da raiz efetiva (ver _resolver_pasta_raiz_efetiva_drive)
@@ -634,6 +719,14 @@ def _prepare_google_drive_documents_por_pasta_recursivo(processamento):
             ignorados += 1
             continue
         if documento is None and not tracker.pode_criar_mais():
+            break
+        # Teto da rodada da rotina automatica (ver prepare_documentos) —
+        # independente do teto de seguranca de subpastas acima.
+        if (
+            documento is None
+            and limite_novos_documentos is not None
+            and created >= limite_novos_documentos
+        ):
             break
         defaults = {
             "nome_arquivo": drive_file["name"],
@@ -787,6 +880,21 @@ def _arquivo_ja_processado_em_outra_execucao(
     adotar_documentos_pendentes_de_retentativa): sem isso, a proxima
     varredura recriaria o arquivo do zero (tentativas_pontuais=0),
     reiniciando o contador de 2 tentativas indefinidamente.
+
+    Tambem considera "em tratamento" (nao recria) um arquivo cujo
+    DocumentoEntrada de outra execucao esteja ERRO+erro_reprocessavel=True
+    enquanto aquela execucao ainda tem o loop de retentativa por sobrecarga
+    do provedor ativo (Processamento.retentativa_sobrecarga_ativa=True — ver
+    agent_execution._iniciar_retentativa_sobrecarga/_processar_rodada_
+    retentativa_sobrecarga). Sem isso, um segundo clique manual (ou uma
+    nova rodada da rotina automatica) durante essa espera nao reconhecia o
+    arquivo como ja em andamento em outro lugar e recriava um DocumentoEntrada
+    novo, chamando a IA de novo em paralelo ao loop — duplicando custo e
+    podendo gerar duas saidas "processadas" pro mesmo arquivo fisico. So
+    cobre enquanto o loop esta ativo: quando ele desiste (2 falhas seguidas
+    ou estoura o teto) ou termina com sucesso, retentativa_sobrecarga_ativa
+    vira False e o arquivo volta a poder ser redescoberto normalmente, como
+    qualquer outro erro transitorio sem retentativa em andamento.
     """
     if processamento.forcar_reprocessamento:
         return False
@@ -802,6 +910,11 @@ def _arquivo_ja_processado_em_outra_execucao(
         .filter(
             models.Q(status=DocumentStatus.PROCESSADO)
             | models.Q(status=DocumentStatus.ERRO, tentativas_pontuais__gte=1)
+            | models.Q(
+                status=DocumentStatus.ERRO,
+                erro_reprocessavel=True,
+                processamento__retentativa_sobrecarga_ativa=True,
+            )
         )
         .exists()
     )

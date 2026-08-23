@@ -23,6 +23,15 @@ SECRET_KEY = _secret_key
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 
+# Tamanho do chunk (KB) do upload em pedacos pra pastas locais (ver
+# local_storage_arquivos.html). O padrao (7 KB) e o valor testado e usado em
+# producao (Hostinger, atras de um proxy NPM/OpenResty que falha de forma
+# intermitente com corpo de request > ~8,8 KB — ver comentario no template
+# com os numeros do teste de carga). Ambiente local nao tem esse proxy na
+# frente, entao pode subir bastante esse valor no .env local (ex.: 2048 =
+# 2 MB) pra upload rapido, sem tocar no padrao usado em producao.
+LOCAL_UPLOAD_CHUNK_SIZE_KB = config("LOCAL_UPLOAD_CHUNK_SIZE_KB", default=7, cast=int)
+
 APP_VERSION = config(
     "APP_VERSION",
     default=VERSION_FILE.read_text(encoding="utf-8").strip()

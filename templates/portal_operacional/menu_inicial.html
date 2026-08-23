@@ -18,6 +18,12 @@
           <p class="eyebrow">Início</p>
           <h1>Painel inicial</h1>
         </div>
+        {% if proxima_rotina_automatica_em %}
+        <div class="session-pill" title="Rotina automática de agentes: próxima verificação de documentos pendentes (Administrador → Rotina automática).">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>Próxima rotina automática: <strong>{{ proxima_rotina_automatica_em|date:"d/m/Y H:i" }}</strong></span>
+        </div>
+        {% endif %}
       </header>
 
       <section class="status-band" id="painel">
