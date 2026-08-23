@@ -285,7 +285,7 @@ def _tokens_por_documento(processamento: Processamento) -> list[DocumentoTokensR
 def listar_processamentos_para_portal(
     *,
     page_number: int | str | None = 1,
-    per_page: int = 20,
+    per_page: int = 10,
 ) -> ProcessamentosPortalResumo:
     """Retorna somente dados operacionais seguros dos processamentos."""
     queryset = (
@@ -632,7 +632,7 @@ class RotinaAutomaticaHistoricoResumo:
 def listar_historico_rotina_automatica(
     *,
     page_number: int | str | None = 1,
-    per_page: int = 25,
+    per_page: int = 10,
     filtro_agente: str = "",
     filtro_status: str = "",
 ) -> RotinaAutomaticaHistoricoResumo:

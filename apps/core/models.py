@@ -144,6 +144,49 @@ class ConfiguracaoGeral(models.Model):
     # pendente e nao tinha como confirmar que a checagem estava de fato
     # acontecendo (21/08/2026).
     rotina_automatica_ultima_verificacao_em = models.DateTimeField(null=True, blank=True)
+    # IA no assistente Biel (chat de ajuda do portal): quando ligado, uma
+    # pergunta que a base de conhecimento estatica (apps.doc_system.views.
+    # _KNOWLEDGE_BASE) nao sabe responder (score 0 na busca por palavra-chave,
+    # o caso que hoje cai em "nao encontrei isso na documentacao") e
+    # respondida por um provedor de IA em vez do texto generico — com a
+    # propria base de conhecimento como contexto, pra reduzir risco de
+    # inventar funcionalidade que nao existe. Perguntas que ja batem com
+    # algo na base continuam respondidas so por palavra-chave, sem custo de
+    # IA. Se a chamada falhar por qualquer motivo (sem integracao escolhida,
+    # erro do provedor, etc.), cai de volta pro "nao encontrei isso" de
+    # sempre, sem expor erro tecnico ao usuario do portal.
+    biel_ia_ativa = models.BooleanField(default=False)
+    biel_ai_provider_integration = models.ForeignKey(
+        "integracoes.AIProviderIntegration",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    # Em branco, usa o modelo padrao da integracao escolhida acima — mesmo
+    # padrao ja usado por AgenteIA.modelo_preferencial (ver
+    # apps.agentes_ia.services: "modelo = agente.modelo_preferencial or
+    # integracao.default_model").
+    biel_ia_modelo = models.CharField(max_length=120, blank=True)
+    # Acumuladores de uso da IA do Biel — atualizados via F() (update
+    # atomico direto na tabela, ver apps.doc_system.views._acumular_uso_biel)
+    # a cada resposta com sucesso, pra nao perder incremento em chamadas
+    # concorrentes. Custo calculado no momento de CADA chamada, com o
+    # modelo realmente usado naquele momento (apps.processamentos.services.
+    # agent_execution._custo_de_tokens) — nao recalculado a partir do
+    # modelo atual, entao continua correto mesmo se o modelo/integracao for
+    # trocado depois. Ficam None/0 (sem custo) se nao houver precificacao
+    # (apps.custos.models.PrecificacaoModelo) ou cotacao do dolar
+    # (ConfiguracaoFinanceira) cadastradas — os tokens continuam contando
+    # normalmente mesmo sem custo calculavel. Zerados via
+    # "Zerar contador" na propria tela (ver ZerarUsoBielView), pra permitir
+    # medir uso por periodo (ex.: por mes) em vez de so o total desde
+    # sempre.
+    biel_tokens_input_total = models.PositiveBigIntegerField(default=0)
+    biel_tokens_output_total = models.PositiveBigIntegerField(default=0)
+    biel_custo_usd_total = models.DecimalField(max_digits=14, decimal_places=6, default=0)
+    biel_custo_brl_total = models.DecimalField(max_digits=14, decimal_places=4, default=0)
+    biel_uso_zerado_em = models.DateTimeField(null=True, blank=True)
     atualizado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

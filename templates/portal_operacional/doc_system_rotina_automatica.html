@@ -135,12 +135,43 @@
 
       <section class="builder-card">
         <div class="form-section-heading">
+          <p class="eyebrow">Retentativa entre rodadas</p>
+          <h2>Erro pontual do provedor de IA nao vira erro na hora</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
+          Quando um documento falha durante a rotina automatica por causa de um erro vindo do
+          <strong>provedor de IA</strong> (instabilidade, erro HTTP, etc.), ele nao vira erro
+          definitivo na hora — fica <strong>pendente</strong>, e a <strong>proxima rodada</strong>
+          o processa de novo automaticamente, com prioridade sobre arquivos novos (entra na
+          mesma cota de documentos por rodada configurada acima, na frente da fila).
+        </p>
+        <div class="doc-code-panel">
+          <strong>Exemplo</strong>
+          <pre><code>Rodada 1 → documento X falha (erro do provedor) → fica PENDENTE
+Rodada 2 → documento X e tentado de novo, com prioridade
+  → deu certo → PROCESSADO, fim da historia
+  → falhou de novo → ERRO DEFINITIVO, para de tentar sozinho</code></pre>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-top:16px;line-height:1.6">
+          So depois dessa <strong>2a falha seguida</strong> o documento para de ser redescoberto
+          automaticamente pela rotina — a partir dai, so volta marcando
+          <strong>"Reprocessar arquivos ja executados"</strong> numa execucao manual. Essa
+          retentativa e exclusiva da rotina automatica: executar manualmente pelo botao
+          "Executar" nao adia nada, o resultado ja sai definitivo (sucesso ou erro) na hora.
+        </p>
+      </section>
+
+      <section class="builder-card">
+        <div class="form-section-heading">
           <p class="eyebrow">Historico de execucoes</p>
           <h2>Acompanhe cada rodada</h2>
         </div>
         <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
           A mesma tela <strong>Administrador &gt; Rotina automatica</strong> lista o historico de
-          tentativas, com filtro por agente e por situacao.
+          tentativas, com filtro por agente e por situacao. Alem de quantos documentos tiveram
+          sucesso ou erro, cada rodada tambem mostra quantos ficaram
+          <strong>pendentes</strong> aguardando a nova tentativa descrita acima — nao contam
+          como erro, so estao esperando a proxima rodada.
         </p>
         <div class="doc-table">
           <div class="doc-table-row doc-table-head">
@@ -176,6 +207,7 @@
           <li>A rotina roda em segundo plano (worker), verificada periodicamente — nao depende de nenhuma aba aberta no navegador.</li>
           <li>Executar manualmente continua funcionando normalmente mesmo com a rotina ativa, respeitando a mesma trava de concorrencia.</li>
           <li>Alterar o interruptor ou o intervalo global tem efeito imediato na proxima verificacao do worker.</li>
+          <li>A mesma tela mostra "Ultima verificacao do worker" — atualizada a cada checagem, mesmo quando o interruptor geral esta desligado ou nao ha nada pendente ainda. Se esse horario para de avancar, o worker caiu; se avanca normalmente mas nada roda, e so falta de documento novo ou o horario/intervalo configurado ainda nao chegou.</li>
         </ul>
       </section>
 

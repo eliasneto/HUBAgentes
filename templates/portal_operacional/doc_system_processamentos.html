@@ -304,15 +304,18 @@ especifica daquele arquivo.</code></pre>
         </div>
 
         <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:16px;line-height:1.6">
-          Existem <strong>dois momentos</strong> de retentativa. O primeiro e automatico e acontece
+          Existem <strong>tres momentos</strong> de retentativa. O primeiro e automatico e acontece
           <strong>dentro da mesma execucao</strong>: no modo de entrada Individual, se um documento falhar por um erro
           vindo da propria IA/provedor, o sistema tenta esse documento <strong>de novo automaticamente ao final do
-          lote</strong>, depois de terminar os demais — sem voce precisar fazer nada. O segundo e o reprocessamento
-          manual entre execucoes: ao executar o agente de novo, o sistema so re-tenta documentos cujo erro e
-          <strong>transitorio</strong> (se resolve sozinho). Erros que exigem <strong>intervencao manual</strong> nao
-          sao re-tentados em nenhum dos dois casos — repetir nao resolveria. Documentos ja processados com sucesso
-          nunca sao re-executados (a menos que a origem seja uma pasta e a opcao de forcar reprocessamento tenha
-          sido marcada na tela de execucao).
+          lote</strong>, depois de terminar os demais — sem voce precisar fazer nada. O segundo, exclusivo da
+          <strong>rotina automatica</strong> (ver Administrador &gt; Rotina automatica), acontece
+          <strong>entre rodadas</strong>: um documento que falhar por erro do provedor de IA fica pendente e e
+          tentado de novo, com prioridade, na proxima rodada — so na 2a falha seguida vira erro definitivo (ver
+          card abaixo). O terceiro e o reprocessamento manual entre execucoes: ao executar o agente de novo, o
+          sistema so re-tenta documentos cujo erro e <strong>transitorio</strong> (se resolve sozinho). Erros que
+          exigem <strong>intervencao manual</strong> nao sao re-tentados em nenhum dos tres casos — repetir nao
+          resolveria. Documentos ja processados com sucesso nunca sao re-executados (a menos que a origem seja uma
+          pasta e a opcao de forcar reprocessamento tenha sido marcada na tela de execucao).
         </p>
 
         <div class="doc-two-columns">
@@ -367,6 +370,18 @@ especifica daquele arquivo.</code></pre>
             lote, o processamento tambem fecha como <strong>atencao</strong> (amarelo) — e instabilidade do
             provedor naquele momento, nao um erro tecnico do sistema. Execute o agente novamente mais tarde para
             esse arquivo especifico.</p>
+          </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">Pendente entre rodadas (so na rotina automatica)</span>
+            <p>Erro do provedor de IA durante a <strong>rotina automatica</strong> nao vira erro na hora — o
+            documento fica <strong>pendente</strong> e e tentado de novo, com prioridade, na proxima rodada. Isso
+            nao conta como erro no historico daquela rodada; a tela Administrador &gt; Rotina automatica mostra
+            quantos documentos ficaram nessa situacao.</p>
+            <small>So na 2a falha seguida (2 rodadas diferentes, ambas com erro) o documento vira erro definitivo e
+            para de ser redescoberto sozinho — a partir dai, so volta marcando "Reprocessar arquivos ja
+            executados" numa execucao manual. Execucao manual pelo botao "Executar" nunca adia: o resultado ja sai
+            definitivo na hora.</small>
           </article>
 
           <article class="doc-guide-card">

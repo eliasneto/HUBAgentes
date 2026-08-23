@@ -1048,7 +1048,7 @@ class ProcessamentosView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context["processamentos"] = listar_processamentos_para_portal(
             page_number=self.request.GET.get("page"),
-            per_page=20,
+            per_page=10,
         )
         return context
 
@@ -1576,11 +1576,20 @@ class ConfiguracaoGeralView(PortalAdministradorRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         from apps.core.models import ConfiguracaoGeral, VisibilidadeDashboard
-        from apps.integracoes.models import LocalStorageIntegration
+        from apps.integracoes.models import AIProviderIntegration, IntegrationStatus, LocalStorageIntegration
         context = super().get_context_data(**kwargs)
         config = ConfiguracaoGeral.obter()
         context["config"] = config
         context["opcoes"] = VisibilidadeDashboard.choices
+        # Mesmo filtro usado no dropdown de integracao de IA de um agente
+        # (ver apps/agentes_ia/forms.py) — so integracoes ativas aparecem.
+        context["ai_integrations"] = (
+            AIProviderIntegration.objects.filter(status=IntegrationStatus.ATIVA)
+            .order_by("nome")
+        )
+        context["biel_tokens_total"] = (
+            config.biel_tokens_input_total + config.biel_tokens_output_total
+        )
         if config.limpeza_automatica_ativa:
             context["proxima_limpeza"] = _proxima_data_limpeza(config.dia_execucao_limpeza)
         context["pastas_compartilhadas"] = (
@@ -1814,6 +1823,18 @@ class SalvarConfiguracaoGeralView(PortalAdministradorRequiredMixin, View):
             )
         except (ValueError, TypeError):
             intervalo_ia = 2
+        from apps.integracoes.models import AIProviderIntegration, IntegrationStatus
+        biel_integracao_id = request.POST.get("biel_ai_provider_integration")
+        biel_integracao = None
+        if biel_integracao_id:
+            # So aceita integracao ativa — se foi desativada depois de
+            # escolhida aqui, ou o id nao existe mais, simplesmente nao
+            # salva nenhuma (biel_ia_ativa pode ficar ligado sem integracao;
+            # nesse caso o Biel so nao tenta IA, sem erro).
+            biel_integracao = AIProviderIntegration.objects.filter(
+                pk=biel_integracao_id, status=IntegrationStatus.ATIVA
+            ).first()
+
         config = ConfiguracaoGeral.obter()
         config.visibilidade_dashboard = valor
         config.limpeza_automatica_ativa = "limpeza_automatica_ativa" in request.POST
@@ -1821,9 +1842,45 @@ class SalvarConfiguracaoGeralView(PortalAdministradorRequiredMixin, View):
         config.max_execucoes_por_usuario = max_usuario
         config.max_pdfs_lote_subpastas = max_pdfs_lote
         config.intervalo_entre_documentos_ia_segundos = intervalo_ia
+        config.biel_ia_ativa = "biel_ia_ativa" in request.POST
+        config.biel_ai_provider_integration = biel_integracao
+        config.biel_ia_modelo = (request.POST.get("biel_ia_modelo") or "").strip()
         config.atualizado_por = request.user
         config.save()
         messages.success(request, "Configurações gerais salvas com sucesso.")
+        return redirect("portal_configuracao_geral")
+
+
+class ZerarUsoBielView(PortalAdministradorRequiredMixin, View):
+    """Zera os acumuladores de tokens/custo da IA do Biel (ver
+    ConfiguracaoGeral.biel_tokens_*/biel_custo_*_total, atualizados em
+    apps.doc_system.views._acumular_uso_biel) — permite medir uso por
+    periodo (ex.: mensal) em vez de so o total acumulado desde sempre."""
+    def post(self, request):
+        from decimal import Decimal
+
+        from django.utils import timezone
+
+        from apps.core.models import ConfiguracaoGeral
+        config = ConfiguracaoGeral.obter()
+        config.biel_tokens_input_total = 0
+        config.biel_tokens_output_total = 0
+        config.biel_custo_usd_total = Decimal("0")
+        config.biel_custo_brl_total = Decimal("0")
+        config.biel_uso_zerado_em = timezone.now()
+        config.atualizado_por = request.user
+        config.save(
+            update_fields=[
+                "biel_tokens_input_total",
+                "biel_tokens_output_total",
+                "biel_custo_usd_total",
+                "biel_custo_brl_total",
+                "biel_uso_zerado_em",
+                "atualizado_por",
+                "updated_at",
+            ]
+        )
+        messages.success(request, "Contador de uso da IA do Biel zerado.")
         return redirect("portal_configuracao_geral")
 
 
@@ -1846,7 +1903,7 @@ class RotinaAutomaticaAgentesView(PortalAdministradorRequiredMixin, TemplateView
             page_number=self.request.GET.get("page"),
             filtro_agente=self.request.GET.get("agente", ""),
             filtro_status=self.request.GET.get("status", ""),
-            per_page=25,
+            per_page=10,
         )
         context["status_choices"] = RotinaAutomaticaExecucaoStatus.choices
         return context

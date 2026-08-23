@@ -5,6 +5,52 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.24] — 2026-08-23
+
+### Adicionado
+- **Biel com acesso a IA** — quando a base de conhecimento estática do assistente Biel não sabe
+  responder (hoje cai em "não encontrei isso na documentação"), ele pode perguntar a um provedor
+  de IA em vez do texto genérico. Configurável em Administrador > Configurações Gerais: um
+  interruptor liga/desliga, um dropdown com as integrações de IA **ativas**, e um campo de modelo
+  opcional (em branco usa o modelo padrão da integração — mesmo padrão já usado pelos agentes:
+  `modelo_preferencial or integration.default_model`). A IA responde com base na **própria
+  documentação do Biel** como contexto do prompt (grounding), reduzindo o risco de inventar
+  campo/tela/comportamento que não existe. Perguntas que já batem com algo mapeado continuam
+  respondidas só por palavra-chave, instantâneas e sem custo de IA — a IA só entra quando nada
+  bate. Qualquer falha (sem integração escolhida, erro do provedor, exceção inesperada) cai de
+  volta pro "não encontrei isso" de sempre, sem expor erro técnico ao usuário do portal.
+  `execute_prompt_without_document` (mesmo método já usado pelos agentes sem documento) e
+  `suporta_reducao_de_thinking_budget` (evita raciocínio caro numa resposta de chat) são
+  reaproveitados sem duplicar lógica. O endpoint `/biel/chat/` passou a exigir login
+  (`login_required`) — antes estava acessível sem nenhuma autenticação, o que virou um risco real
+  de custo agora que uma chamada pode acionar uma API de IA paga.
+- **Contador de uso/custo da IA do Biel** (`ConfiguracaoGeral.biel_tokens_*_total`/
+  `biel_custo_*_total`, migration `core/0021`) — a mesma tela mostra tokens de entrada/saída/total
+  e custo estimado em US$/R$ consumidos pelo Biel, acumulados desde sempre (ou desde o último
+  "Zerar contador", para medir por período — ex.: mensal). Reaproveita a mesma tabela de
+  precificação por modelo (`apps.custos`) já usada no custo dos agentes; sem precificação
+  cadastrada, os tokens continuam contando normalmente e o custo fica zerado. O custo de cada
+  chamada é calculado com o modelo realmente usado **naquele momento**, não recalculado a partir
+  da configuração atual — continua correto mesmo se a integração/modelo do Biel for trocado
+  depois. Update atômico via `F()` direto na tabela, não perde incremento em conversas
+  concorrentes.
+
+### Alterado
+- **Grids de Processamentos e do histórico da Rotina automática mostram 10 itens por página**
+  (eram 20 e 25) — os dois já tinham paginação de verdade (link de página com nova requisição ao
+  servidor a cada clique, sem acumular DOM/memória de páginas antigas no navegador); só o tamanho
+  da página foi reduzido, para carregar menos de uma vez.
+- Base de conhecimento do Biel e as páginas `/doc-system/rotina-automatica/` e
+  `/doc-system/processamentos/` documentam a retentativa entre rodadas da rotina automática para
+  erro pontual do provedor de IA e o heartbeat "Última verificação do worker" (ambos da 1.5.23).
+
+### Cobertura
+- 21 testes novos: `apps/doc_system/tests_biel_ia.py`, `apps/core/tests_configuracao_geral_biel_ia.py`,
+  `apps/processamentos/tests_paginacao_grids.py`. Suite completa (239 testes), `manage.py check` e
+  `makemigrations --check --dry-run` OK.
+
+---
+
 ## [1.5.23] — 2026-08-23
 
 ### Adicionado

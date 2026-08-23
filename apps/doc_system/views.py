@@ -1,12 +1,16 @@
 import json
+import logging
 import re
 import unicodedata
 
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.generic import TemplateView
+
+logger = logging.getLogger(__name__)
 
 
 class DocSystemIndexView(TemplateView):
@@ -31,7 +35,7 @@ _KNOWLEDGE_BASE = [
     },
     {
         "keywords": ["processamento", "processamentos", "acompanhar", "status", "progresso", "download", "baixar resultado", "arquivo final", "concluido", "erro processamento", "falha execucao", "concluido com atencao", "atencao amarelo", "qual documento deu erro", "qual arquivo deu erro", "qual documento falhou", "qual arquivo falhou", "documento com erro", "arquivo com erro", "tokens por documento"],
-        "resposta": "**Processamentos** é onde você acompanha cada execução.\n\n📊 **Status possíveis:**\n• **Aguardando** — na fila, ainda não iniciou\n• **Em andamento** — processando agora\n• **Concluído com sucesso** — arquivo pronto para download\n• **Concluído com atenção** (amarelo) — situação normal, não é falha técnica: pasta vazia, arquivos já processados antes, ou instabilidade passageira do provedor de IA\n• **Concluído com erro** (vermelho) — falha técnica real, clique em \"Ver erro\" para ver o detalhe\n\nAbra **Ver tokens por documento** no card para ver o status e a mensagem de erro de cada arquivo do lote individualmente. O botão de download aparece automaticamente quando o arquivo está pronto.",
+        "resposta": "**Processamentos** é onde você acompanha cada execução.\n\n📊 **Status possíveis:**\n• **Aguardando** — na fila, ainda não iniciou\n• **Em andamento** — processando agora\n• **Concluído com sucesso** — arquivo pronto para download\n• **Concluído com atenção** (amarelo) — situação normal, não é falha técnica: pasta vazia, arquivos já processados antes, ou instabilidade passageira do provedor de IA\n• **Concluído com erro** (vermelho) — falha técnica real, clique em \"Ver erro\" para ver o detalhe\n\nAbra **Ver tokens por documento** no card para ver o status e a mensagem de erro de cada arquivo do lote individualmente. O botão de download aparece automaticamente quando o arquivo está pronto.\n\n💡 Se um documento individual aparecer como **\"Pendente\"** mesmo com o processamento já concluído, é sinal de que ele está aguardando uma nova tentativa automática da rotina automática — pergunte sobre \"documento pendente\" para entender esse caso.",
         "link": "/doc-system/processamentos/",
     },
     {
@@ -41,8 +45,13 @@ _KNOWLEDGE_BASE = [
     },
     {
         "keywords": ["retentativa", "tenta de novo", "tenta novamente", "tentar de novo", "reprocessar automatico", "reprocessa sozinho", "reprocessa automaticamente", "erro sumiu", "tentou de novo sozinho", "quantas tentativas", "maximo de tentativas", "resposta invalida da ia", "json invalido", "ia nao respondeu", "rodou de novo", "de novo automaticamente", "corrigiu sozinho"],
-        "resposta": "**Retentativa automática:** quando um agente processa vários arquivos (modo Individual) e um deles falha por um erro vindo da própria IA (instabilidade, timeout, resposta vazia ou em JSON inválido), o sistema tenta esse arquivo **de novo automaticamente, ao final do lote**, antes de marcar o processamento como concluído — sem você precisar fazer nada.\n\n⚠️ **Erros de configuração não são re-tentados** (chave de API inválida, modelo inexistente, documento maior que o contexto do modelo) — repetir não resolveria, é preciso corrigir a causa.\n\nO limite de tentativas por documento é configurável em **Gerenciar agentes** (campo \"Máximo de tentativas\").",
+        "resposta": "**Retentativa automática:** quando um agente processa vários arquivos (modo Individual) e um deles falha por um erro vindo da própria IA (instabilidade, timeout, resposta vazia ou em JSON inválido), o sistema tenta esse arquivo **de novo automaticamente, ao final do lote**, antes de marcar o processamento como concluído — sem você precisar fazer nada.\n\n⚠️ **Erros de configuração não são re-tentados** (chave de API inválida, modelo inexistente, documento maior que o contexto do modelo) — repetir não resolveria, é preciso corrigir a causa.\n\nO limite de tentativas por documento é configurável em **Gerenciar agentes** (campo \"Máximo de tentativas\").\n\n🔁 Isso é diferente da retentativa **entre rodadas** da rotina automática, que dá uma 2ª chance ao documento numa rodada futura em vez de dentro do mesmo lote — pergunte sobre \"documento pendente\" para entender esse outro caso.",
         "link": "/doc-system/processamentos/",
+    },
+    {
+        "keywords": ["documento pendente", "ficou pendente", "por que ficou pendente", "aguardando nova tentativa", "vai tentar de novo", "tenta de novo na proxima rotina", "erro pontual", "erro pontual do provedor", "quando vira erro definitivo", "duas tentativas seguidas", "2 tentativas seguidas", "falhou duas vezes", "documento nao virou erro", "por que nao deu erro ainda", "readotado", "prioridade na rotina", "pendente entre rotinas", "quantos pendentes"],
+        "resposta": "**Documento \"Pendente\" entre rodadas da rotina automática:** quando um documento falha por um erro vindo do **provedor de IA** (instabilidade, erro HTTP, etc.) durante a rotina automática, ele não vira erro na hora — fica **pendente**, e a **próxima rodada** o processa de novo automaticamente, com prioridade sobre arquivos novos (entra na cota de documentos por rodada já configurada).\n\n⚠️ Só se essa nova tentativa **também falhar** (ou seja, 2 falhas seguidas em rodadas diferentes) o documento vira **erro definitivo** e para de ser tentado sozinho — a partir daí, só volta marcando **\"Reprocessar arquivos já executados\"** numa execução manual.\n\nEssa retentativa só existe na **rotina automática** — executar manualmente pelo botão \"Executar\" não adia nada, o resultado já sai definitivo (sucesso ou erro) na hora. O histórico em Administrador > Rotina automática mostra quantos documentos de cada rodada ficaram pendentes aguardando essa nova tentativa.",
+        "link": "/doc-system/rotina-automatica/",
     },
     {
         "keywords": ["reprocessar", "reprocessar arquivo", "arquivo ja processado", "ja foi executado", "arquivo que ja foi executado", "arquivos ignorados", "pular arquivo", "nao processou de novo", "forcar reprocessamento", "reprocessar pasta"],
@@ -71,7 +80,7 @@ _KNOWLEDGE_BASE = [
     },
     {
         "keywords": ["rotina automatica", "rotina automatizada", "processar sozinho", "processar automaticamente", "executar sozinho", "executar automaticamente", "agendar execucao", "agendar agente", "processar 40 documentos", "processar 50 documentos", "muitos documentos de uma vez", "lote grande", "documentos por rodada", "intervalo entre rodadas", "ativar rotina automatica", "desligar rotina automatica", "rotina desligada", "historico da rotina", "rotina nao rodou", "proxima rodada", "quantos documentos por rodada", "horario de inicio", "data de inicio", "hora de inicio", "agendar horario", "comecar em um horario especifico", "primeira rodada"],
-        "resposta": "**Rotina automática** processa um lote pequeno de documentos pendentes de tempos em tempos, sem precisar clicar em Executar — pensada para pastas com muitos arquivos de uma vez (ex.: 40-50 editais).\n\n🔧 **Por agente** (em Gerenciar agentes): apenas o toggle **\"Ativar rotina automática\"**. Só agentes com o toggle ligado participam.\n\n🔑 **Global** (em Administrador > Rotina automática, vale para **todos** os agentes participantes): um interruptor geral (desligado = para nenhum agente), o intervalo único entre rodadas (10min a 24h) e quantos **documentos por rodada** cada agente processa (padrão 10). Intervalos menores que 30 minutos forçam no máximo 6 documentos por rodada, por segurança, ignorando o valor configurado.\n\n🕐 **Data e hora de início (opcional):** agenda a primeira rodada para um momento exato (ex.: 20/08/2026 às 19:20). Depois dela, as rodadas seguintes usam só o intervalo — o horário de início não se repete. Deixe em branco para ficar elegível já na próxima checagem do sistema.\n\n📋 A mesma tela mostra o **histórico**: se cada rodada rodou ou não, quantos documentos, quantos com sucesso/erro e os motivos.\n\nSe não houver documento novo (tudo já processado antes), a rotina simplesmente não faz nada — sem gerar erro.",
+        "resposta": "**Rotina automática** processa um lote pequeno de documentos pendentes de tempos em tempos, sem precisar clicar em Executar — pensada para pastas com muitos arquivos de uma vez (ex.: 40-50 editais).\n\n🔧 **Por agente** (em Gerenciar agentes): apenas o toggle **\"Ativar rotina automática\"**. Só agentes com o toggle ligado participam.\n\n🔑 **Global** (em Administrador > Rotina automática, vale para **todos** os agentes participantes): um interruptor geral (desligado = para nenhum agente), o intervalo único entre rodadas (10min a 24h) e quantos **documentos por rodada** cada agente processa (padrão 10). Intervalos menores que 30 minutos forçam no máximo 6 documentos por rodada, por segurança, ignorando o valor configurado.\n\n🕐 **Data e hora de início (opcional):** agenda a primeira rodada para um momento exato (ex.: 20/08/2026 às 19:20). Depois dela, as rodadas seguintes usam só o intervalo — o horário de início não se repete. Deixe em branco para ficar elegível já na próxima checagem do sistema.\n\n📋 A mesma tela mostra o **histórico**: se cada rodada rodou ou não, quantos documentos, quantos com sucesso/erro e quantos ficaram **pendentes** aguardando uma nova tentativa automática (pergunte sobre \"documento pendente\" para entender esse caso).\n\nSe não houver documento novo (tudo já processado antes), a rotina simplesmente não faz nada — sem gerar erro.\n\n🩺 **A rotina não rodou no horário esperado?** A mesma tela mostra \"Última verificação do worker\": se esse horário está avançando a cada poucos minutos, o sistema está checando normalmente (só pode não ter achado nada pendente ainda, ou o intervalo/horário configurado ainda não chegou); se parou de avançar, o worker caiu — contate o administrador.",
         "link": "/doc-system/rotina-automatica/",
     },
     {
@@ -135,7 +144,17 @@ def _keyword_presente(kw_norm, texto_norm):
     return re.search(r"(?<!\w)" + re.escape(kw_norm) + r"(?!\w)", texto_norm) is not None
 
 
-def _biel_responder(mensagem):
+_RESPOSTA_PADRAO = {
+    "resposta": "Hmm, não encontrei isso na documentação. Tente perguntar sobre: agentes, processamentos, integrações, fontes de documentos, usuários ou configurações.",
+    "link": None,
+}
+
+
+def _biel_buscar_na_base(mensagem):
+    """Busca por palavra-chave na base de conhecimento estatica. Devolve o
+    item com melhor pontuacao, ou None se nada bateu (score 0) — usado por
+    BielChatView pra decidir se ainda vale tentar a IA (ver
+    _biel_responder_com_ia) antes de cair no _RESPOSTA_PADRAO."""
     texto_norm = _normalizar(mensagem)
     melhor, melhor_score = None, 0
     for item in _KNOWLEDGE_BASE:
@@ -146,16 +165,125 @@ def _biel_responder(mensagem):
         )
         if score > melhor_score:
             melhor_score, melhor = score, item
-
-    if melhor and melhor_score > 0:
-        return melhor
-
-    return {
-        "resposta": "Hmm, não encontrei isso na documentação. Tente perguntar sobre: agentes, processamentos, integrações, fontes de documentos, usuários ou configurações.",
-        "link": None,
-    }
+    return melhor if melhor_score > 0 else None
 
 
+def _biel_montar_contexto_documentacao():
+    """Junta o texto de resposta de toda a base de conhecimento num unico
+    bloco — vira o "grounding" do prompt de IA (ver _biel_responder_com_ia),
+    pra reduzir o risco da IA inventar campo/tela/comportamento que nao
+    existe de verdade no sistema."""
+    return "\n\n---\n\n".join(
+        item["resposta"] for item in _KNOWLEDGE_BASE if item["resposta"]
+    )
+
+
+_BIEL_IA_PROMPT_TEMPLATE = """Voce e o Biel, assistente virtual do HUB Agentes, um portal de \
+automacao de leitura de documentos com IA.
+
+Responda a pergunta do usuario em portugues, de forma direta e objetiva (poucos paragrafos, \
+pode usar uma lista curta se ajudar). Baseie sua resposta SOMENTE nas informacoes abaixo, que \
+descrevem como o sistema funciona hoje — nao invente campos, telas, botoes ou comportamentos \
+que nao estejam descritos aqui. Se a pergunta nao puder ser respondida com essas informacoes, \
+diga isso claramente e sugira contatar um administrador do sistema, em vez de adivinhar.
+
+--- INFORMACOES SOBRE O SISTEMA ---
+{documentacao}
+--- FIM DAS INFORMACOES ---
+
+Pergunta do usuario: {pergunta}"""
+
+
+def _biel_responder_com_ia(mensagem, config):
+    """Chama a integracao de IA configurada em Administrador > Configuracoes
+    Gerais (ConfiguracaoGeral.biel_ia_ativa/biel_ai_provider_integration/
+    biel_ia_modelo) pra responder uma pergunta que a base de conhecimento
+    nao cobre. Devolve None (sinal pra BielChatView cair no _RESPOSTA_PADRAO)
+    sempre que faltar configuracao ou a chamada falhar por qualquer motivo —
+    o Biel nunca deve mostrar um erro tecnico ao usuario do portal."""
+    from apps.integracoes.models import IntegrationStatus
+    from apps.integracoes.services.ai_providers import (
+        AIProviderServiceError,
+        get_ai_provider_adapter,
+        suporta_reducao_de_thinking_budget,
+    )
+
+    integracao = config.biel_ai_provider_integration
+    if integracao is None or integracao.status != IntegrationStatus.ATIVA:
+        return None
+
+    model_name = (config.biel_ia_modelo or "").strip() or integracao.default_model
+    if not model_name:
+        return None
+
+    prompt = _BIEL_IA_PROMPT_TEMPLATE.format(
+        documentacao=_biel_montar_contexto_documentacao(),
+        pergunta=mensagem,
+    )
+    # Resposta de chat nao precisa de raciocinio pesado — reaproveita a
+    # mesma checagem que agent_execution._build_execution_params usa pra
+    # nao pedir reducao de thinking budget em modelos que nao aceitam
+    # (ex.: gemini-2.5-pro), evitando uma chamada HTTP desperdicada.
+    execution_params = {}
+    if suporta_reducao_de_thinking_budget(model_name):
+        execution_params["thinking_budget"] = 0
+
+    try:
+        adapter = get_ai_provider_adapter(integracao)
+        resultado = adapter.execute_prompt_without_document(
+            prompt=prompt,
+            execution_params=execution_params,
+            model_name=model_name,
+        )
+    except AIProviderServiceError:
+        return None
+    except Exception:
+        logger.exception("Erro inesperado ao chamar a IA do assistente Biel.")
+        return None
+
+    # Conta tokens/custo mesmo se o texto vier vazio — o provedor ja cobrou
+    # pela chamada. So nao conta chamadas que levantaram excecao (nesses
+    # casos normalmente nao ha usage_metadata de verdade).
+    _acumular_uso_biel(config, model_name, resultado.usage_metadata)
+
+    texto = (resultado.output_text or "").strip()
+    if not texto:
+        return None
+    return {"resposta": texto, "link": None}
+
+
+def _acumular_uso_biel(config, model_name, usage_metadata):
+    """Soma tokens/custo desta chamada aos acumuladores de
+    ConfiguracaoGeral (ver Administrador > Configuracoes Gerais, "IA no
+    assistente Biel"), pra dar visibilidade do custo dessa funcionalidade
+    no dia a dia. Update atomico via F() direto na tabela — evita perder
+    incremento se duas conversas do Biel acontecerem ao mesmo tempo."""
+    from django.db.models import F
+
+    from apps.core.models import ConfiguracaoGeral
+    from apps.processamentos.services.agent_execution import (
+        _custo_de_tokens,
+        _tokens_from_usage,
+    )
+
+    tokens = _tokens_from_usage(usage_metadata)
+    tokens_saida = (tokens.get("output_tokens") or 0) + (tokens.get("processing_tokens") or 0)
+    custo_usd, custo_brl = _custo_de_tokens(model_name, tokens)
+
+    updates = {}
+    if tokens.get("input_tokens"):
+        updates["biel_tokens_input_total"] = F("biel_tokens_input_total") + tokens["input_tokens"]
+    if tokens_saida:
+        updates["biel_tokens_output_total"] = F("biel_tokens_output_total") + tokens_saida
+    if custo_usd:
+        updates["biel_custo_usd_total"] = F("biel_custo_usd_total") + custo_usd
+    if custo_brl:
+        updates["biel_custo_brl_total"] = F("biel_custo_brl_total") + custo_brl
+    if updates:
+        ConfiguracaoGeral.objects.filter(pk=config.pk).update(**updates)
+
+
+@method_decorator(login_required, name="dispatch")
 class BielChatView(View):
     def post(self, request):
         try:
@@ -167,7 +295,20 @@ class BielChatView(View):
         if not mensagem:
             return JsonResponse({"resposta": "Pode digitar sua pergunta!", "link": None})
 
-        resultado = _biel_responder(mensagem)
+        # 1) Palavra-chave primeiro — instantaneo e sem custo, cobre tudo
+        # que ja esta mapeado na base de conhecimento.
+        resultado = _biel_buscar_na_base(mensagem)
+        if resultado is None:
+            # 2) Nada bateu — so ai, se configurado, tenta a IA (ver
+            # ConfiguracaoGeral.biel_ia_ativa). Qualquer falha (sem
+            # integracao, erro do provedor, etc.) devolve None e cai no
+            # _RESPOSTA_PADRAO de sempre, sem expor erro tecnico.
+            from apps.core.models import ConfiguracaoGeral
+
+            config = ConfiguracaoGeral.obter()
+            if config.biel_ia_ativa:
+                resultado = _biel_responder_com_ia(mensagem, config)
+        resultado = resultado or _RESPOSTA_PADRAO
         return JsonResponse({"resposta": resultado["resposta"], "link": resultado["link"]})
 
 

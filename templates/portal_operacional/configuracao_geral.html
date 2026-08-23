@@ -232,11 +232,112 @@
           </div>
         </section>
 
+        <!-- IA no assistente Biel -->
+        <section class="builder-card" style="margin-top:0">
+          <div class="form-section-heading">
+            <p class="eyebrow">Assistente</p>
+            <h2>IA no assistente Biel</h2>
+          </div>
+          <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:24px;line-height:1.6">
+            Quando o Biel não encontra uma resposta na documentação interna, ele pode perguntar a
+            um provedor de IA em vez de dizer "não encontrei isso" — a IA responde com base na
+            mesma documentação, sem inventar funcionalidades que não existem no sistema. Perguntas
+            que já têm resposta mapeada continuam respondidas instantaneamente, sem custo de IA.
+          </p>
+
+          <!-- Toggle liga/desliga -->
+          <label class="toggle-line" for="id_biel_ia_toggle" style="max-width:420px">
+            <input type="checkbox" id="id_biel_ia_toggle" name="biel_ia_ativa" value="1"
+              {% if config.biel_ia_ativa %}checked{% endif %}>
+            <span class="toggle-switch" aria-hidden="true"></span>
+            <span>
+              <strong>{% if config.biel_ia_ativa %}IA do Biel ativa{% else %}IA do Biel inativa{% endif %}</strong>
+              <small>{% if config.biel_ia_ativa %}O Biel usa IA quando não encontra resposta na documentação.{% else %}O Biel só responde com a documentação interna (comportamento atual).{% endif %}</small>
+            </span>
+          </label>
+
+          <div id="biel-ia-campos" style="margin-top:18px;{% if not config.biel_ia_ativa %}display:none{% endif %}">
+            <div class="execution-field" style="max-width:420px">
+              <label for="id_biel_ai_provider_integration">Integração de IA</label>
+              <select id="id_biel_ai_provider_integration" name="biel_ai_provider_integration">
+                <option value="">Selecione uma integração ativa...</option>
+                {% for integracao in ai_integrations %}
+                  <option value="{{ integracao.id }}" {% if config.biel_ai_provider_integration_id == integracao.id %}selected{% endif %}>
+                    {{ integracao.nome }}
+                  </option>
+                {% endfor %}
+              </select>
+              <small>Só aparecem integrações de IA com status ativo.</small>
+            </div>
+
+            <div class="execution-field" style="max-width:420px;margin-top:18px">
+              <label for="id_biel_ia_modelo">Modelo (opcional)</label>
+              <input type="text" id="id_biel_ia_modelo" name="biel_ia_modelo"
+                value="{{ config.biel_ia_modelo }}" placeholder="Deixe em branco para usar o modelo padrão da integração">
+              <small>Deixe em branco para usar o modelo padrão configurado na integração escolhida acima.</small>
+            </div>
+          </div>
+        </section>
+
         <div class="execution-actions builder-actions">
           <button type="submit" class="start-button">Salvar configurações</button>
         </div>
 
       </form>
+
+      <script>
+        (function () {
+          var toggle = document.getElementById('id_biel_ia_toggle');
+          var campos = document.getElementById('biel-ia-campos');
+          if (toggle && campos) {
+            toggle.addEventListener('change', function () {
+              campos.style.display = toggle.checked ? '' : 'none';
+            });
+          }
+        })();
+      </script>
+
+      <!-- Uso da IA do Biel — form separado (acao diferente da tela principal) -->
+      <section class="builder-card" style="margin-top:1.5rem">
+        <div class="form-section-heading">
+          <p class="eyebrow">Assistente</p>
+          <h2>Uso da IA do Biel</h2>
+        </div>
+        <p style="font-size:13px;color:var(--muted,#7ca5b8);margin-bottom:20px;line-height:1.6">
+          Tokens e custo estimado consumidos pelas respostas de IA do Biel
+          {% if config.biel_uso_zerado_em %}desde {{ config.biel_uso_zerado_em|date:"d/m/Y H:i" }}{% else %}desde o início{% endif %}.
+          Zere o contador quando quiser reiniciar a contagem (ex.: no começo de cada mês).
+        </p>
+
+        <div style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:20px">
+          <span style="font-size:13px;color:var(--muted,#7ca5b8)">
+            <strong style="color:var(--neon-1,#00d8ff)">Tokens de entrada:</strong>
+            {{ config.biel_tokens_input_total }}
+          </span>
+          <span style="font-size:13px;color:var(--muted,#7ca5b8)">
+            <strong style="color:var(--neon-1,#00d8ff)">Tokens de saída:</strong>
+            {{ config.biel_tokens_output_total }}
+          </span>
+          <span style="font-size:13px;color:var(--muted,#7ca5b8)">
+            <strong style="color:var(--neon-1,#00d8ff)">Total de tokens:</strong>
+            {{ biel_tokens_total }}
+          </span>
+          <span style="font-size:13px;color:var(--muted,#7ca5b8)">
+            <strong style="color:var(--neon-1,#00d8ff)">Custo estimado:</strong>
+            {% if config.biel_custo_usd_total %}
+              US$ {{ config.biel_custo_usd_total|floatformat:4 }} (R$ {{ config.biel_custo_brl_total|floatformat:2 }})
+            {% else %}
+              — (cadastre a precificação do modelo em Custos para calcular)
+            {% endif %}
+          </span>
+        </div>
+
+        <form method="post" action="{% url 'portal_configuracao_geral_biel_zerar_uso' %}"
+          onsubmit="return confirm('Zerar o contador de uso da IA do Biel?')">
+          {% csrf_token %}
+          <button type="submit" class="secondary-action">Zerar contador</button>
+        </form>
+      </section>
 
       <!-- Pastas compartilhadas — form separado -->
       <section class="builder-card" style="margin-top:1.5rem">
