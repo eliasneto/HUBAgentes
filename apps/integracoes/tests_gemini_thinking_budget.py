@@ -9,7 +9,10 @@ from unittest.mock import patch
 from django.test import SimpleTestCase
 
 from apps.integracoes.services.ai_providers.base import AIProviderServiceError
-from apps.integracoes.services.ai_providers.gemini_adapter import GeminiProviderAdapter
+from apps.integracoes.services.ai_providers.gemini_adapter import (
+    GeminiProviderAdapter,
+    suporta_reducao_de_thinking_budget,
+)
 
 
 class BuildGenerationConfigThinkingBudgetTests(SimpleTestCase):
@@ -111,3 +114,31 @@ class PostJsonThinkingBudgetFallbackTests(SimpleTestCase):
                 self.adapter._post_json("https://exemplo/url", payload)
 
         self.assertEqual(mock_post.call_count, 1)
+
+
+class SuportaReducaoDeThinkingBudgetTests(SimpleTestCase):
+    """suporta_reducao_de_thinking_budget — usada por agent_execution.
+    _build_execution_params para pular a chamada HTTP desperdicada (ver
+    PostJsonThinkingBudgetFallbackTests acima) direto, em vez de so
+    descobrir depois de uma tentativa que falhou."""
+
+    def test_gemini_2_5_pro_nao_suporta(self):
+        self.assertFalse(suporta_reducao_de_thinking_budget("gemini-2.5-pro"))
+
+    def test_case_insensitive(self):
+        self.assertFalse(suporta_reducao_de_thinking_budget("Gemini-2.5-Pro"))
+
+    def test_com_espacos_e_prefixo_models(self):
+        self.assertFalse(suporta_reducao_de_thinking_budget("  models/gemini-2.5-pro  "))
+
+    def test_gemini_2_5_flash_suporta(self):
+        self.assertTrue(suporta_reducao_de_thinking_budget("gemini-2.5-flash"))
+
+    def test_modelo_desconhecido_suporta_por_padrao(self):
+        # O retry em _post_json continua como rede de seguranca caso essa
+        # suposicao otimista esteja errada para um modelo novo.
+        self.assertTrue(suporta_reducao_de_thinking_budget("gemini-3.0-super-pro"))
+
+    def test_vazio_ou_none_suporta_por_padrao(self):
+        self.assertTrue(suporta_reducao_de_thinking_budget(""))
+        self.assertTrue(suporta_reducao_de_thinking_budget(None))

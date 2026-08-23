@@ -605,6 +605,7 @@ class RotinaAutomaticaExecucaoResumo:
     total_documentos: int
     total_sucesso: int
     total_erro: int
+    total_pendente: int
     motivo: str
     processamento_codigo: str
 
@@ -670,6 +671,7 @@ def listar_historico_rotina_automatica(
             total_documentos=execucao.total_documentos,
             total_sucesso=execucao.total_sucesso,
             total_erro=execucao.total_erro,
+            total_pendente=execucao.total_pendente,
             motivo=execucao.motivo,
             processamento_codigo=(
                 execucao.processamento.codigo if execucao.processamento_id else ""

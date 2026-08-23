@@ -368,6 +368,20 @@ especifica daquele arquivo.</code></pre>
             provedor naquele momento, nao um erro tecnico do sistema. Execute o agente novamente mais tarde para
             esse arquivo especifico.</p>
           </article>
+
+          <article class="doc-guide-card">
+            <span class="doc-chip">"Processamento interrompido antes da conclusao"</span>
+            <p>Mensagem generica de erro (vermelho) que aparece quando a execucao manual ("Executar") passa de
+            <strong>10 minutos</strong> — limite do servidor por requisicao. Se os documentos individuais estao
+            demorando muito (PDF grande, modelo mais lento), o servidor interrompe a execucao no meio; o sistema
+            so percebe e marca como erro <strong>~5 minutos depois</strong>, quando ve que nada mais esta
+            acontecendo — por isso a mensagem nao aponta uma causa tecnica especifica.</p>
+            <small>Os documentos que ja tinham processado ficam salvos normalmente (confira em "Ver tokens por
+            documento"). Clique em Executar de novo no mesmo agente: os ja processados sao ignorados
+            (duplicidade), so os que faltaram sao retomados. Para nao esbarrar nesse limite de novo com lotes
+            grandes, ative a <strong>rotina automatica</strong> do agente (Administrador > Rotina automatica) em
+            vez de clicar Executar manualmente — ela processa em lotes pequenos e seguros, automaticamente.</small>
+          </article>
         </div>
       </section>
 

@@ -438,6 +438,63 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
         self.assertEqual(kwargs["lote_tamanho"], 8)
 
 
+class UltimaVerificacaoHeartbeatTests(TestCase):
+    """ConfiguracaoGeral.rotina_automatica_ultima_verificacao_em — heartbeat
+    exibido em Administrador > Rotina automatica pra confirmar que o
+    worker esta de fato chamando essa rotina no intervalo esperado. Sem
+    isso, "nada elegivel ainda"/"interruptor desligado" e "worker parado"
+    ficam indistinguiveis (historico igualmente vazio nos tres casos) —
+    caso real: usuario deixou a rotina rodando ~3h sem documento pendente
+    e nao tinha como confirmar que a checagem estava acontecendo
+    (21/08/2026)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="dono5", password="x")
+        ConfiguracaoGeral.objects.all().delete()
+
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    def test_atualiza_mesmo_com_interruptor_geral_desligado(self, mock_rodar):
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_agentes_ativa = False
+        config.save(update_fields=["rotina_automatica_agentes_ativa"])
+        antes = timezone.now()
+
+        executar_rotinas_automaticas_agentes()
+
+        config.refresh_from_db()
+        self.assertIsNotNone(config.rotina_automatica_ultima_verificacao_em)
+        self.assertGreaterEqual(config.rotina_automatica_ultima_verificacao_em, antes)
+        mock_rodar.assert_not_called()
+
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    def test_atualiza_mesmo_sem_rodada_elegivel_ainda(self, mock_rodar):
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_proxima_execucao_em = timezone.now() + timedelta(minutes=30)
+        config.save(update_fields=["rotina_automatica_proxima_execucao_em"])
+        _criar_agente(criado_por=self.user, execucao_automatica_ativa=True)
+        antes = timezone.now()
+
+        executar_rotinas_automaticas_agentes()
+
+        config.refresh_from_db()
+        self.assertIsNotNone(config.rotina_automatica_ultima_verificacao_em)
+        self.assertGreaterEqual(config.rotina_automatica_ultima_verificacao_em, antes)
+        mock_rodar.assert_not_called()
+
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    def test_atualiza_quando_roda_normalmente(self, mock_rodar):
+        mock_rodar.return_value = {"agente": "x", "status": "executada"}
+        _criar_agente(criado_por=self.user, execucao_automatica_ativa=True)
+        antes = timezone.now()
+
+        executar_rotinas_automaticas_agentes()
+
+        config = ConfiguracaoGeral.obter()
+        self.assertIsNotNone(config.rotina_automatica_ultima_verificacao_em)
+        self.assertGreaterEqual(config.rotina_automatica_ultima_verificacao_em, antes)
+        mock_rodar.assert_called_once()
+
+
 class RegistrarHistoricoRotinaTests(TestCase):
     """RotinaAutomaticaExecucao — o registro que alimenta a tela
     Administrador > Rotina automatica (rodou ou nao, quantos documentos,
@@ -660,6 +717,27 @@ class RotinaAutomaticaAgentesViewTests(TestCase):
         resp = self.client.get(reverse("portal_rotina_automatica"))
         self.assertContains(resp, agente.nome)
         self.assertContains(resp, "Nenhum PDF pendente encontrado.")
+
+    def test_pagina_exibe_heartbeat_da_ultima_verificacao(self):
+        # ConfiguracaoGeral.rotina_automatica_ultima_verificacao_em setado
+        # (ex.: pelo worker) precisa aparecer na tela, mesmo sem nenhum
+        # registro no historico — e o que confirma pro usuario que o
+        # worker esta de fato checando (ver UltimaVerificacaoHeartbeatTests).
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_ultima_verificacao_em = timezone.now()
+        config.save(update_fields=["rotina_automatica_ultima_verificacao_em"])
+
+        resp = self.client.get(reverse("portal_rotina_automatica"))
+
+        self.assertContains(resp, "Última verificação do worker")
+
+    def test_pagina_carrega_sem_heartbeat_ainda_registrado(self):
+        # rotina_automatica_ultima_verificacao_em ainda None (worker nunca
+        # chamou o comando) nao pode quebrar a pagina.
+        resp = self.client.get(reverse("portal_rotina_automatica"))
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "Última verificação do worker")
 
     def test_salvar_liga_e_ajusta_intervalo_e_lote(self):
         resp = self.client.post(

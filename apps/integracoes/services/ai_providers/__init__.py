@@ -2,7 +2,7 @@ from apps.integracoes.models import AIProviderType
 
 from .anthropic_adapter import AnthropicProviderAdapter
 from .base import AIProviderServiceError
-from .gemini_adapter import GeminiProviderAdapter
+from .gemini_adapter import GeminiProviderAdapter, suporta_reducao_de_thinking_budget
 from .groq_adapter import GroqProviderAdapter
 from .openai_adapter import OpenAIProviderAdapter
 
@@ -22,4 +22,8 @@ def get_ai_provider_adapter(integration):
     return adapter_class(integration)
 
 
-__all__ = ["AIProviderServiceError", "get_ai_provider_adapter"]
+__all__ = [
+    "AIProviderServiceError",
+    "get_ai_provider_adapter",
+    "suporta_reducao_de_thinking_budget",
+]

@@ -463,6 +463,18 @@ class DocumentoEntrada(TimestampedModel):
     # ou se exige intervenção manual (chave inválida, documento grande demais,
     # saída inválida) e não deve ser re-tentada num reprocessamento.
     erro_reprocessavel = models.BooleanField(default=True)
+    # Retentativa entre rodadas da ROTINA AUTOMATICA (diferente de
+    # AgenteConfiguracaoOperacional.max_tentativas, que limita tentativas
+    # dentro do MESMO Processamento — ver _documento_excedeu_tentativas):
+    # conta quantas rotinas automaticas seguidas este documento ja falhou
+    # por erro pontual do provedor de IA (AIProviderServiceError). Na 1a
+    # falha o documento fica PENDENTE (nao ERRO) e e readotado pela proxima
+    # rodada com prioridade (ver document_sources.
+    # adotar_documentos_pendentes_de_retentativa); na 2a falha seguida vira
+    # ERRO definitivo e para de ser redescoberto automaticamente (ver
+    # _arquivo_ja_processado_em_outra_execucao). Caso real: agente
+    # JHS/Licitacao, 21/08/2026.
+    tentativas_pontuais = models.PositiveSmallIntegerField(default=0)
     processado_em = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -476,6 +488,9 @@ class DocumentoEntrada(TimestampedModel):
             # Suporta a consulta de "arquivo ja processado por este agente
             # nesta pasta em uma execucao anterior" (document_sources.py).
             models.Index(fields=["nome_arquivo"]),
+            # Suporta adotar_documentos_pendentes_de_retentativa (busca por
+            # documentos PENDENTE com tentativas_pontuais >= 1 entre agentes).
+            models.Index(fields=["status", "tentativas_pontuais"]),
         ]
 
     EXTENSOES_SUPORTADAS = {"pdf", "txt", "csv", "png", "jpg", "jpeg", "xlsx"}
@@ -716,6 +731,12 @@ class RotinaAutomaticaExecucao(TimestampedModel):
     total_documentos = models.PositiveSmallIntegerField(default=0)
     total_sucesso = models.PositiveSmallIntegerField(default=0)
     total_erro = models.PositiveSmallIntegerField(default=0)
+    # Documentos que falharam por erro pontual do provedor de IA e foram
+    # adiados para a proxima rotina em vez de virar erro definitivo (ver
+    # DocumentoEntrada.tentativas_pontuais) — nao contam em total_erro.
+    # Existe para o total bater: total_documentos - total_sucesso -
+    # total_erro so fecha em zero somando total_pendente.
+    total_pendente = models.PositiveSmallIntegerField(default=0)
     # Motivo quando status != executada (ex.: "agente ja em execucao"), ou
     # um resumo dos erros tecnicos quando total_erro > 0.
     motivo = models.TextField(blank=True)

@@ -23,6 +23,32 @@ _THINKING_BUDGET_INVALIDO_PATTERNS = (
     "only works in thinking mode",
 )
 
+# Modelos Gemini conhecidos por NAO aceitar thinkingBudget=0 (exigem
+# "thinking mode" sempre ligado) — hoje so o 2.5 Pro; o 2.5 Flash/
+# Flash-Lite aceita normalmente. Caso real: agente JHS/Licitacao,
+# 21/08/2026 — a 1a tentativa falhava com o erro acima e a retentativa sem
+# thinkingConfig (mais lenta, com raciocinio completo ligado) rodava em
+# TODO documento, adicionando uma chamada HTTP inteira desperdicada por
+# documento e empurrando lotes de poucos documentos perto/alem do timeout
+# de 600s do servidor (ver agent_execution._build_execution_params, que
+# usa suporta_reducao_de_thinking_budget() para nao pedir a reducao nesses
+# modelos e pular a chamada desperdicada direto). O retry aqui em
+# _post_json continua existindo como rede de seguranca para modelos
+# futuros/desconhecidos com a mesma restricao, ainda nao mapeados aqui.
+MODELOS_SEM_SUPORTE_A_REDUCAO_DE_THINKING = frozenset({"gemini-2.5-pro"})
+
+
+def suporta_reducao_de_thinking_budget(model_name):
+    """True se o modelo aceita thinkingBudget=0 (reducao de custo de
+    raciocinio). Modelos conhecidos por nao aceitar (ver
+    MODELOS_SEM_SUPORTE_A_REDUCAO_DE_THINKING) retornam False; qualquer
+    modelo desconhecido retorna True por padrao — o retry em _post_json
+    continua como rede de seguranca caso a suposicao esteja errada."""
+    if not model_name:
+        return True
+    nome = model_name.strip().removeprefix("models/").strip().lower()
+    return nome not in MODELOS_SEM_SUPORTE_A_REDUCAO_DE_THINKING
+
 
 class GeminiProviderAdapter(BaseAIProviderAdapter):
     default_base_url = "https://generativelanguage.googleapis.com/v1beta"

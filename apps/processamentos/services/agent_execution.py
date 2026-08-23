@@ -21,6 +21,7 @@ from apps.agentes_ia.services import (
 from apps.integracoes.services.ai_providers import (
     AIProviderServiceError,
     get_ai_provider_adapter,
+    suporta_reducao_de_thinking_budget,
 )
 from apps.integracoes.services.google_drive import GoogleDriveServiceError
 from apps.integracoes.services.local_storage import LocalStorageServiceError
@@ -38,6 +39,7 @@ from apps.processamentos.models import (
 )
 from apps.processamentos.services.document_sources import (
     DocumentSourcePreparationError,
+    adotar_documentos_pendentes_de_retentativa,
     load_document_bytes,
     prepare_documentos,
 )
@@ -262,7 +264,7 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
             "Defina um modelo na integracao de IA ou no agente antes de executar."
         )
 
-    execution_params = _build_execution_params(processamento)
+    execution_params = _build_execution_params(processamento, model_name=model_name)
     if not processamento.ai_provider_integration_snapshot_id:
         processamento.ai_provider_integration_snapshot = integration
     if _deve_reconstruir_prompt_snapshot(processamento):
@@ -270,6 +272,20 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
     if not processamento.modelo_snapshot:
         processamento.modelo_snapshot = model_name
 
+    if limite_documentos_por_execucao is not None:
+        # So a rotina automatica (unico call site que preenche esse limite —
+        # ver operational_execution._executar_rotina_automatica_agente)
+        # readota documentos de rodadas anteriores deste agente que ficaram
+        # PENDENTE aguardando uma 2a chance apos erro pontual do provedor de
+        # IA (ver _marcar_documento_pendente_retentativa). Precisa acontecer
+        # ANTES de prepare_documentos: como eles passam a pertencer a este
+        # processamento, _select_documentos ja os inclui e, por serem mais
+        # antigos (created_at), entram na frente dos arquivos novos no corte
+        # de limite_documentos_por_execucao logo abaixo — prioridade "de
+        # graca", sem precisar reduzir a descoberta de arquivos novos.
+        adotar_documentos_pendentes_de_retentativa(
+            processamento, limite_documentos_por_execucao
+        )
     resultado_preparo = prepare_documentos(processamento)
     processamento.total_documentos_ignorados = resultado_preparo.get("ignorados", 0)
     # Sinaliza para a view/front-end que a descoberta parou antes de
@@ -344,6 +360,10 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
             intervalo_entre_documentos_segundos=(
                 ConfiguracaoGeral.obter().intervalo_entre_documentos_ia_segundos
             ),
+            # So a rotina automatica pode adiar erro pontual do provedor de
+            # IA para a proxima rodada (ver _marcar_documento_pendente_retentativa)
+            # — execucao manual mantem o comportamento atual (erro na hora).
+            permite_adiamento_erro_pontual=limite_documentos_por_execucao is not None,
         )
     elif _usa_execucao_por_pasta(processamento):
         batch_result = _execute_documents_by_folder(
@@ -602,7 +622,7 @@ def _processar_rodada_retentativa_sobrecarga(processamento, *, agora):
         or processamento.agente.ai_provider_integration
     )
     model_name = processamento.modelo_snapshot or integration.default_model
-    execution_params = _build_execution_params(processamento)
+    execution_params = _build_execution_params(processamento, model_name=model_name)
     actor = processamento.iniciado_por
 
     documentos = list(
@@ -794,7 +814,7 @@ def _adicionar_instrucao_formato_definido_pela_ia(prompt):
     )
 
 
-def _build_execution_params(processamento):
+def _build_execution_params(processamento, *, model_name):
     execution_params = dict(processamento.agente.parametros_execucao or {})
     # Para formato LIVRE a IA deve retornar exatamente o que o prompt pede,
     # sem coerção de tipo. Para todos os outros formatos forçamos JSON para
@@ -808,9 +828,20 @@ def _build_execution_params(processamento):
     # execucao — construido aqui uma unica vez, vale para os tres modos
     # (individual, grupo, pasta) e tambem para execucao sem documento.
     # Adapters que nao suportam thinking budget (todos exceto Gemini, por
-    # enquanto) ignoram essa chave silenciosamente.
+    # enquanto) ignoram essa chave silenciosamente. Modelos Gemini que
+    # exigem thinking mode sempre ligado (ex.: gemini-2.5-pro) sao
+    # excluidos aqui — sem essa checagem, TODO documento pagaria uma
+    # chamada HTTP inteira desperdicada (erro "Budget 0 is invalid...",
+    # ver gemini_adapter) antes da retentativa que de fato funciona. Caso
+    # real: agente JHS/Licitacao, 21/08/2026 — lote de 6 documentos
+    # esbarrou no timeout de 600s do servidor por causa dessa lentidao
+    # extra, so processando 5.
     configuracao_operacional = getattr(processamento.agente, "configuracao_operacional", None)
-    if configuracao_operacional and configuracao_operacional.enable_thinking_budget_reduction:
+    if (
+        configuracao_operacional
+        and configuracao_operacional.enable_thinking_budget_reduction
+        and suporta_reducao_de_thinking_budget(model_name)
+    ):
         execution_params.setdefault("thinking_budget", 0)
     return execution_params
 
@@ -879,6 +910,12 @@ def _tentar_executar_documento_individual(
             "retryable": retryable,
             "mensagem_operacional": mensagem_operacional,
             "mensagem_tecnica": mensagem_tecnica,
+            # Usado por _execute_documents_individually para decidir se pode
+            # adiar para a proxima rotina em vez de finalizar como erro (ver
+            # _pode_adiar_para_proxima_rotina) — so falha vinda do PROVEDOR
+            # de IA conta; erro interno (Drive, storage local, empacotamento
+            # de saida) sempre vai direto para erro definitivo.
+            "eh_erro_provedor_ia": isinstance(exc, AIProviderServiceError),
         }
 
     return {"sucesso": True, "execution_result": execution_result}
@@ -893,6 +930,7 @@ def _execute_documents_individually(
     execution_params,
     actor,
     intervalo_entre_documentos_segundos=0,
+    permite_adiamento_erro_pontual=False,
 ):
     output_records = []
     total_success = 0
@@ -911,6 +949,25 @@ def _execute_documents_individually(
         last_error_message = resultado["mensagem_operacional"]
         if resultado["mensagem_tecnica"]:
             last_technical_error_message = resultado["mensagem_tecnica"]
+
+    def _finalizar_documento_com_falha(documento, resultado):
+        # Erro pontual do provedor de IA (ver AIProviderServiceError), 1a
+        # falha deste documento entre rotinas automaticas: adia para a
+        # proxima rodada em vez de fechar como erro definitivo agora — nao
+        # entra em total_errors, entao o processamento pode fechar
+        # CONCLUIDO_SUCESSO mesmo com este documento ainda pendente (o
+        # documento resolve seu proprio destino, nao trava o processamento).
+        # _mark_document_error ja rodou (dentro de
+        # _tentar_executar_documento_individual) e ja registrou a auditoria
+        # desta tentativa falha — aqui so ajustamos o status final.
+        if (
+            permite_adiamento_erro_pontual
+            and resultado.get("eh_erro_provedor_ia")
+            and documento.tentativas_pontuais == 0
+        ):
+            _marcar_documento_pendente_retentativa(documento)
+            return
+        _registrar_erro_final(resultado)
 
     # Espaca as chamadas de IA (ConfiguracaoGeral.
     # intervalo_entre_documentos_ia_segundos) para reduzir a chance de
@@ -970,7 +1027,7 @@ def _execute_documents_individually(
             a_retentar.append(documento)
             continue
 
-        _registrar_erro_final(resultado)
+        _finalizar_documento_com_falha(documento, resultado)
 
     # 2a passada: uma unica retentativa automatica, ao final do lote, so para
     # os documentos guardados acima. Caso do incidente PROC-20260817131407:
@@ -992,7 +1049,7 @@ def _execute_documents_individually(
             total_success += 1
             output_records.append(resultado["execution_result"]["output_record"])
             continue
-        _registrar_erro_final(resultado)
+        _finalizar_documento_com_falha(documento, resultado)
 
     return {
         "output_records": output_records,
@@ -1984,6 +2041,36 @@ def _documento_excedeu_tentativas(processamento, documento, max_tentativas):
         documento=documento
     ).count()
     return tentativas_realizadas >= max_tentativas
+
+
+def _marcar_documento_pendente_retentativa(documento):
+    """Adia um documento que falhou por erro pontual do provedor de IA (ver
+    AIProviderServiceError) para a proxima rotina automatica, em vez de
+    finalizar como erro definitivo — so na 1a falha consecutiva deste
+    documento (ver DocumentoEntrada.tentativas_pontuais e
+    _finalizar_documento_com_falha, em _execute_documents_individually).
+
+    _mark_document_error ja rodou antes disso (dentro de
+    _tentar_executar_documento_individual) e ja criou o registro de
+    auditoria (ProcessamentoExecucaoIA com status ERRO) desta tentativa —
+    aqui so sobrescrevemos o status "final" do documento, preservando esse
+    historico. document_sources.adotar_documentos_pendentes_de_retentativa
+    e quem devolve este documento para a fila na proxima rodada. Caso real:
+    agente JHS/Licitacao, 21/08/2026.
+    """
+    documento.status = DocumentStatus.PENDENTE
+    documento.mensagem_erro = ""
+    documento.erro_reprocessavel = True
+    documento.tentativas_pontuais += 1
+    documento.save(
+        update_fields=[
+            "status",
+            "mensagem_erro",
+            "erro_reprocessavel",
+            "tentativas_pontuais",
+            "updated_at",
+        ]
+    )
 
 
 def _mark_document_max_tentativas(*, processamento, documento, message):

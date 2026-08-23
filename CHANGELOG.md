@@ -5,6 +5,19 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.5.23] — 2026-08-23
+
+### Adicionado
+- **Retentativa entre rodadas da rotina automática para erro pontual do provedor de IA** (`DocumentoEntrada.tentativas_pontuais`, migration `processamentos/0033`) — antes, qualquer `AIProviderServiceError` (ex.: HTTP 400/503, erro de conteúdo) fazia o documento virar erro definitivo na hora, mesmo sendo uma falha pontual que uma nova tentativa resolveria sozinha. Agora, na rotina automática, a 1ª falha desse tipo deixa o documento **pendente** (não erro) — sem travar o processamento, que fecha normalmente considerando quem terminou — e a **próxima rodada** o readota automaticamente, com prioridade sobre arquivos novos (entra na cota configurada de documentos por rodada). Só na **2ª falha seguida** vira erro definitivo e para de ser redescoberto automaticamente pela varredura de pasta — só volta via reenvio manual com "Reprocessar arquivos já executados". Execução manual ("Executar") e os modos de execução em grupo/pasta continuam com o comportamento anterior (erro na hora), sem adiamento. A tela Administrador > Rotina automática mostra quantos documentos ficaram pendentes aguardando nova tentativa (`RotinaAutomaticaExecucao.total_pendente`). Caso real: agente JHS (Licitação), 21/08/2026.
+- **Heartbeat de última verificação da rotina automática** (`ConfiguracaoGeral.rotina_automatica_ultima_verificacao_em`, migration `core/0019`) — atualizado a cada chamada do worker (`executar_rotinas_automaticas_agentes`), mesmo sem rodada elegível ou com o interruptor geral desligado. Antes, a tela Administrador > Rotina automática não tinha como distinguir "worker rodando mas sem nada pendente agora" de "worker parado" — as duas situações deixavam o histórico igualmente vazio. Caso real: usuário deixou a rotina rodando ~3h sem nenhum documento pendente e não tinha como confirmar que a checagem estava de fato acontecendo (21/08/2026).
+
+### Corrigido
+- **`gemini-2.5-pro` pagava uma chamada HTTP inteira desperdiçada por documento quando "Reduzir custo de raciocínio da IA" estava ligado** (`suporta_reducao_de_thinking_budget`, `gemini_adapter.py`) — esse modelo não aceita `thinkingBudget=0` (só funciona em thinking mode); o sistema já tinha um retry que refazia a chamada sem esse parâmetro (ver 1.5.19), mas isso significava 2 chamadas por documento (uma que sempre falha + o retry lento, com raciocínio completo ligado). `agent_execution._build_execution_params` agora detecta modelos conhecidos por essa restrição e nem tenta pedir a redução neles, pulando direto para a chamada que funciona. Caso real: agente JHS (Licitação), 21/08/2026 — um lote de 6 documentos esbarrou no timeout de 600s do servidor por causa dessa lentidão extra, processando só 5.
+- Atualizada a base de conhecimento do assistente Biel e as páginas `/doc-system/gerenciar-agentes/` e `/doc-system/processamentos/` com essas mudanças e com uma explicação nova sobre o erro "Processamento interrompido antes da conclusão" (timeout de 10min do servidor em execuções manuais grandes).
+- Cobertura: `apps/processamentos/tests_retentativa_erro_pontual.py` (14 testes novos), `apps/processamentos/tests_rotina_automatica_agentes.py` (+5 testes do heartbeat), `apps/integracoes/tests_gemini_thinking_budget.py` e `apps/processamentos/tests_thinking_budget.py` (+13 testes). Suite completa (218 testes), `manage.py check` e `makemigrations --check --dry-run` OK.
+
+---
+
 ## [1.5.22] — 2026-08-20
 
 ### Adicionado

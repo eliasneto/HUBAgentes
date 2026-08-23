@@ -133,6 +133,17 @@ class ConfiguracaoGeral(models.Model):
     # proxima checagem do worker (ou respeita rotina_automatica_inicio_em,
     # se configurado).
     rotina_automatica_proxima_execucao_em = models.DateTimeField(null=True, blank=True)
+    # Calculado automaticamente (nao editavel) — atualizado a CADA vez que o
+    # comando executar_rotinas_automaticas_agentes roda (chamado pelo worker
+    # a cada ~5min via docker-compose.yml), independente do interruptor
+    # geral estar ligado ou de haver rodada elegivel agora. Sem isso, a tela
+    # Administrador > Rotina automatica nao tinha como distinguir "worker
+    # rodando mas ainda sem rodada elegivel/documento pendente" de "worker
+    # parado" — as duas situacoes deixavam o historico igualmente vazio.
+    # Caso real: usuario deixou a rotina rodando ~3h sem nenhum documento
+    # pendente e nao tinha como confirmar que a checagem estava de fato
+    # acontecendo (21/08/2026).
+    rotina_automatica_ultima_verificacao_em = models.DateTimeField(null=True, blank=True)
     atualizado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

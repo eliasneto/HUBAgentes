@@ -3,7 +3,8 @@ import hashlib
 from pathlib import Path
 
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import models, transaction
+from django.utils import timezone
 
 from apps.agentes_ia.models import AgentDocumentExecutionMode
 from apps.integracoes.services.google_drive import (
@@ -775,7 +776,17 @@ def _arquivo_ja_processado_em_outra_execucao(
     Nunca se aplica a execucao pontual de arquivo (upload_at_execution/
     local_file nao chamam esta funcao). Pode ser ignorado marcando
     `forcar_reprocessamento` no Processamento (checkbox "Reprocessar
-    arquivos ja executados" na tela de execucao).
+    arquivos ja executados" na tela de execucao) — essa mesma valvula de
+    escape cobre o "so tenta de novo se enviado manualmente" do caso abaixo.
+
+    Alem de PROCESSADO (ja concluido com sucesso antes), tambem considera
+    "ja tratado" um arquivo cujo DocumentoEntrada mais recente de outra
+    execucao esteja em ERRO definitivo apos esgotar as retentativas
+    pontuais entre rotinas automaticas (tentativas_pontuais >= 1 — ver
+    agent_execution._marcar_documento_pendente_retentativa e
+    adotar_documentos_pendentes_de_retentativa): sem isso, a proxima
+    varredura recriaria o arquivo do zero (tentativas_pontuais=0),
+    reiniciando o contador de 2 tentativas indefinidamente.
     """
     if processamento.forcar_reprocessamento:
         return False
@@ -785,12 +796,52 @@ def _arquivo_ja_processado_em_outra_execucao(
             source_type=source_type,
             nome_arquivo=nome_arquivo,
             pasta_grupo=pasta_grupo,
-            status=DocumentStatus.PROCESSADO,
             **escopo_filtros,
         )
         .exclude(processamento_id=processamento.id)
+        .filter(
+            models.Q(status=DocumentStatus.PROCESSADO)
+            | models.Q(status=DocumentStatus.ERRO, tentativas_pontuais__gte=1)
+        )
         .exists()
     )
+
+
+def adotar_documentos_pendentes_de_retentativa(processamento, limite):
+    """Reatribui a este `processamento` os DocumentoEntrada de rodadas
+    anteriores da rotina automatica deste mesmo agente que falharam por erro
+    pontual do provedor de IA e ainda nao tiveram a 2a chance — PENDENTE com
+    tentativas_pontuais >= 1 (ver agent_execution.
+    _marcar_documento_pendente_retentativa). Isso os coloca de volta na fila
+    desta nova rodada com prioridade: por serem mais antigos (created_at),
+    _select_documentos (que ordena por created_at) os mantem na frente dos
+    arquivos novos descobertos por prepare_documentos logo em seguida.
+
+    So chamada pela rotina automatica (ver agent_execution.execute_processing
+    — so quando limite_documentos_por_execucao is not None); execucao manual
+    roda apenas o que ja esta pendente no proprio processamento, sem
+    "roubar" documentos de outras execucoes.
+
+    Retorna quantos documentos foram adotados.
+    """
+    if not limite or not processamento.agente_id:
+        return 0
+    candidatos_ids = list(
+        DocumentoEntrada.objects.filter(
+            processamento__agente_id=processamento.agente_id,
+            status=DocumentStatus.PENDENTE,
+            tentativas_pontuais__gte=1,
+        )
+        .exclude(processamento_id=processamento.id)
+        .order_by("updated_at")
+        .values_list("id", flat=True)[:limite]
+    )
+    if not candidatos_ids:
+        return 0
+    DocumentoEntrada.objects.filter(id__in=candidatos_ids).update(
+        processamento=processamento, updated_at=timezone.now()
+    )
+    return len(candidatos_ids)
 
 
 def _arquivo_ja_processado_anteriormente(processamento, nome_arquivo, pasta_grupo=""):

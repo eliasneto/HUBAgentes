@@ -204,16 +204,32 @@ def executar_rotinas_automaticas_agentes():
     duplicidade que ja existe) ou o agente ja estiver em execucao agora
     (trava de concorrencia), simplesmente nao roda nada nessa rodada — sem
     gerar processamento visivel de erro. Cada tentativa (rodou ou nao) fica
-    registrada em RotinaAutomaticaExecucao, para a tela de historico."""
+    registrada em RotinaAutomaticaExecucao, para a tela de historico.
+
+    ConfiguracaoGeral.rotina_automatica_ultima_verificacao_em e atualizado
+    a cada chamada desta funcao, mesmo sem nenhuma rodada elegivel (ou com
+    o interruptor geral desligado) — e o heartbeat exibido na tela, para
+    confirmar que o worker esta de fato checando no intervalo esperado."""
     from apps.agentes_ia.models import AgentStatus
     from apps.agentes_ia.services import montar_payload_execucao_padrao
     from apps.core.models import ConfiguracaoGeral
 
     configuracao_geral = ConfiguracaoGeral.obter()
-    if not configuracao_geral.rotina_automatica_agentes_ativa:
-        return []
 
     agora = timezone.now()
+    # Grava a CADA chamada (mesmo com o interruptor geral desligado ou sem
+    # rodada elegivel ainda) — e o unico sinal, na tela Administrador >
+    # Rotina automatica, de que o worker esta de fato vivo e chamando esse
+    # comando na frequencia esperada. Sem isso, "nada pra fazer agora" e
+    # "worker parado" ficam indistinguiveis (historico igualmente vazio nos
+    # dois casos). Update direto na tabela — nao usa configuracao_geral.save()
+    # pra nao pisar em outros campos alterados concorrentemente.
+    ConfiguracaoGeral.objects.filter(pk=configuracao_geral.pk).update(
+        rotina_automatica_ultima_verificacao_em=agora
+    )
+
+    if not configuracao_geral.rotina_automatica_agentes_ativa:
+        return []
     proxima_execucao = configuracao_geral.rotina_automatica_proxima_execucao_em
     if proxima_execucao is None:
         # Nunca rodou desde a ultima vez que essa configuracao foi salva —
@@ -334,16 +350,22 @@ def _registrar_historico_rotina(agente, *, iniciado_em, status, processamento=No
     """Persiste o resultado de uma tentativa da rotina automatica (rodou
     ou nao, quantos documentos, quantos com sucesso/erro e os motivos),
     para alimentar a tela Administrador > Rotina automatica de agentes."""
-    total_documentos = total_sucesso = total_erro = 0
+    total_documentos = total_sucesso = total_erro = total_pendente = 0
     if processamento is not None:
         contagem = processamento.documentos.aggregate(
             total=models.Count("id"),
             sucesso=models.Count("id", filter=models.Q(status=DocumentStatus.PROCESSADO)),
             erro=models.Count("id", filter=models.Q(status=DocumentStatus.ERRO)),
+            # Adiados para a proxima rotina por erro pontual do provedor de
+            # IA (ver agent_execution._marcar_documento_pendente_retentativa)
+            # — nao contam em total_erro; sem isso total_documentos -
+            # total_sucesso - total_erro ficaria > 0 sem explicacao na tela.
+            pendente=models.Count("id", filter=models.Q(status=DocumentStatus.PENDENTE)),
         )
         total_documentos = contagem["total"]
         total_sucesso = contagem["sucesso"]
         total_erro = contagem["erro"]
+        total_pendente = contagem["pendente"]
         if total_erro and not motivo:
             motivos_erro = list(
                 processamento.documentos.filter(status=DocumentStatus.ERRO)
@@ -362,6 +384,7 @@ def _registrar_historico_rotina(agente, *, iniciado_em, status, processamento=No
         total_documentos=total_documentos,
         total_sucesso=total_sucesso,
         total_erro=total_erro,
+        total_pendente=total_pendente,
         motivo=motivo,
     )
     return {
@@ -371,6 +394,7 @@ def _registrar_historico_rotina(agente, *, iniciado_em, status, processamento=No
         "total_documentos": total_documentos,
         "total_sucesso": total_sucesso,
         "total_erro": total_erro,
+        "total_pendente": total_pendente,
         "motivo": motivo,
     }
 
