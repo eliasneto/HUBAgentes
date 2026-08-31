@@ -144,6 +144,18 @@ class ConfiguracaoGeral(models.Model):
     # pendente e nao tinha como confirmar que a checagem estava de fato
     # acontecendo (21/08/2026).
     rotina_automatica_ultima_verificacao_em = models.DateTimeField(null=True, blank=True)
+    # ADR-001 Fase 2 (v2.0.0): trava GLOBAL — diferente da trava por agente
+    # (AgenteConfiguracaoOperacional.execucao_em_andamento), esta bloqueia
+    # QUALQUER execucao manual (de qualquer agente/processamento) enquanto o
+    # ciclo inteiro da rotina automatica esta rodando (nao so o agente da
+    # vez). Calculada automaticamente (nao editavel) — liga no inicio do
+    # loop de agentes de executar_rotinas_automaticas_agentes e desliga no
+    # fim (try/finally), com auto-recuperacao por
+    # LIMITE_TRAVA_ROTINA_AUTOMATICA_MINUTOS caso o worker morra no meio do
+    # ciclo (mesmo padrao da trava por agente, ver
+    # operational_execution._tentar_adquirir_trava_execucao).
+    rotina_automatica_em_execucao = models.BooleanField(default=False)
+    rotina_automatica_em_execucao_desde = models.DateTimeField(null=True, blank=True)
     # IA no assistente Biel (chat de ajuda do portal): quando ligado, uma
     # pergunta que a base de conhecimento estatica (apps.doc_system.views.
     # _KNOWLEDGE_BASE) nao sabe responder (score 0 na busca por palavra-chave,

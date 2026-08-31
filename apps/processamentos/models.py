@@ -44,6 +44,15 @@ class ProcessingStatus(models.TextChoices):
     CONCLUIDO_ERRO = "concluido_erro", "Concluido com erro"
     CONCLUIDO_ATENCAO = "concluido_atencao", "Concluido com atencao"
     CANCELADO = "cancelado", "Cancelado"
+    # ADR-001 Fase 5b (v2.0.0, regra 6): so possivel num Processamento
+    # individual (1 documento) cujo unico documento foi adiado para a
+    # proxima rotina automatica por erro pontual do provedor de IA (1a
+    # falha — ver agent_execution._marcar_documento_pendente_retentativa).
+    # Nao conta como concluido nem como erro; a proxima rotina reexecuta
+    # este MESMO Processamento (ver operational_execution.
+    # _reexecutar_processamento_pendente_retentativa) com prioridade sobre
+    # descobrir arquivos novos.
+    PENDENTE_RETENTATIVA = "pendente_retentativa", "Aguardando proxima rotina"
 
 
 class DocumentStatus(models.TextChoices):
@@ -107,6 +116,23 @@ class Processamento(SoftDeleteModel, TimestampedModel):
         blank=True,
         related_name="processamentos",
     )
+    # ADR-001 Fase 5a (v2.0.0): FK NORMAL (nao OneToOne) para a rodada da
+    # rotina automatica que criou este Processamento — substitui, so para
+    # Processamentos criados a partir desta versao, o OneToOneField legado
+    # RotinaAutomaticaExecucao.processamento (que so comporta 1 rodada = 1
+    # Processamento). O campo legado NAO e alterado nem migrado: rodadas
+    # antigas continuam usando so ele, sem qualquer migracao de dados
+    # retroativa (regra de negocio explicita — ver ADR-001, "dados
+    # legados"). A Fase 5b (1 processamento por documento) e quem vai de
+    # fato popular este campo, criando N Processamentos ligados a 1 rodada;
+    # esta fase (5a) e so o schema, sem nenhuma mudanca de comportamento.
+    rotina_automatica_execucao = models.ForeignKey(
+        "RotinaAutomaticaExecucao",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="processamentos_da_rodada",
+    )
     input_source_type = models.CharField(
         max_length=30,
         choices=ProcessingInputSourceType.choices,
@@ -149,6 +175,13 @@ class Processamento(SoftDeleteModel, TimestampedModel):
     # tiverem sido concluidos com sucesso antes. Marcado via checkbox na tela
     # de execucao — so tem efeito quando input_source_type = google_drive_folder.
     forcar_reprocessamento = models.BooleanField(default=False)
+    # ADR-001 Fase 4 (v2.0.0, regra 3): um Processamento CONCLUIDO_ERRO ganha
+    # botao "Executar" nele mesmo (ver operational_execution.
+    # reexecutar_processamento_existente) — mas so existe 1 reexecucao
+    # possivel: se ela tambem terminar em CONCLUIDO_ERRO, este campo vira
+    # True e o botao desaparece para sempre (o arquivo pode rodar de novo,
+    # mas so criando um Processamento NOVO via "Executar" no agente).
+    bloqueado_permanentemente = models.BooleanField(default=False)
     output_format = models.CharField(
         max_length=20,
         choices=ProcessingOutputFormat.choices,

@@ -39,6 +39,7 @@ from apps.agentes_ia.models import (
     AgentStatus,
     AgentType,
 )
+from apps.auditoria.models import EventoAuditoria
 from apps.integracoes.services.ai_providers import AIProviderServiceError
 from apps.integracoes.models import (
     AIProviderIntegration,
@@ -324,11 +325,28 @@ class RetentativaErroPontualEndToEndTests(TestCase):
         documento = processamento.documentos.get(nome_arquivo="falha.pdf")
         self.assertEqual(documento.status, DocumentStatus.PENDENTE)
         self.assertEqual(documento.tentativas_pontuais, 1)
-        # Nao conta como erro do lote — processamento fecha sucesso mesmo
-        # com o unico documento ainda pendente (status por documento, nao
-        # trava o processamento pai).
+        # ADR-001 Fase 5b (v2.0.0): nao conta como erro do lote, mas tambem
+        # nao fecha mais como sucesso com o documento ainda pendente por
+        # baixo (quirk anterior, ver ADR-001 pendencia 6) — ganha um status
+        # proprio, deixando explicito que este processamento aguarda a
+        # proxima rotina.
         processamento.refresh_from_db()
-        self.assertEqual(processamento.status, ProcessingStatus.CONCLUIDO_SUCESSO)
+        self.assertEqual(processamento.status, ProcessingStatus.PENDENTE_RETENTATIVA)
+
+    def test_1a_falha_gera_evento_de_auditoria_no_log_do_processamento(self):
+        # ADR-001 Fase 3 (v2.0.0) — todo processamento tem seu proprio log.
+        processamento = self._processamento("evento-adiamento")
+        with patch(
+            "apps.processamentos.services.agent_execution._execute_document",
+            side_effect=self._levanta_erro_provedor,
+        ):
+            execute_processing(processamento, self.user, limite_documentos_por_execucao=10)
+
+        evento = EventoAuditoria.objects.get(
+            processamento=processamento,
+            acao="documento_adiado_retentativa_pontual",
+        )
+        self.assertIn("falha.pdf", evento.descricao)
 
     def test_execucao_manual_nao_adia_erro_do_provedor(self):
         processamento = self._processamento("manual")
@@ -395,7 +413,12 @@ class RetentativaErroPontualEndToEndTests(TestCase):
         self.assertEqual(novo_documento.tentativas_pontuais, 0)
         self.assertEqual(novo_documento.status, DocumentStatus.PROCESSADO)
 
-    def test_rodada_com_um_sucesso_e_um_adiado_fecha_sucesso(self):
+    def test_rodada_com_um_sucesso_e_um_adiado_fica_pendente_retentativa(self):
+        # ADR-001 Fase 5b (v2.0.0): antes desta fase, um documento adiado
+        # dentro de um lote com pelo menos 1 sucesso fechava o processamento
+        # como CONCLUIDO_SUCESSO (quirk documentado na ADR-001, pendencia
+        # 6). Agora ganha o status proprio PENDENTE_RETENTATIVA, mesmo com
+        # outro documento ja PROCESSADO.
         (self.base_path / "sucesso.pdf").write_bytes(b"pdf")
         processamento = self._processamento("misto")
 
@@ -415,7 +438,7 @@ class RetentativaErroPontualEndToEndTests(TestCase):
             execute_processing(processamento, self.user, limite_documentos_por_execucao=10)
 
         processamento.refresh_from_db()
-        self.assertEqual(processamento.status, ProcessingStatus.CONCLUIDO_SUCESSO)
+        self.assertEqual(processamento.status, ProcessingStatus.PENDENTE_RETENTATIVA)
         self.assertEqual(
             processamento.documentos.filter(status=DocumentStatus.PROCESSADO).count(), 1
         )

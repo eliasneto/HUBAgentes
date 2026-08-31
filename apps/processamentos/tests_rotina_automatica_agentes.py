@@ -50,17 +50,22 @@ from apps.processamentos.models import (
     OutputDocumentStatus,
     Processamento,
     ProcessingInputSourceType,
+    ProcessingStatus,
     RotinaAutomaticaExecucao,
     RotinaAutomaticaExecucaoStatus,
 )
 from apps.processamentos.services.agent_execution import execute_processing
 from apps.processamentos.services.operational_execution import (
     LIMITE_TRAVA_EXECUCAO_MINUTOS,
+    LIMITE_TRAVA_ROTINA_AUTOMATICA_MINUTOS,
     OperationalExecutionError,
     _executar_rotina_automatica_agente,
     _liberar_trava_execucao,
+    _liberar_trava_rotina_automatica_global,
     _registrar_historico_rotina,
+    _rotina_automatica_em_execucao_agora,
     _tentar_adquirir_trava_execucao,
+    _tentar_adquirir_trava_rotina_automatica_global,
     criar_e_iniciar_processamento_para_agente,
     executar_rotinas_automaticas_agentes,
 )
@@ -207,6 +212,82 @@ class CriarEIniciarProcessamentoTravaTests(TestCase):
         _, kwargs = mock_execute.call_args
         self.assertEqual(kwargs["limite_documentos_por_execucao"], 10)
 
+    # ADR-001 Fase 2 (v2.0.0) — trava global da rotina automatica bloqueando
+    # execucao manual (regra 8).
+
+    def test_bloqueia_execucao_manual_com_rotina_automatica_em_execucao(
+        self, mock_execute
+    ):
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_em_execucao = True
+        config.rotina_automatica_em_execucao_desde = timezone.now()
+        config.save(
+            update_fields=[
+                "rotina_automatica_em_execucao",
+                "rotina_automatica_em_execucao_desde",
+            ]
+        )
+
+        with self.assertRaises(OperationalExecutionError) as ctx:
+            criar_e_iniciar_processamento_para_agente(
+                agente=self.agente, actor=self.user, cleaned_data=self.cleaned_data
+            )
+
+        self.assertIn("rotina automatica esta em execucao", str(ctx.exception).lower())
+        mock_execute.assert_not_called()
+
+    def test_origem_rotina_automatica_nao_se_autobloqueia(self, mock_execute):
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_em_execucao = True
+        config.rotina_automatica_em_execucao_desde = timezone.now()
+        config.save(
+            update_fields=[
+                "rotina_automatica_em_execucao",
+                "rotina_automatica_em_execucao_desde",
+            ]
+        )
+
+        criar_e_iniciar_processamento_para_agente(
+            agente=self.agente,
+            actor=self.user,
+            cleaned_data=self.cleaned_data,
+            origem_rotina_automatica=True,
+        )
+
+        mock_execute.assert_called_once()
+
+    def test_trava_global_presa_ha_muito_tempo_nao_bloqueia_execucao_manual(
+        self, mock_execute
+    ):
+        config = ConfiguracaoGeral.obter()
+        muito_tempo_atras = timezone.now() - timedelta(
+            minutes=LIMITE_TRAVA_ROTINA_AUTOMATICA_MINUTOS + 5
+        )
+        config.rotina_automatica_em_execucao = True
+        config.rotina_automatica_em_execucao_desde = muito_tempo_atras
+        config.save(
+            update_fields=[
+                "rotina_automatica_em_execucao",
+                "rotina_automatica_em_execucao_desde",
+            ]
+        )
+
+        criar_e_iniciar_processamento_para_agente(
+            agente=self.agente, actor=self.user, cleaned_data=self.cleaned_data
+        )
+
+        mock_execute.assert_called_once()
+
+    def test_rotina_automatica_desligada_nao_bloqueia_execucao_manual(
+        self, mock_execute
+    ):
+        # rotina_automatica_em_execucao=False (default) — comportamento
+        # inalterado em relacao a antes da Fase 2.
+        criar_e_iniciar_processamento_para_agente(
+            agente=self.agente, actor=self.user, cleaned_data=self.cleaned_data
+        )
+        mock_execute.assert_called_once()
+
 
 class ExecutarRotinaAutomaticaAgenteTests(TestCase):
     def setUp(self):
@@ -289,7 +370,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
         # proxima_execucao ainda agendada).
         ConfiguracaoGeral.objects.all().delete()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_so_considera_agentes_com_rotina_ativa(self, mock_rodar):
         mock_rodar.return_value = {"agente": "x", "status": "executada"}
         _criar_agente(criado_por=self.user, execucao_automatica_ativa=False)
@@ -301,7 +382,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
 
         self.assertEqual(mock_rodar.call_count, 1)
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_interruptor_geral_desligado_nao_roda_nenhum_agente(self, mock_rodar):
         config = ConfiguracaoGeral.obter()
         config.rotina_automatica_agentes_ativa = False
@@ -313,7 +394,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
         self.assertEqual(resultados, [])
         mock_rodar.assert_not_called()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_nao_considera_quando_proxima_rodada_global_ainda_nao_chegou(self, mock_rodar):
         config = ConfiguracaoGeral.obter()
         config.rotina_automatica_proxima_execucao_em = timezone.now() + timedelta(minutes=30)
@@ -324,7 +405,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
 
         mock_rodar.assert_not_called()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_considera_quando_proxima_rodada_global_ja_passou(self, mock_rodar):
         mock_rodar.return_value = {"agente": "x", "status": "executada"}
         config = ConfiguracaoGeral.obter()
@@ -336,7 +417,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
 
         mock_rodar.assert_called_once()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_nao_considera_antes_do_horario_de_inicio_agendado(self, mock_rodar):
         # rotina_automatica_proxima_execucao_em ainda None (nunca rodou) —
         # respeita o horario de inicio configurado.
@@ -349,7 +430,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
 
         mock_rodar.assert_not_called()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_considera_quando_horario_de_inicio_agendado_ja_passou(self, mock_rodar):
         mock_rodar.return_value = {"agente": "x", "status": "executada"}
         config = ConfiguracaoGeral.obter()
@@ -361,7 +442,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
 
         mock_rodar.assert_called_once()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_horario_de_inicio_e_ignorado_apos_a_primeira_rodada(self, mock_rodar):
         # Uma vez que rotina_automatica_proxima_execucao_em ja foi
         # calculado (rodou pelo menos uma vez), o horario de inicio nao
@@ -379,7 +460,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
 
         mock_rodar.assert_called_once()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_agente_inativo_nao_e_considerado_mesmo_com_rotina_ativa(self, mock_rodar):
         agente, configuracao = _criar_agente(
             criado_por=self.user, execucao_automatica_ativa=True
@@ -391,7 +472,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
 
         mock_rodar.assert_not_called()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_reagenda_a_proxima_rodada_global_antes_de_executar(self, mock_rodar):
         mock_rodar.return_value = {"agente": "x", "status": "executada"}
         config = ConfiguracaoGeral.obter()
@@ -409,7 +490,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
             delta=3,
         )
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_intervalo_abaixo_de_30_forca_lote_de_6(self, mock_rodar):
         mock_rodar.return_value = {"agente": "x", "status": "executada"}
         config = ConfiguracaoGeral.obter()
@@ -423,7 +504,7 @@ class ExecutarRotinasAutomaticasAgentesTests(TestCase):
         _, kwargs = mock_rodar.call_args
         self.assertEqual(kwargs["lote_tamanho"], 6)
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_intervalo_de_30_ou_mais_usa_o_lote_global_configurado(self, mock_rodar):
         mock_rodar.return_value = {"agente": "x", "status": "executada"}
         config = ConfiguracaoGeral.obter()
@@ -452,7 +533,7 @@ class UltimaVerificacaoHeartbeatTests(TestCase):
         self.user = User.objects.create_user(username="dono5", password="x")
         ConfiguracaoGeral.objects.all().delete()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_atualiza_mesmo_com_interruptor_geral_desligado(self, mock_rodar):
         config = ConfiguracaoGeral.obter()
         config.rotina_automatica_agentes_ativa = False
@@ -466,7 +547,7 @@ class UltimaVerificacaoHeartbeatTests(TestCase):
         self.assertGreaterEqual(config.rotina_automatica_ultima_verificacao_em, antes)
         mock_rodar.assert_not_called()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_atualiza_mesmo_sem_rodada_elegivel_ainda(self, mock_rodar):
         config = ConfiguracaoGeral.obter()
         config.rotina_automatica_proxima_execucao_em = timezone.now() + timedelta(minutes=30)
@@ -481,7 +562,7 @@ class UltimaVerificacaoHeartbeatTests(TestCase):
         self.assertGreaterEqual(config.rotina_automatica_ultima_verificacao_em, antes)
         mock_rodar.assert_not_called()
 
-    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente")
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
     def test_atualiza_quando_roda_normalmente(self, mock_rodar):
         mock_rodar.return_value = {"agente": "x", "status": "executada"}
         _criar_agente(criado_por=self.user, execucao_automatica_ativa=True)
@@ -743,6 +824,34 @@ class RotinaAutomaticaAgentesViewTests(TestCase):
         self.assertContains(resp, agente.nome)
         self.assertContains(resp, "Nenhum PDF pendente encontrado.")
 
+    def test_pagina_lista_n_processamentos_da_rodada(self):
+        # ADR-001 Fase 5b (v2.0.0) — rodada de agente Individual liga N
+        # Processamentos via Processamento.rotina_automatica_execucao
+        # (Fase 5a), exibidos como contagem + lista expansivel.
+        agente, _ = _criar_agente(criado_por=self.admin)
+        rodada = RotinaAutomaticaExecucao.objects.create(
+            agente=agente,
+            status=RotinaAutomaticaExecucaoStatus.EXECUTADA,
+            iniciado_em=timezone.now(),
+            total_documentos=2,
+            total_sucesso=2,
+        )
+        for sufixo in ("1", "2"):
+            Processamento.objects.create(
+                codigo=f"PROC-HIST-{sufixo}",
+                iniciado_por=self.admin,
+                agente=agente,
+                input_source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+                status=ProcessingStatus.CONCLUIDO_SUCESSO,
+                rotina_automatica_execucao=rodada,
+            )
+
+        resp = self.client.get(reverse("portal_rotina_automatica"))
+
+        self.assertContains(resp, "2 processamento(s) desta rodada")
+        self.assertContains(resp, "PROC-HIST-1")
+        self.assertContains(resp, "PROC-HIST-2")
+
     def test_pagina_exibe_heartbeat_da_ultima_verificacao(self):
         # ConfiguracaoGeral.rotina_automatica_ultima_verificacao_em setado
         # (ex.: pelo worker) precisa aparecer na tela, mesmo sem nenhum
@@ -924,3 +1033,210 @@ class RotinaAutomaticaAgentesViewTests(TestCase):
         )
         config = ConfiguracaoGeral.obter()
         self.assertEqual(config.rotina_automatica_intervalo_minutos, 1440)
+
+
+class RotinaAutomaticaExecucaoSchemaFaseCincoATests(TestCase):
+    """ADR-001 Fase 5a (v2.0.0) — so schema, zero mudanca de comportamento:
+    Processamento.rotina_automatica_execucao (FK normal, nova) coexiste com
+    RotinaAutomaticaExecucao.processamento (OneToOneField legado), sem tocar
+    no legado."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="dono-schema-5a", password="x")
+        self.agente, _ = _criar_agente(criado_por=self.user)
+
+    def test_campo_novo_comeca_nulo(self):
+        processamento = Processamento.objects.create(
+            codigo="PROC-SCHEMA-5A-1",
+            iniciado_por=self.user,
+            agente=self.agente,
+            input_source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+        )
+        self.assertIsNone(processamento.rotina_automatica_execucao_id)
+
+    def test_campo_legado_continua_funcionando_sem_o_campo_novo(self):
+        # Simula uma rodada "antiga" (pre-corte de versao): so o
+        # OneToOneField legado populado, campo novo nunca tocado.
+        processamento = Processamento.objects.create(
+            codigo="PROC-SCHEMA-5A-2",
+            iniciado_por=self.user,
+            agente=self.agente,
+            input_source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+        )
+        rodada = RotinaAutomaticaExecucao.objects.create(
+            agente=self.agente,
+            processamento=processamento,
+            status=RotinaAutomaticaExecucaoStatus.EXECUTADA,
+        )
+
+        self.assertEqual(processamento.execucao_rotina_automatica_origem, rodada)
+        self.assertIsNone(processamento.rotina_automatica_execucao_id)
+
+    def test_campo_novo_liga_processamento_a_rodada_via_related_name_1_para_n(self):
+        rodada = RotinaAutomaticaExecucao.objects.create(
+            agente=self.agente, status=RotinaAutomaticaExecucaoStatus.EXECUTADA
+        )
+        p1 = Processamento.objects.create(
+            codigo="PROC-SCHEMA-5A-3",
+            iniciado_por=self.user,
+            agente=self.agente,
+            input_source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+            rotina_automatica_execucao=rodada,
+        )
+        p2 = Processamento.objects.create(
+            codigo="PROC-SCHEMA-5A-4",
+            iniciado_por=self.user,
+            agente=self.agente,
+            input_source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+            rotina_automatica_execucao=rodada,
+        )
+
+        self.assertEqual(
+            set(rodada.processamentos_da_rodada.values_list("id", flat=True)),
+            {p1.id, p2.id},
+        )
+
+    def test_apagar_rodada_no_campo_novo_nao_apaga_o_processamento(self):
+        rodada = RotinaAutomaticaExecucao.objects.create(
+            agente=self.agente, status=RotinaAutomaticaExecucaoStatus.EXECUTADA
+        )
+        processamento = Processamento.objects.create(
+            codigo="PROC-SCHEMA-5A-5",
+            iniciado_por=self.user,
+            agente=self.agente,
+            input_source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+            rotina_automatica_execucao=rodada,
+        )
+
+        rodada.delete()
+
+        processamento.refresh_from_db()
+        self.assertIsNone(processamento.rotina_automatica_execucao_id)
+
+
+class TravaGlobalRotinaAutomaticaTests(TestCase):
+    """ADR-001 Fase 2 (v2.0.0) — trava GLOBAL do ciclo da rotina automatica
+    (diferente da trava por agente, ja coberta em TravaExecucaoTests)."""
+
+    def setUp(self):
+        ConfiguracaoGeral.objects.all().delete()
+        self.config = ConfiguracaoGeral.obter()
+
+    def test_adquire_quando_livre(self):
+        self.assertTrue(_tentar_adquirir_trava_rotina_automatica_global(self.config))
+        self.config.refresh_from_db()
+        self.assertTrue(self.config.rotina_automatica_em_execucao)
+        self.assertIsNotNone(self.config.rotina_automatica_em_execucao_desde)
+
+    def test_nao_adquire_quando_ja_esta_em_andamento(self):
+        self.assertTrue(_tentar_adquirir_trava_rotina_automatica_global(self.config))
+        self.assertFalse(_tentar_adquirir_trava_rotina_automatica_global(self.config))
+
+    def test_liberar_permite_adquirir_de_novo(self):
+        _tentar_adquirir_trava_rotina_automatica_global(self.config)
+        _liberar_trava_rotina_automatica_global(self.config)
+        self.config.refresh_from_db()
+        self.assertFalse(self.config.rotina_automatica_em_execucao)
+        self.assertTrue(_tentar_adquirir_trava_rotina_automatica_global(self.config))
+
+    def test_trava_presa_ha_muito_tempo_e_liberavel_sozinha(self):
+        muito_tempo_atras = timezone.now() - timedelta(
+            minutes=LIMITE_TRAVA_ROTINA_AUTOMATICA_MINUTOS + 5
+        )
+        ConfiguracaoGeral.objects.filter(pk=self.config.pk).update(
+            rotina_automatica_em_execucao=True,
+            rotina_automatica_em_execucao_desde=muito_tempo_atras,
+        )
+        self.assertTrue(_tentar_adquirir_trava_rotina_automatica_global(self.config))
+
+    def test_trava_presa_ha_pouco_tempo_nao_e_liberavel(self):
+        recente = timezone.now() - timedelta(minutes=5)
+        ConfiguracaoGeral.objects.filter(pk=self.config.pk).update(
+            rotina_automatica_em_execucao=True,
+            rotina_automatica_em_execucao_desde=recente,
+        )
+        self.assertFalse(_tentar_adquirir_trava_rotina_automatica_global(self.config))
+
+    def test_leitura_sem_trava_nao_bloqueia(self):
+        self.assertFalse(_rotina_automatica_em_execucao_agora(self.config))
+
+    def test_leitura_com_trava_recente_bloqueia(self):
+        self.config.rotina_automatica_em_execucao = True
+        self.config.rotina_automatica_em_execucao_desde = timezone.now()
+        self.assertTrue(_rotina_automatica_em_execucao_agora(self.config))
+
+    def test_leitura_com_trava_antiga_nao_bloqueia(self):
+        # Auto-recuperacao: mesmo com o campo True no banco, uma trava
+        # presa ha mais que o limite nao deve bloquear execucao manual
+        # para sempre (risco #1 apontado na ADR-001).
+        self.config.rotina_automatica_em_execucao = True
+        self.config.rotina_automatica_em_execucao_desde = timezone.now() - timedelta(
+            minutes=LIMITE_TRAVA_ROTINA_AUTOMATICA_MINUTOS + 1
+        )
+        self.assertFalse(_rotina_automatica_em_execucao_agora(self.config))
+
+
+class ExecutarRotinasAutomaticasAgentesTravaGlobalTests(TestCase):
+    """ADR-001 Fase 2 (v2.0.0) — executar_rotinas_automaticas_agentes
+    adquire a trava global antes do loop de agentes e libera no final,
+    mesmo quando algo da errado no meio."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="dono-trava-global", password="x")
+        ConfiguracaoGeral.objects.all().delete()
+
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
+    def test_libera_a_trava_global_apos_rodar_com_sucesso(self, mock_rodar):
+        mock_rodar.return_value = {"agente": "x", "status": "executada"}
+        _criar_agente(criado_por=self.user, execucao_automatica_ativa=True)
+
+        executar_rotinas_automaticas_agentes()
+
+        config = ConfiguracaoGeral.obter()
+        self.assertFalse(config.rotina_automatica_em_execucao)
+        self.assertIsNone(config.rotina_automatica_em_execucao_desde)
+
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
+    def test_libera_a_trava_global_mesmo_com_excecao_inesperada_no_loop(self, mock_rodar):
+        mock_rodar.side_effect = RuntimeError("bug inesperado no meio do loop")
+        _criar_agente(criado_por=self.user, execucao_automatica_ativa=True)
+
+        with self.assertRaises(RuntimeError):
+            executar_rotinas_automaticas_agentes()
+
+        config = ConfiguracaoGeral.obter()
+        self.assertFalse(config.rotina_automatica_em_execucao)
+
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
+    def test_trava_global_ja_ocupada_nao_processa_nenhum_agente(self, mock_rodar):
+        _criar_agente(criado_por=self.user, execucao_automatica_ativa=True)
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_em_execucao = True
+        config.rotina_automatica_em_execucao_desde = timezone.now()
+        config.save(
+            update_fields=[
+                "rotina_automatica_em_execucao",
+                "rotina_automatica_em_execucao_desde",
+            ]
+        )
+
+        resultado = executar_rotinas_automaticas_agentes()
+
+        self.assertEqual(resultado, [])
+        mock_rodar.assert_not_called()
+
+    @patch("apps.processamentos.services.operational_execution._executar_rotina_automatica_agente_individual")
+    def test_interruptor_desligado_nao_chega_a_adquirir_a_trava_global(self, mock_rodar):
+        # Retorno antecipado (nada elegivel) nao deve nem tentar travar —
+        # so a Fase 5 do trabalho de fato (loop de agentes) precisa da
+        # trava global.
+        config = ConfiguracaoGeral.obter()
+        config.rotina_automatica_agentes_ativa = False
+        config.save(update_fields=["rotina_automatica_agentes_ativa"])
+        _criar_agente(criado_por=self.user, execucao_automatica_ativa=True)
+
+        executar_rotinas_automaticas_agentes()
+
+        config.refresh_from_db()
+        self.assertFalse(config.rotina_automatica_em_execucao)
+        mock_rodar.assert_not_called()

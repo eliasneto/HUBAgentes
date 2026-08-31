@@ -16,16 +16,31 @@ que teria sucesso se tentado de novo mais tarde.
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase
+from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
+from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
-from apps.processamentos.models import DocumentStatus, ProcessingStatus
+from apps.agentes_ia.models import AgentStatus, AgentType, AgenteIA
+from apps.integracoes.models import AIProviderIntegration, IntegrationStatus
+from apps.processamentos.models import (
+    DocumentoEntrada,
+    DocumentoSaidaProcessamento,
+    DocumentStatus,
+    ExecutionScopeType,
+    OutputDocumentStatus,
+    Processamento,
+    ProcessingInputSourceType,
+    ProcessingStatus,
+)
 from apps.processamentos.services.agent_execution import (
     LIMITE_RETENTATIVA_SOBRECARGA,
     _eh_erro_modelo_sobrecarregado,
+    _finalizar_loop_sobrecarga,
     _iniciar_retentativa_sobrecarga,
     _processar_rodada_retentativa_sobrecarga,
     _proximo_intervalo_retentativa_sobrecarga,
+    retentar_processamentos_com_sobrecarga,
 )
 from apps.processamentos.services.stalled_processing import _is_candidate
 
@@ -266,3 +281,171 @@ class IniciarRetentativaSobrecargaTests(SimpleTestCase):
             primeira_espera.total_seconds(), timedelta(minutes=2).total_seconds(), delta=2
         )
         processamento.save.assert_called_once()
+
+
+class FinalizarLoopSobrecargaComFalhaDePublicacaoTests(TestCase):
+    """_finalizar_loop_sobrecarga nao pode deixar OutputPackagingError
+    escapar: roda dentro de um transaction.atomic() sem nenhum try/except
+    ao redor mais acima (retentar_processamentos_com_sobrecarga e chamada
+    direto pelo loop do worker, ver management command
+    retentar_processamentos_sobrecarga_provedor) — uma excecao aqui reverte
+    ATE o reset de retentativa_sobrecarga_ativa, deixando o processamento
+    preso pra sempre e o worker crashando a cada rodada.
+
+    Casos reais em producao (30/08/2026): PROC-20260826130828-16738188
+    (documento com sucesso na ULTIMA tentativa, mas 3 tentativas de erro
+    antes — output_packaging.publicar_saida_final pegava a mais antiga, sem
+    arquivo) e PROC-20260826181415-4A373EE2 (nenhuma tentativa gerou
+    arquivo), ambos presos desde 26/08/2026 com o worker crashando a cada
+    5min desde entao."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="dono-sobrecarga", password="x")
+        self.ai_integration = AIProviderIntegration.objects.create(
+            nome="Integracao Sobrecarga",
+            api_key="chave-teste",
+            status=IntegrationStatus.ATIVA,
+            default_model="gemini-2.5-pro",
+        )
+        self.agente = AgenteIA.objects.create(
+            nome="Agente Sobrecarga",
+            slug="agente-sobrecarga",
+            tipo=AgentType.GENERICO,
+            ai_provider_integration=self.ai_integration,
+            status=AgentStatus.ATIVO,
+            prompt_base="prompt",
+        )
+
+    def _processamento(self, sufixo):
+        # total_documentos=1 forca o caminho de arquivo unico (nao ZIP) em
+        # _deve_empacotar_em_zip — replica o cenario real (1 documento de
+        # entrada, N registros de saida por causa das retentativas).
+        return Processamento.objects.create(
+            codigo=f"PROC-SOBRECARGA-{sufixo}",
+            iniciado_por=self.user,
+            agente=self.agente,
+            input_source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+            total_documentos=1,
+            retentativa_sobrecarga_ativa=True,
+            retentativa_sobrecarga_iniciada_em=timezone.now() - LIMITE_RETENTATIVA_SOBRECARGA,
+        )
+
+    def test_ultima_tentativa_com_sucesso_finaliza_sem_explodir(self):
+        # PROC-20260826130828-16738188: 3 tentativas de erro seguidas de 1
+        # com sucesso — o documento de entrada terminou PROCESSADO.
+        processamento = self._processamento("sucesso-na-ultima")
+        documento = DocumentoEntrada.objects.create(
+            processamento=processamento,
+            nome_arquivo="edital.pdf",
+            status=DocumentStatus.PROCESSADO,
+        )
+        for _ in range(3):
+            DocumentoSaidaProcessamento.objects.create(
+                processamento=processamento,
+                documento=documento,
+                status=OutputDocumentStatus.ERRO,
+                scope_type=ExecutionScopeType.INDIVIDUAL,
+            )
+        record_sucesso = DocumentoSaidaProcessamento(
+            processamento=processamento,
+            documento=documento,
+            status=OutputDocumentStatus.GERADO,
+            scope_type=ExecutionScopeType.INDIVIDUAL,
+        )
+        record_sucesso.arquivo.save(
+            "edital.json", ContentFile(b'{"ok": true}'), save=False
+        )
+        record_sucesso.save()
+
+        _finalizar_loop_sobrecarga(processamento, desistiu_por_timeout=True)
+
+        processamento.refresh_from_db()
+        self.assertFalse(processamento.retentativa_sobrecarga_ativa)
+        self.assertEqual(processamento.status, ProcessingStatus.CONCLUIDO_SUCESSO)
+        self.assertTrue(processamento.arquivo_saida.name)
+
+    def test_nenhuma_tentativa_com_sucesso_finaliza_como_atencao_sem_explodir(self):
+        # PROC-20260826181415-4A373EE2: todas as tentativas terminaram em
+        # erro, nenhum arquivo de saida existe — nao ha o que publicar, mas
+        # a finalizacao precisa completar (nao travar pra sempre).
+        processamento = self._processamento("todas-com-erro")
+        documento = DocumentoEntrada.objects.create(
+            processamento=processamento,
+            nome_arquivo="edital.pdf",
+            status=DocumentStatus.ERRO,
+            erro_reprocessavel=True,
+        )
+        for _ in range(2):
+            DocumentoSaidaProcessamento.objects.create(
+                processamento=processamento,
+                documento=documento,
+                status=OutputDocumentStatus.ERRO,
+                scope_type=ExecutionScopeType.INDIVIDUAL,
+            )
+
+        _finalizar_loop_sobrecarga(processamento, desistiu_por_timeout=True)
+
+        processamento.refresh_from_db()
+        self.assertFalse(processamento.retentativa_sobrecarga_ativa)
+        self.assertEqual(processamento.status, ProcessingStatus.CONCLUIDO_ATENCAO)
+        self.assertTrue(processamento.mensagem_erro)
+        self.assertFalse(processamento.arquivo_saida.name)
+
+
+class RetentarProcessamentosComSobrecargaResilienciaTests(TestCase):
+    """retentar_processamentos_com_sobrecarga e chamada direto pelo loop do
+    worker (ver management command retentar_processamentos_sobrecarga_
+    provedor), sem nenhum try/except ao redor — uma excecao nao tratada
+    numa unica rodada nao pode derrubar o comando inteiro nem bloquear a
+    rodada dos demais processamentos elegveis (o for original parava no
+    primeiro que falhasse)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="dono-resiliencia", password="x")
+        self.ai_integration = AIProviderIntegration.objects.create(
+            nome="Integracao Resiliencia",
+            api_key="chave-teste",
+            status=IntegrationStatus.ATIVA,
+            default_model="gemini-2.5-pro",
+        )
+        self.agente = AgenteIA.objects.create(
+            nome="Agente Resiliencia",
+            slug="agente-resiliencia",
+            tipo=AgentType.GENERICO,
+            ai_provider_integration=self.ai_integration,
+            status=AgentStatus.ATIVO,
+            prompt_base="prompt",
+        )
+
+    def _processamento_elegivel(self, sufixo):
+        agora = timezone.now()
+        return Processamento.objects.create(
+            codigo=f"PROC-RESILIENCIA-{sufixo}",
+            iniciado_por=self.user,
+            agente=self.agente,
+            input_source_type=ProcessingInputSourceType.LOCAL_FOLDER,
+            retentativa_sobrecarga_ativa=True,
+            retentativa_sobrecarga_iniciada_em=agora - timedelta(minutes=10),
+            retentativa_sobrecarga_proxima_em=agora - timedelta(minutes=1),
+        )
+
+    @patch("apps.processamentos.services.agent_execution._processar_rodada_retentativa_sobrecarga")
+    def test_excecao_num_processamento_nao_impede_os_demais(self, mock_processar):
+        quebrado = self._processamento_elegivel("quebrado")
+        saudavel = self._processamento_elegivel("saudavel")
+
+        def side_effect(processamento, *, agora):
+            if processamento.pk == quebrado.pk:
+                raise RuntimeError("boom")
+            return "tentando_de_novo"
+
+        mock_processar.side_effect = side_effect
+
+        resultados = retentar_processamentos_com_sobrecarga()
+
+        codigos_processados = {r["codigo"] for r in resultados}
+        self.assertEqual(codigos_processados, {quebrado.codigo, saudavel.codigo})
+        resultado_quebrado = next(r for r in resultados if r["codigo"] == quebrado.codigo)
+        self.assertEqual(resultado_quebrado["resultado"], "erro_inesperado_na_rodada")
+        resultado_saudavel = next(r for r in resultados if r["codigo"] == saudavel.codigo)
+        self.assertEqual(resultado_saudavel["resultado"], "tentando_de_novo")

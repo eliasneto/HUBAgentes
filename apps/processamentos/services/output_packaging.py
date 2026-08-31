@@ -39,8 +39,24 @@ def publicar_saida_final(
         processamento.arquivo_saida_formato = ProcessingOutputFormat.ZIP
         return True
 
-    output_record = output_records[-1]
-    if not output_record.arquivo:
+    # Prefere o registro mais recente que TEM arquivo, em vez de pegar
+    # output_records[-1] (o mais ANTIGO, ja que DocumentoSaidaProcessamento.
+    # Meta.ordering = ["-created_at"] traz do mais novo pro mais velho) —
+    # quando um documento e retentado (ex.: loop de retentativa por
+    # sobrecarga do provedor), cada tentativa cria um novo registro; pegar
+    # o mais velho as cegas pode escolher uma tentativa que falhou (sem
+    # arquivo) mesmo com uma tentativa POSTERIOR bem-sucedida (com arquivo)
+    # na mesma lista. Caso real em producao (30/08/2026,
+    # PROC-20260826130828-16738188): documento tinha 3 tentativas com erro
+    # seguidas de 1 com sucesso, e o codigo antigo pegava a mais antiga
+    # (erro, sem arquivo) e explodia com OutputPackagingError — travando o
+    # processamento pra sempre (ver agent_execution._finalizar_loop_
+    # sobrecarga, que roda dentro de um transaction.atomic() sem try/except
+    # ao redor desta chamada: a excecao revertia ATE o reset de
+    # retentativa_sobrecarga_ativa, entao o worker recriava o mesmo erro a
+    # cada rodada, indefinidamente).
+    output_record = next((r for r in output_records if r.arquivo), None)
+    if output_record is None:
         raise OutputPackagingError(
             "A saida individual nao possui arquivo disponivel para publicacao final."
         )

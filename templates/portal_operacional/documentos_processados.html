@@ -1,0 +1,177 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentos Processados - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260831-remove-widget-1">
+</head>
+<body>
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="documentos_processados" %}
+
+    <section class="portal-main" aria-label="Documentos Processados">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">Execuções</p>
+          <h1>Documentos Processados</h1>
+        </div>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if 'success' in message.tags %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="docproc-hero">
+        <div>
+          <p class="eyebrow">Identidade por nome</p>
+          <h2>Veja cada documento e todos os processamentos em que ele apareceu.</h2>
+          <p>
+            O nome do arquivo é a identidade do documento: se um documento já foi concluído com
+            sucesso em algum processamento, ele não é processado de novo com esse mesmo nome — só
+            volta a ser elegível se for reenviado com um nome diferente. Um mesmo documento pode
+            aparecer em vários processamentos (retentativas, execuções manuais, rotina automática).
+          </p>
+        </div>
+        <div class="docproc-metrics" aria-label="Resumo dos documentos">
+          <article>
+            <strong>{{ documentos_processados.total }}</strong>
+            <span>Documentos distintos</span>
+          </article>
+          <article>
+            <strong>{{ documentos_processados.agentes_disponiveis|length }}</strong>
+            <span>Agentes envolvidos</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="docproc-filters" aria-label="Filtros">
+        <form method="get" action="" class="docproc-filter-form">
+          <div class="execution-field">
+            <label for="filtro-agente-doc">Agente</label>
+            <select id="filtro-agente-doc" name="agente">
+              <option value="">Todos os agentes</option>
+              {% for agente_id, agente_nome in documentos_processados.agentes_disponiveis %}
+                <option value="{{ agente_id }}" {% if documentos_processados.filtro_agente == agente_id|stringformat:"s" %}selected{% endif %}>
+                  {{ agente_nome }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="execution-field docproc-filter-search">
+            <label for="filtro-busca-doc">Buscar</label>
+            <input
+              id="filtro-busca-doc"
+              type="search"
+              name="busca"
+              value="{{ documentos_processados.filtro_busca }}"
+              placeholder="Buscar pelo nome do arquivo..."
+              autocomplete="off"
+            >
+          </div>
+          <button type="submit" class="start-button docproc-filter-btn">Filtrar</button>
+          {% if documentos_processados.filtro_agente or documentos_processados.filtro_busca %}
+            <a href="{% url 'portal_documentos_processados' %}" class="secondary-action docproc-filter-btn">Limpar</a>
+          {% endif %}
+        </form>
+      </section>
+
+      <section class="docproc-list" aria-label="Lista de documentos processados">
+        {% for documento in documentos_processados.documentos %}
+          <article class="docproc-card">
+            <div class="docproc-card-body">
+              <span class="docproc-nome">{{ documento.nome_arquivo }}</span>
+              <div class="docproc-badges">
+                {% if documento.pode_reprocessar %}
+                  <span class="docproc-badge docproc-badge-liberado">Pode ser reprocessado</span>
+                {% else %}
+                  <span class="docproc-badge docproc-badge-bloqueado">Já concluído — bloqueado por nome</span>
+                {% endif %}
+              </div>
+              <p class="docproc-meta">
+                <strong>{{ documento.total_processamentos }}</strong>
+                processamento{{ documento.total_processamentos|pluralize }} ·
+                Agente(s): <strong>{{ documento.agentes }}</strong> ·
+                Status mais recente: <strong>{{ documento.status_mais_recente }}</strong>
+                {% if documento.ultima_execucao_formatada %}
+                  · Última execução: <strong>{{ documento.ultima_execucao_formatada }}</strong>
+                {% endif %}
+              </p>
+            </div>
+            <div class="docproc-card-actions">
+              <a class="secondary-action docproc-ver-link" href="{{ documento.ver_processamentos_url }}">
+                Ver processamentos →
+              </a>
+            </div>
+          </article>
+        {% empty %}
+          <article class="empty-agents processing-empty">
+            <span class="empty-icon" aria-hidden="true">PX</span>
+            <p class="eyebrow">Estado vazio</p>
+            <h2>Nenhum documento processado encontrado</h2>
+            <p>
+              {% if documentos_processados.filtro_busca or documentos_processados.filtro_agente %}
+                Nenhum documento bate com o filtro atual.
+              {% else %}
+                Assim que um agente processar um documento, ele aparece aqui.
+              {% endif %}
+            </p>
+          </article>
+        {% endfor %}
+      </section>
+
+      {% if documentos_processados.total_paginas > 1 %}
+        <nav class="portal-pagination" aria-label="Paginação de documentos processados">
+          <div>
+            <span>
+              {{ documentos_processados.primeiro_item }}-{{ documentos_processados.ultimo_item }}
+              de {{ documentos_processados.total }}
+            </span>
+            <small>{{ documentos_processados.itens_por_pagina }} por pagina</small>
+          </div>
+
+          <div class="pagination-actions">
+            {% if documentos_processados.tem_pagina_anterior %}
+              <a
+                class="pagination-button"
+                href="?page={{ documentos_processados.pagina_anterior }}{% if documentos_processados.filtro_agente %}&agente={{ documentos_processados.filtro_agente }}{% endif %}{% if documentos_processados.filtro_busca %}&busca={{ documentos_processados.filtro_busca }}{% endif %}"
+                aria-label="Pagina anterior"
+                title="Pagina anterior"
+              >&lsaquo;</a>
+            {% else %}
+              <span class="pagination-button disabled" aria-hidden="true">&lsaquo;</span>
+            {% endif %}
+
+            {% for pagina in documentos_processados.paginas %}
+              {% if pagina == "..." %}
+                <span class="pagination-ellipsis">...</span>
+              {% elif pagina == documentos_processados.pagina_atual %}
+                <span class="pagination-button active" aria-current="page">{{ pagina }}</span>
+              {% else %}
+                <a class="pagination-button" href="?page={{ pagina }}{% if documentos_processados.filtro_agente %}&agente={{ documentos_processados.filtro_agente }}{% endif %}{% if documentos_processados.filtro_busca %}&busca={{ documentos_processados.filtro_busca }}{% endif %}">{{ pagina }}</a>
+              {% endif %}
+            {% endfor %}
+
+            {% if documentos_processados.tem_proxima_pagina %}
+              <a
+                class="pagination-button"
+                href="?page={{ documentos_processados.proxima_pagina }}{% if documentos_processados.filtro_agente %}&agente={{ documentos_processados.filtro_agente }}{% endif %}{% if documentos_processados.filtro_busca %}&busca={{ documentos_processados.filtro_busca }}{% endif %}"
+                aria-label="Proxima pagina"
+                title="Proxima pagina"
+              >&rsaquo;</a>
+            {% else %}
+              <span class="pagination-button disabled" aria-hidden="true">&rsaquo;</span>
+            {% endif %}
+          </div>
+        </nav>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>

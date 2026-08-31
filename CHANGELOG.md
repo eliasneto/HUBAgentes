@@ -5,6 +5,248 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [2.0.0] — Em desenvolvimento (implementação completa, aguardando commit/deploy)
+
+### Corrigido/Melhorado (encontrado testando no servidor local, 30/08/2026)
+- **Arquivo `concluido_atencao` era redescoberto e reprocessado indefinidamente**
+  (`document_sources._arquivo_ja_processado_em_outra_execucao`) — a decisão de que
+  `concluido_atencao` conta como "concluído" (29/08/2026) só tinha sido aplicada no status/botão
+  "Executar", nunca na deduplicação da descoberta. Um agente cujo único documento cai
+  repetidamente em `concluido_atencao` (ex.: provedor de IA sobrecorregado, mensagem bate em
+  `_MENSAGENS_ATENCAO`) tinha esse arquivo recriado a cada clique em "Executar", chamando a IA de
+  novo indefinidamente. Cobertura: 2 testes novos em `tests_dedup_execucao_concorrente.py`.
+- **Botão "Executar" de um Processamento não dava nenhum feedback visual durante a reexecução**
+  (`static/portal_operacional/js/processamentos.js`) — a reexecução é síncrona (só responde
+  quando termina, o que pode levar minutos se o provedor de IA estiver lento/sobrecarregado); o
+  clique era um POST de formulário comum, então a tela ficava parada sem nenhuma indicação visível
+  até a página recarregar no fim. Agora envia via AJAX, mostra "0%"/"Em processamento" assim que
+  clicado (feedback imediato) e atualiza para o estado real assim que a resposta chega,
+  reaproveitando o mesmo `applyStatus`/polling já usado pelos cards normais.
+- **Cache-busting desatualizado nos templates que servem `processamentos.js`/`agente_execucao.js`/
+  `menu_inicial.css`** (`processamentos.html`, `agentes_leitura.html`, `agente_execucao.html`,
+  `rotina_automatica.html`, `processamento_log.html`) — o `?v=...` na URL do arquivo estava
+  parado em versões de dias atrás (`20260817`, `20260820`, `20260525`), então o navegador podia
+  continuar servindo do cache uma cópia de antes de qualquer mudança desta sessão (Fases 1-5b +
+  correções de hoje), mesmo com o servidor já rodando o código novo. Confirmado direto no banco
+  que o processamento continuava avançando normalmente (um já tinha concluído com sucesso,
+  outro estava ativamente em `em_processamento` com atividade seguindos atrás) enquanto a tela
+  parecia parada — sintoma clássico de JS desatualizado no navegador. Todos os `?v=` bumped pra
+  `20260830-individual-1`.
+- **Barra de progresso ficava zerada num Processamento que já tinha terminado com erro**
+  (`selectors._calcular_percentual`) — `total_processados` só contava documentos `PROCESSADO`,
+  nunca `ERRO`, então um Processamento `CONCLUIDO_ERRO` (rodou o processo inteiro, só que o
+  resultado foi erro) calculava 0%, como se nada tivesse acontecido. Mais visível com a Fase 5b (1
+  documento por Processamento): um erro no único documento zerava a barra inteira. Agora todo
+  status terminal (`concluido_sucesso`/`concluido_erro`/`concluido_atencao`/`cancelado`) mostra
+  100% — o ciclo de execução terminou, independente do resultado por documento.
+  `pendente_retentativa` fica de fora de propósito (ainda vai rodar de novo). Cobertura: 7 testes
+  novos em `tests_percentual_processamento.py`; suíte completa (334 testes) e `manage.py check`
+  OK.
+- **Cota ZERADA do Gemini (HTTP 429 "limit: 0") era tratada como instabilidade transitória
+  genérica** (`BaseAIProviderAdapter`/`GeminiProviderAdapter`,
+  `apps/integracoes/services/ai_providers/base.py` e `gemini_adapter.py`) — investigando queixa de
+  "provedor de IA temporariamente indisponível" aparecendo em ~55% das execuções Gemini de um
+  agente local: o log técnico (`EventoAuditoria`, ação `erro_execucao_agente_documento`) mostrou
+  que 31 de 36 falhas nos últimos 30 dias eram na verdade um 429 `RESOURCE_EXHAUSTED` com
+  `"limit: 0"` no corpo — a chave de API não tem NENHUMA cota liberada para o modelo (projeto sem
+  billing habilitado), não um rate limit comum (limite > 0, só estourado no minuto/dia) que se
+  resolve sozinho com espera; a própria Gemini manda `"retryDelay": "0s"` nesse caso, confirmando
+  que não há cooldown que libere a chamada. Antes disso caía no mesmo fluxo do 429 comum (5
+  retentativas com backoff de até ~50s, sempre inúteis) e terminava com a mesma mensagem genérica
+  de "tente novamente", escondendo que o problema é de plano/billing da chave, não instabilidade do
+  provedor. Agora esse caso específico é detectado (novo hook `_eh_erro_cota_zerada`, sempre `False`
+  na base — outros provedores continuam com o 429 tratado como antes) e falha imediatamente, sem
+  gastar as 5 retentativas, com mensagem própria orientando a checar plano/billing da chave ou
+  trocar o modelo. Cobertura: `apps/integracoes/tests_cota_zerada_gemini.py` (8 testes novos);
+  suíte de `integracoes` (31 testes) e `manage.py check` OK.
+- **Worker de produção crashando a cada 5min há dias, travando 2 processamentos pra sempre**
+  (`agent_execution._finalizar_loop_sobrecarga`, `output_packaging.publicar_saida_final`) —
+  verificado via SSH em produção (30/08/2026): 2 processamentos do agente "JHS (Licitação)"
+  presos em `em_processamento` desde 26/08/2026, `retentativa_sobrecarga_ativa=True` bem além do
+  teto de 45min. Causa: `publicar_saida_final` escolhia `output_records[-1]` (o registro mais
+  ANTIGO, já que `DocumentoSaidaProcessamento.Meta.ordering` traz do mais novo pro mais velho) em
+  vez do mais recente — um documento com 3 tentativas de erro seguidas de 1 com sucesso pegava a
+  tentativa errada (sem arquivo) e explodia `OutputPackagingError`; o outro caso tinha mesmo
+  nenhuma tentativa bem-sucedida. Como essa chamada roda dentro do `transaction.atomic()` de
+  `_finalizar_loop_sobrecarga`, sem nenhum `try/except` acima (chamada direto pelo loop do worker
+  via `retentar_processamentos_sobrecarga_provedor`), a exceção revertia até o reset de
+  `retentativa_sobrecarga_ativa` — o processamento ficava preso pra sempre, e o worker crashava
+  com o MESMO erro a cada rodada (a cada 5min, confirmado no `docker logs` do servidor).
+  Corrigido em três frentes: (1) `publicar_saida_final` agora prefere o registro mais recente que
+  TEM arquivo, em vez de pegar às cegas; (2) `_finalizar_loop_sobrecarga` captura
+  `OutputPackagingError` e finaliza como `CONCLUIDO_ATENCAO` em vez de propagar; (3)
+  `retentar_processamentos_com_sobrecarga` isola cada processamento num `try/except` — uma
+  exceção não prevista em 1 processamento não bloqueia mais os demais elegíveis nem derruba o
+  comando inteiro. Cobertura: 5 testes novos (`tests_output_packaging.py`,
+  `tests_retentativa_sobrecarga_provedor.py`); suíte de
+  `processamentos`/`integracoes`/`agentes_ia`/`core`/`auditoria` (350 testes, mesmos 11 erros
+  pré-existentes e não relacionados em `tests_processamentos_individuais_por_arquivo.py`
+  confirmados antes desta mudança) e `manage.py check` OK.
+
+Versão maior (breaking change): processamento passa a ser individual por documento em vez de
+por lote, entre outras mudanças de rastreabilidade/manutenção. Plano completo em
+[`docs/adr/ADR-001_PROCESSAMENTO_INDIVIDUAL_POR_DOCUMENTO.md`](docs/adr/ADR-001_PROCESSAMENTO_INDIVIDUAL_POR_DOCUMENTO.md)
+— 6 fases, nenhuma migration destrutiva. **As 6 fases foram implementadas e testadas em
+29-30/08/2026** (327 testes, `manage.py check` OK) e estão rodando no servidor local — nada
+commitado no git nem implantado em produção ainda.
+
+### Alterado
+- **Card do Processamento mostra o nome do arquivo direto, sem exigir clique, quando é 1
+  documento** (`templates/portal_operacional/processamentos.html`) — a pedido do usuário: "como
+  agora é um arquivo por processamento, quero que retire essa opção e coloque o nome do arquivo no
+  processamento". O botão retrátil "Ver tokens por documento (N)" só fazia sentido quando um
+  processamento agrupava vários arquivos; desde a Fase 5b do ADR-001, o modo Individual (a maioria
+  dos agentes) já é 1 Processamento = 1 documento, então esconder o único nome atrás de um clique
+  era atrito sem necessidade. Agora, quando há exatamente 1 documento, o nome do arquivo (com
+  status, tokens e link de download) aparece direto no card; processamentos com vários documentos
+  (modo Grupo único/Lote por pasta) continuam com o "Ver tokens por documento (N)" retrátil, sem
+  mudança — confirmado com Playwright em ambos os casos reais do banco local (1 documento e 11
+  documentos). `data-tokens-panel`/`data-tokens-list` continuam presentes nos dois formatos: o
+  polling ao vivo de `processamentos.js` não precisou de nenhuma mudança. `manage.py check` OK.
+
+### Removido
+- **Indicador global de "processamento ativo" na barra lateral** (widget flutuante que aparecia em
+  qualquer tela do portal mostrando nome do documento/agente e barra de progresso, atualizado a
+  cada 8s via `/processamentos/ativos/`) — removido a pedido do usuário (avaliação visual: "ta
+  muito feito"). Removidos `templates/portal_operacional/_portal_sidebar.html` (markup + script de
+  polling) e as ~20 regras `.processamento-ativo-*` em `menu_inicial.css`. O acompanhamento de
+  progresso continua disponível normalmente na tela Processamentos; o endpoint
+  `portal_processamentos_ativos`/`ProcessamentosAtivosView` foi mantido (não tinha outro
+  consumidor, mas não há necessidade de remover a view/URL agora). `manage.py check` OK; validado
+  visualmente com Playwright (widget ausente do DOM, sem erro no console, rodapé da sidebar
+  continua ancorado embaixo normalmente).
+
+### Corrigido
+- **Clicar em qualquer toggle/campo perto da borda do scroll interno "arrancava" a tela inteira,
+  ficando tudo azul e sem reação** (`static/portal_operacional/css/menu_inicial.css`, regra base
+  de `body`) — reproduzido com Playwright a partir da queixa "botão que liga a IA do Biel em
+  Configurações Gerais: ao clicar, a tela fica toda azul e não acontece nada". Causa raiz: o
+  `<body>` tinha só `overflow: hidden` para nunca rolar (só `.portal-sidebar`/`.portal-main`
+  deveriam rolar, cada um com seu próprio `overflow-y: auto`) — mas `overflow: hidden` sozinho não
+  impede 100% dos casos: ao clicar num checkbox/label perto da borda do scroll interno, o
+  navegador move o foco pra ele e, nativamente, rola o elemento focado pra dentro da área visível
+  ("scroll to focused element") — esse comportamento nativo ignora o `overflow: hidden` do body e
+  rola o `<html>`/`<body>` mesmo assim, "arrancando" o layout de grid (`.portal-shell`) pra cima e
+  revelando só o fundo gradiente por baixo, sem nenhum erro no console. Confirmado com um clique
+  puro via coordenadas de mouse (sem nenhum auto-scroll do Playwright): `document.documentElement.
+  scrollTop` ia a 893px mesmo com `overflow: hidden`. Corrigido travando o `<body>` de verdade com
+  `position: fixed; inset: 0` — um elemento fixo não participa do fluxo de scroll do documento sob
+  nenhuma circunstância, então toda rolagem real continua isolada dentro de `.portal-sidebar`/
+  `.portal-main`, como já era a intenção. Como as páginas de documentação e "criar agente"
+  (`.agent-builder-page`) dependem do documento crescendo e rolando de verdade (arquitetura
+  diferente, `.portal-shell { height: auto }`), essa classe ganhou `position: static` de volta
+  para não quebrar — confirmado com Playwright que ambos os layouts rolam corretamente depois da
+  mudança (roda do mouse rola `.portal-main` num, rola o documento no outro, nenhum "arranca" mais
+  o body). Afeta todas as páginas do portal operacional (bug pré-existente, não introduzido nesta
+  sessão) — `?v=` de `menu_inicial.css` foi atualizado nos 30 templates que a referenciam.
+
+### Adicionado
+- **Nova tela "Documentos Processados"** (menu Operação) — 1 linha por NOME de documento
+  (identidade do documento, mesma regra já usada na descoberta de arquivos: nome igual = mesmo
+  documento, não reprocessa se já concluiu com sucesso; nome diferente = documento novo, ver
+  `document_sources._arquivo_ja_processado_em_outra_execucao`). Mostra em quantos Processamentos
+  diferentes cada nome apareceu (N processamentos para 1 documento — retentativas, execuções
+  manuais, rotina automática) e um botão "Ver processamentos" que reaproveita o filtro `?codigos=`
+  que `ProcessamentosView` já suportava (Fase 5b do ADR-001), sem precisar de UI de filtro nova.
+  Cada linha traz nome do arquivo, agente(s) envolvido(s), quantidade de processamentos, status
+  mais recente, última execução e um selo "Pode ser reprocessado" / "Já concluído — bloqueado por
+  nome" — a última tentativa com sucesso é o que conta, mesmo com tentativas com erro antes.
+  Filtros por agente e por busca no nome, paginação de 10 (mesmo padrão de Processamentos/
+  Auditoria/Rotina automática). Nova página registrada em `PermissaoMenu` (chave
+  `documentos_processados`, `seed_permissoes_menu`) nos grupos operador/analista/administrador.
+  Implementado em `selectors.listar_documentos_processados_para_portal`, `DocumentosProcessadosView`
+  (`apps/core/views.py`), template `documentos_processados.html` e CSS `.docproc-*` (visual
+  espelhado em `.audit-*`, classes próprias para não acoplar as duas telas). Cobertura: 14 testes
+  novos em `apps/processamentos/tests_documentos_processados.py`; suíte completa de
+  `processamentos`/`integracoes`/`agentes_ia`/`core`/`auditoria`/`usuarios`/`custos` (364 testes,
+  mesmos 11 erros pré-existentes e não relacionados em
+  `tests_processamentos_individuais_por_arquivo.py`), `manage.py check` e
+  `makemigrations --check --dry-run` OK.
+- **Fase 1 — Edição de agente bloqueada durante execução** (`apps/agentes_ia/services.
+  agente_bloqueado_por_execucao`, `AgentePortalUpdateView.dispatch`,
+  `templates/portal_operacional/agentes_leitura.html`) — enquanto um agente tem uma execução em
+  andamento (mesmo campo/janela de auto-recuperação da trava de concorrência já existente,
+  `execucao_em_andamento`/`LIMITE_TRAVA_EXECUCAO_MINUTOS`), o botão "Editar" aparece
+  desabilitado na tela de gerenciamento e o formulário de edição redireciona com aviso mesmo se
+  acessado diretamente pela URL — evita salvar prompt/configuração novos no meio de um
+  processamento que já congelou o comportamento antigo em snapshot. Cobre só o formulário de
+  edição no portal operacional; "Excluir" e o Django admin (`/admin/`) não entram nessa regra
+  (decisão explícita, ver ADR-001). Cobertura: `apps/core/
+  tests_agente_edicao_bloqueada_em_execucao.py` (7 testes); suíte completa de
+  `processamentos`/`agentes_ia`/`core` (227 testes) e `manage.py check` OK.
+- **Fase 2 — Trava global bloqueando execução manual durante a rotina automática**
+  (`ConfiguracaoGeral.rotina_automatica_em_execucao`/`..._desde`,
+  `operational_execution._tentar_adquirir_trava_rotina_automatica_global`) — diferente da trava
+  por agente já existente, esta bloqueia **qualquer** execução manual (de qualquer agente) durante
+  todo o ciclo da rotina automática, não só o agente da vez. Liga no início do loop de agentes de
+  `executar_rotinas_automaticas_agentes` e desliga no fim (`try`/`finally`), com auto-recuperação
+  própria de 60 minutos caso o worker morra no meio do ciclo — janela maior que a trava por agente
+  (20min) porque um ciclo processa vários agentes em sequência. A própria rotina automática não se
+  autobloqueia (`origem_rotina_automatica=True`). Mensagem amigável ao usuário via
+  `OperationalExecutionError` (mesmo caminho já usado pela trava por agente). Cobertura: 14 testes
+  novos em `apps/processamentos/tests_rotina_automatica_agentes.py`; suíte completa de
+  `processamentos`/`agentes_ia`/`core`/`integracoes` (265 testes) e `manage.py check` OK.
+- **Fase 3 — Log próprio por processamento** (`apps/auditoria/services.registrar_evento_auditoria`,
+  `apps/auditoria/selectors.listar_eventos_do_processamento`, nova tela "Ver log" em
+  `templates/portal_operacional/processamento_log.html`, link a partir de cada linha em
+  `processamentos.html`) — reaproveita `EventoAuditoria` (já tinha FK `processamento`) em vez de
+  criar um sistema de log paralelo. Passa a registrar 6 pontos que antes não geravam nenhum
+  evento: criação do processamento, bloqueio de execução manual pela trava por agente OU pela
+  trava global da Fase 2 (só quando quem foi bloqueado é uma execução manual — a rotina
+  automática já tem seu próprio registro em `RotinaAutomaticaExecucao`, não duplicado aqui),
+  documento ignorado por duplicidade (fica no log do processamento que estava descobrindo agora,
+  não no antigo que já tratou o arquivo), início e desistência do loop de retentativa por
+  sobrecarga do provedor de IA. Cobertura: 12 testes novos em `apps/processamentos/
+  tests_log_proprio_processamento.py` + 1 teste novo em `tests_retentativa_erro_pontual.py`;
+  suíte completa de `processamentos`/`agentes_ia`/`core`/`integracoes`/`auditoria` (278 testes) e
+  `manage.py check` OK.
+- **Fase 4 — Reexecutar o mesmo processamento + trava permanente**
+  (`Processamento.bloqueado_permanentemente`, `operational_execution.
+  reexecutar_processamento_existente`, novo botão "Executar" em cada linha de
+  `processamentos.html` para processamentos `concluido_erro`) — diferente do fluxo manual de
+  sempre (que cria um Processamento novo), reexecuta o **mesmo** Processamento. Só existe 1
+  reexecução possível: se ela também terminar em erro real, o Processamento trava para sempre
+  (sem contador novo — a regra é estrutural: criação nunca trava, reexecução sempre trava se
+  falhar) e o botão some — o arquivo ainda pode rodar de novo, mas só criando um Processamento
+  novo (Executar no agente). `concluido_sucesso` e `concluido_atencao` não ganham o botão (contam
+  como "concluído"). Corrigido durante a implementação: `execute_processing` sempre re-executa a
+  descoberta e só seleciona documentos `PENDENTE` — a reexecução precisa resetar os documentos em
+  `ERRO` de volta para `PENDENTE`, e não pode cair no ramo "sem trabalho" (que soft-deletaria o
+  próprio Processamento sendo reexecutado). Refatoração: extraído `_executar_e_tratar_erros` e
+  `_validar_e_travar_para_execucao`, compartilhados entre criação e reexecução. Cobertura: 15
+  testes novos em `apps/processamentos/tests_reexecutar_processamento.py`; suíte completa (293
+  testes) e `manage.py check` OK.
+- **Fase 5a — Schema: `Processamento.rotina_automatica_execucao`** (FK normal, nova, `SET_NULL`,
+  `related_name="processamentos_da_rodada"`) — fundação para a Fase 5b (1 rodada da rotina
+  automática vai poder gerar N processamentos). O `OneToOneField` legado
+  (`RotinaAutomaticaExecucao.processamento`) não é alterado nem migrado — rodadas antigas
+  continuam usando só ele. Fase só de schema, zero mudança de comportamento. Cobertura: 4 testes
+  novos em `tests_rotina_automatica_agentes.py`; suíte completa (293 testes) e `manage.py check`
+  OK.
+- **Fase 5b (parcial) — Status `pendente_retentativa` e retentativa automática com trava
+  permanente** (`ProcessingStatus.PENDENTE_RETENTATIVA`, `operational_execution.
+  _reexecutar_processamento_pendente_retentativa`) — corrige um comportamento antigo em que um
+  Processamento com o único documento adiado (1ª falha por erro pontual do provedor de IA)
+  fechava `concluido_sucesso` mesmo sem esse documento ter sido processado de fato. Reaproveita o
+  núcleo de reexecução da Fase 4: se a 2ª tentativa também falhar (por qualquer motivo), vira
+  `concluido_erro` definitivo e o Processamento trava para sempre — igual à regra manual. Botão
+  "Executar" manual passa a também aparecer em Processamentos `pendente_retentativa`. **Esta é só
+  uma fatia da Fase 5b** — a reescrita da descoberta para criar de fato "1 Processamento por
+  arquivo" ainda não foi feita (ver ADR-001 para o que falta e um problema de granularidade de
+  trava identificado durante o design, ainda não resolvido). Cobertura: 7 testes novos em
+  `tests_pendente_retentativa_reexecucao.py`; suíte completa (304 testes) e `manage.py check` OK.
+- **Fase 5b (parcial) — Lacuna de duplicidade fechada**: encontrada testando no servidor local —
+  um arquivo com documento `pendente` dentro de um Processamento `pendente_retentativa` (aguardando
+  a próxima rotina) não era reconhecido pelo dedup (`document_sources.
+  _arquivo_ja_processado_em_outra_execucao`); um clique manual em "Executar" no MESMO agente
+  recriava o arquivo do zero, chamando a IA em paralelo à espera. Corrigido com uma nova cláusula
+  no dedup (mesma classe de correção já aplicada para o loop de sobrecarga). Duplicidade entre
+  agentes DIFERENTES lendo a mesma pasta continua permitida, de propósito. Cobertura: 4 testes
+  novos em `tests_dedup_execucao_concorrente.py`; suíte completa (308 testes) e `manage.py check`
+  OK.
+
+---
+
 ## [1.6.0] — 2026-08-23
 
 ### Adicionado

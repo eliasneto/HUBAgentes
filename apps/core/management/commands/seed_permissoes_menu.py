@@ -6,23 +6,24 @@ from apps.core.models import PermissaoMenu
 
 PAGINAS = [
     # (chave, label, descricao, ordem)
-    ("painel",              "Painel inicial",           "Dashboard com resumo do sistema",         1),
-    ("agentes",             "Agentes",                  "Lista de agentes disponíveis para uso",   2),
-    ("processamentos",      "Processamentos",           "Histórico de processamentos do usuário",  3),
-    ("gerenciar_agentes",   "Gerenciar agentes",        "Criar e editar agentes de IA",            4),
-    ("fontes_documentos",   "Fontes de documentos",     "Gerenciar pastas e fontes de entrada",    5),
-    ("integracoes",         "Integrações",              "Configurar integrações (IA, Drive, etc)", 6),
-    ("auditoria",           "Histórico e auditoria",    "Log de todas as ações do sistema",        7),
-    ("usuarios_acessos",    "Usuários e acessos",       "Gerenciar usuários do sistema",           8),
-    ("configuracao_custos", "Configuração de Custos",   "Precificação e configuração financeira",  9),
-    ("tela_login",          "Tela de Login",            "Personalizar tela de login",              10),
-    ("configuracao_geral",  "Configurações Gerais",     "Configurações gerais do sistema",         11),
-    ("rotina_automatica",   "Rotina automática",        "Liga/desliga e acompanha o historico da rotina automatica de agentes", 12),
+    ("painel",                 "Painel inicial",           "Dashboard com resumo do sistema",         1),
+    ("agentes",                "Agentes",                  "Lista de agentes disponíveis para uso",   2),
+    ("processamentos",         "Processamentos",           "Histórico de processamentos do usuário",  3),
+    ("documentos_processados", "Documentos Processados",   "Documentos ja processados e em quais processamentos cada um apareceu", 4),
+    ("gerenciar_agentes",      "Gerenciar agentes",        "Criar e editar agentes de IA",            5),
+    ("fontes_documentos",      "Fontes de documentos",     "Gerenciar pastas e fontes de entrada",    6),
+    ("integracoes",            "Integrações",              "Configurar integrações (IA, Drive, etc)", 7),
+    ("auditoria",              "Histórico e auditoria",    "Log de todas as ações do sistema",        8),
+    ("usuarios_acessos",       "Usuários e acessos",       "Gerenciar usuários do sistema",           9),
+    ("configuracao_custos",    "Configuração de Custos",   "Precificação e configuração financeira",  10),
+    ("tela_login",             "Tela de Login",            "Personalizar tela de login",              11),
+    ("configuracao_geral",     "Configurações Gerais",     "Configurações gerais do sistema",         12),
+    ("rotina_automatica",      "Rotina automática",        "Liga/desliga e acompanha o historico da rotina automatica de agentes", 13),
 ]
 
 GRUPOS = {
-    "operador":       ["painel", "agentes", "processamentos", "fontes_documentos"],
-    "analista":       ["painel", "agentes", "processamentos", "gerenciar_agentes",
+    "operador":       ["painel", "agentes", "processamentos", "documentos_processados", "fontes_documentos"],
+    "analista":       ["painel", "agentes", "processamentos", "documentos_processados", "gerenciar_agentes",
                        "fontes_documentos", "integracoes", "auditoria", "configuracao_custos"],
     "administrador":  [p[0] for p in PAGINAS],  # tudo
 }

@@ -1,3 +1,4 @@
+import re
 from urllib.parse import urlencode
 
 import base64
@@ -8,6 +9,23 @@ from .base import (
     BaseAIProviderAdapter,
     redact_url_credentials,
 )
+
+
+# Identifica um 429 de cota ZERADA (nao rate limit comum) no corpo que a
+# Gemini devolve: status "RESOURCE_EXHAUSTED" e "limit: 0" para o modelo no
+# corpo de erro. Ex. real (producao, 30/08/2026): a mensagem traz "...Quota
+# exceeded for metric: generativelanguage.googleapis.com/generate_content_
+# free_tier_requests, limit: 0, model: gemini-2.0-flash" e SO DEPOIS, no
+# campo "status" (separado, mais adiante no JSON), "RESOURCE_EXHAUSTED" —
+# por isso os dois trechos sao checados independentes de ordem, nunca com
+# um regex unico que exija "resource_exhausted" antes de "limit: 0". A
+# chave de API nao tem NENHUMA cota liberada pro modelo (projeto sem
+# billing habilitado), diferente de um rate limit comum (limite > 0, so
+# estourado no minuto/dia), que se resolve sozinho com espera. O corpo da
+# Gemini ainda manda `"retryDelay": "0s"` nesse caso, confirmando que nao
+# ha cooldown que libere a chamada — so muda com billing habilitado ou
+# trocando o modelo.
+_LIMITE_ZERO_PATTERN = re.compile(r"limit:\s*0\b", re.IGNORECASE)
 
 
 # Erro que a Gemini devolve quando thinkingBudget=0 e enviado para um modelo
@@ -352,6 +370,14 @@ class GeminiProviderAdapter(BaseAIProviderAdapter):
     def _eh_erro_thinking_budget_invalido(exc):
         mensagem = str(exc).lower()
         return any(pattern in mensagem for pattern in _THINKING_BUDGET_INVALIDO_PATTERNS)
+
+    def _eh_erro_cota_zerada(self, code, body):
+        if code != 429:
+            return False
+        normalizado = (body or "").lower()
+        if "resource_exhausted" not in normalizado:
+            return False
+        return bool(_LIMITE_ZERO_PATTERN.search(normalizado))
 
     def _extract_output_text(self, response_payload):
         texts = []

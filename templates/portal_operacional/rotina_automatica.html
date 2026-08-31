@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rotina Automática - Portal</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260820-rotina-automatica-1">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260831-remove-widget-1">
 </head>
 <body>
   <main class="portal-shell">
@@ -195,6 +195,21 @@
               {% endif %}
               {% if execucao.processamento_codigo %}
                 <small class="audit-objeto">Processamento &middot; #{{ execucao.processamento_codigo }}</small>
+              {% endif %}
+              {% if execucao.processamentos_da_rodada %}
+                <details class="processing-tokens-panel">
+                  <summary>{{ execucao.processamentos_da_rodada|length }} processamento(s) desta rodada</summary>
+                  <ul class="processing-tokens-list">
+                    {% for p in execucao.processamentos_da_rodada %}
+                      <li>
+                        <span class="processing-tokens-nome">
+                          <a href="{% url 'portal_processamento_log' p.codigo %}">{{ p.codigo }}</a>
+                          &middot; {{ p.status_label }}
+                        </span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </details>
               {% endif %}
             </div>
 

@@ -1,0 +1,133 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log do processamento {{ processamento.codigo }} - Portal</title>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260831-remove-widget-1">
+</head>
+<body>
+  <main class="portal-shell">
+    {% include "portal_operacional/_portal_sidebar.html" with active_nav="processamentos" %}
+
+    <section class="portal-main" aria-label="Log do processamento">
+      <header class="portal-topbar">
+        <div>
+          <p class="eyebrow">
+            <a href="{% url 'portal_processamentos' %}" class="processing-log-link">&lsaquo; Voltar para Processamentos</a>
+          </p>
+          <h1>Log de {{ processamento.codigo }}</h1>
+        </div>
+      </header>
+
+      {% if messages %}
+        <section class="builder-messages" aria-label="Mensagens do sistema">
+          {% for message in messages %}
+            <div class="form-alert {% if 'success' in message.tags %}form-alert-success{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="audit-hero">
+        <div>
+          <p class="eyebrow">{{ processamento.agente.nome|default:"Agente removido" }}</p>
+          <h2>Histórico de eventos deste processamento.</h2>
+          <p>
+            Cada etapa relevante desta execução — criação, bloqueios, documentos ignorados
+            por duplicidade, retentativas — fica registrada aqui, na ordem em que aconteceu.
+          </p>
+        </div>
+        <div class="audit-metrics" aria-label="Resumo dos eventos">
+          <article>
+            <strong>{{ log.total }}</strong>
+            <span>Eventos</span>
+          </article>
+          <article>
+            <strong>{{ processamento.get_status_display }}</strong>
+            <span>Status atual</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="audit-list" aria-label="Lista de eventos deste processamento">
+        {% for evento in log.eventos %}
+          <article class="audit-card">
+            <div class="audit-card-left">
+              <span class="audit-module-badge audit-module-{{ evento.modulo }}">{{ evento.modulo }}</span>
+              <span class="audit-action">{{ evento.acao }}</span>
+            </div>
+
+            <div class="audit-card-body">
+              <p class="audit-descricao">
+                {% if evento.descricao %}
+                  {{ evento.descricao }}
+                {% else %}
+                  {{ evento.objeto_tipo }}{% if evento.objeto_id %} #{{ evento.objeto_id }}{% endif %}
+                {% endif %}
+              </p>
+            </div>
+
+            <dl class="audit-card-meta">
+              <div>
+                <dt>Usuario</dt>
+                <dd>{{ evento.actor }}</dd>
+              </div>
+              <div>
+                <dt>Data</dt>
+                <dd title="{{ evento.criado_em_formatado }}">{{ evento.criado_em_formatado }}</dd>
+              </div>
+              <div>
+                <dt>Tempo</dt>
+                <dd>{{ evento.tempo_relativo }}</dd>
+              </div>
+            </dl>
+          </article>
+        {% empty %}
+          <article class="empty-agents">
+            <span class="empty-icon" aria-hidden="true">LG</span>
+            <p class="eyebrow">Estado vazio</p>
+            <h2>Nenhum evento registrado ainda</h2>
+            <p>Os eventos deste processamento aparecerão aqui conforme forem registrados.</p>
+          </article>
+        {% endfor %}
+      </section>
+
+      {% if log.total_paginas > 1 %}
+        <nav class="portal-pagination" aria-label="Paginação de eventos">
+          <div>
+            <span>{{ log.primeiro_item }}-{{ log.ultimo_item }} de {{ log.total }}</span>
+            <small>{{ log.itens_por_pagina }} por pagina</small>
+          </div>
+
+          <div class="pagination-actions">
+            {% if log.tem_pagina_anterior %}
+              <a class="pagination-button" href="?page={{ log.pagina_anterior }}" aria-label="Pagina anterior">&lsaquo;</a>
+            {% else %}
+              <span class="pagination-button disabled" aria-hidden="true">&lsaquo;</span>
+            {% endif %}
+
+            {% for pagina in log.paginas %}
+              {% if pagina == "..." %}
+                <span class="pagination-ellipsis">...</span>
+              {% elif pagina == log.pagina_atual %}
+                <span class="pagination-button active" aria-current="page">{{ pagina }}</span>
+              {% else %}
+                <a class="pagination-button" href="?page={{ pagina }}">{{ pagina }}</a>
+              {% endif %}
+            {% endfor %}
+
+            {% if log.tem_proxima_pagina %}
+              <a class="pagination-button" href="?page={{ log.proxima_pagina }}" aria-label="Proxima pagina">&rsaquo;</a>
+            {% else %}
+              <span class="pagination-button disabled" aria-hidden="true">&rsaquo;</span>
+            {% endif %}
+          </div>
+        </nav>
+      {% endif %}
+
+    </section>
+  </main>
+</body>
+</html>

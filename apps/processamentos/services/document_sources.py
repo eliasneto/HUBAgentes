@@ -28,6 +28,7 @@ from apps.processamentos.models import (
     DocumentoEntrada,
     DocumentStatus,
     ProcessingInputSourceType,
+    ProcessingStatus,
 )
 
 
@@ -895,10 +896,37 @@ def _arquivo_ja_processado_em_outra_execucao(
     ou estoura o teto) ou termina com sucesso, retentativa_sobrecarga_ativa
     vira False e o arquivo volta a poder ser redescoberto normalmente, como
     qualquer outro erro transitorio sem retentativa em andamento.
+
+    ADR-001 Fase 5b (v2.0.0) — lacuna encontrada e fechada em 30/08/2026:
+    tambem considera "ja tratado" (nao recria) um arquivo cujo
+    DocumentoEntrada de outra execucao esteja PENDENTE enquanto aquele
+    Processamento estiver com status PENDENTE_RETENTATIVA (aguardando a
+    proxima rotina automatica — ver ProcessingStatus.PENDENTE_RETENTATIVA e
+    agent_execution._marcar_documento_pendente_retentativa). Sem isso, um
+    clique manual em "Executar" no MESMO agente enquanto um arquivo dele
+    esta nesse estado recriava um DocumentoEntrada novo (a trava por agente
+    ja tinha sido liberada, entao passava pela trava — so a descoberta nao
+    reconhecia o arquivo como ja em espera em outro lugar), chamando a IA
+    de novo em paralelo a espera — mesma classe de duplicacao ja corrigida
+    para o loop de sobrecarga acima. Nao se aplica entre agentes diferentes
+    (mesmo lendo a mesma pasta) — duplicidade continua por agente, de
+    proposito: dois agentes podem legitimamente processar o mesmo arquivo
+    fisico para finalidades diferentes.
+
+    Lacuna adicional encontrada e fechada em 30/08/2026, testando no
+    servidor local: um arquivo cujo Processamento terminou
+    CONCLUIDO_ATENCAO tambem nao era reconhecido como "ja tratado" — a
+    decisao do usuario (29/08/2026) foi que atencao conta como concluido
+    (bloqueia duplicidade, sem botao Executar), mas isso so tinha sido
+    aplicado no status/botao, nunca na deduplicacao da descoberta. Sem
+    isso, um agente cujo unico documento fica repetidamente CONCLUIDO_
+    ATENCAO (ex.: provedor de IA sobrecarregado, mensagem bate em
+    _MENSAGENS_ATENCAO) tinha esse arquivo redescoberto — e reprocessado,
+    chamando a IA de novo — a cada clique em "Executar", indefinidamente.
     """
     if processamento.forcar_reprocessamento:
         return False
-    return (
+    duplicado = (
         DocumentoEntrada.objects.filter(
             processamento__agente_id=processamento.agente_id,
             source_type=source_type,
@@ -909,15 +937,49 @@ def _arquivo_ja_processado_em_outra_execucao(
         .exclude(processamento_id=processamento.id)
         .filter(
             models.Q(status=DocumentStatus.PROCESSADO)
+            | models.Q(processamento__status=ProcessingStatus.CONCLUIDO_ATENCAO)
             | models.Q(status=DocumentStatus.ERRO, tentativas_pontuais__gte=1)
             | models.Q(
                 status=DocumentStatus.ERRO,
                 erro_reprocessavel=True,
                 processamento__retentativa_sobrecarga_ativa=True,
             )
+            | models.Q(
+                status=DocumentStatus.PENDENTE,
+                processamento__status=ProcessingStatus.PENDENTE_RETENTATIVA,
+            )
         )
-        .exists()
+        .select_related("processamento")
+        .first()
     )
+    if duplicado is None:
+        return False
+
+    # ADR-001 Fase 3 (v2.0.0): registra no log do processamento ATUAL (o que
+    # esta descobrindo agora, e por isso deixa de criar este documento de
+    # novo) — nao no processamento antigo que ja tratou o arquivo.
+    from apps.auditoria.services import registrar_evento_auditoria
+
+    registrar_evento_auditoria(
+        modulo="processamentos",
+        acao="documento_ignorado_duplicidade",
+        actor=processamento.iniciado_por,
+        processamento=processamento,
+        objeto_tipo="DocumentoEntrada",
+        objeto_id=duplicado.pk,
+        descricao=(
+            f'Arquivo "{nome_arquivo}" nao foi descoberto de novo neste '
+            f"processamento: ja foi tratado no processamento "
+            f"{duplicado.processamento.codigo} (status "
+            f"{duplicado.get_status_display()})."
+        ),
+        payload={
+            "nome_arquivo": nome_arquivo,
+            "processamento_anterior_codigo": duplicado.processamento.codigo,
+            "processamento_anterior_status": duplicado.status,
+        },
+    )
+    return True
 
 
 def adotar_documentos_pendentes_de_retentativa(processamento, limite):

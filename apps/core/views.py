@@ -20,6 +20,7 @@ from apps.agentes_ia.selectors import (
     listar_agentes_para_portal,
 )
 from apps.agentes_ia.services import (
+    agente_bloqueado_por_execucao,
     montar_payload_execucao_padrao,
 )
 from apps.integracoes.selectors import (
@@ -43,8 +44,10 @@ from apps.integracoes.services.validation import (
     validate_google_drive_integration,
     validate_local_storage,
 )
+from apps.auditoria.selectors import listar_eventos_do_processamento
 from apps.processamentos.forms import AgenteExecucaoForm
 from apps.processamentos.selectors import (
+    listar_documentos_processados_para_portal,
     listar_historico_rotina_automatica,
     listar_processamentos_ativos_do_usuario,
     listar_processamentos_para_portal,
@@ -53,8 +56,11 @@ from apps.processamentos.selectors import (
 from apps.processamentos.models import Processamento, RotinaAutomaticaExecucaoStatus
 from apps.processamentos.services.operational_execution import (
     OperationalExecutionError,
+    _agente_usa_execucao_individual,
     _e_situacao_atencao,
     criar_e_iniciar_processamento_para_agente,
+    criar_e_iniciar_processamentos_individuais_para_agente,
+    reexecutar_processamento_existente,
 )
 from apps.usuarios.selectors import listar_usuarios_acessos_para_portal
 from apps.usuarios.forms import UsuarioPortalForm
@@ -385,6 +391,18 @@ class AgentePortalUpdateView(AgentePortalFormMixin, FormView):
             ),
             slug=kwargs["slug"],
         )
+        # ADR-001 Fase 1: enquanto o agente esta em execucao, a edicao fica
+        # bloqueada (evita salvar prompt/configuracao novos no meio de um
+        # processamento que ja congelou o comportamento antigo em snapshot).
+        # So o formulario de edicao no portal — Excluir e o Django admin nao
+        # entram nessa regra (decisao explicita do usuario em 29/08/2026).
+        if agente_bloqueado_por_execucao(self.agente):
+            messages.error(
+                request,
+                f"O agente \"{self.agente.nome}\" está em execução agora — "
+                "aguarde terminar para editar.",
+            )
+            return redirect("portal_agentes_gerenciar")
         return super().dispatch(request, *args, **kwargs)
 
     def get_form_kwargs(self):
@@ -538,6 +556,14 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
         cleaned_data["forcar_reprocessamento"] = getattr(
             self, "_forcar_reprocessamento", False
         )
+        configuracao = getattr(self.agente, "configuracao_operacional", None)
+        if configuracao and _agente_usa_execucao_individual(configuracao):
+            # ADR-001 Fase 5b (v2.0.0, regra 1): agente em modo Individual —
+            # cada arquivo ganha seu proprio Processamento (nunca
+            # compartilhado). GRUPO_UNICO/LOTE_POR_PASTA continuam no
+            # caminho de baixo, sem nenhuma mudanca.
+            return self._executar_individual_por_arquivo(cleaned_data, is_ajax=is_ajax)
+
         try:
             processamento = criar_e_iniciar_processamento_para_agente(
                 agente=self.agente,
@@ -576,6 +602,45 @@ class AgenteExecucaoView(LoginRequiredMixin, View):
             )
         messages.success(self.request, mensagem_sucesso)
         return redirect("portal_processamentos")
+
+    def _executar_individual_por_arquivo(self, cleaned_data, is_ajax=False):
+        """ADR-001 Fase 5b (v2.0.0): 1 clique cria/roda N Processamentos (1
+        por arquivo). Diferente de criar_e_iniciar_processamento_para_agente,
+        a funcao nova nao levanta excecao por arquivo — so nas checagens de
+        pre-voo (trava, disponibilidade). Redireciona pra lista de
+        Processamentos ja filtrada pelos codigos tocados neste clique (UX
+        decidida com o usuario em 29/08/2026)."""
+        try:
+            processamentos = criar_e_iniciar_processamentos_individuais_para_agente(
+                agente=self.agente,
+                actor=self.request.user,
+                cleaned_data=cleaned_data,
+            )
+        except (OperationalExecutionError, ValueError) as exc:
+            if is_ajax:
+                return JsonResponse(self._erro_execucao_payload(exc), status=400)
+            messages.error(self.request, str(exc))
+            return redirect("portal_agentes_leitura")
+
+        if not processamentos:
+            mensagem = "Nenhum arquivo novo encontrado para processar."
+            if is_ajax:
+                return JsonResponse({"erro": mensagem, "tipo": "atencao"}, status=400)
+            messages.info(self.request, mensagem)
+            return redirect("portal_agentes_leitura")
+
+        codigos = [p.codigo for p in processamentos]
+        url_lista = reverse("portal_processamentos") + "?codigos=" + ",".join(codigos)
+
+        if is_ajax:
+            return JsonResponse({"redirect_url": url_lista})
+
+        messages.success(
+            self.request,
+            f"{len(processamentos)} processamento(s) iniciado(s) para o agente "
+            f"{self.agente.nome}.",
+        )
+        return redirect(url_lista)
 
     def _erro_execucao_payload(self, exc):
         """
@@ -1070,9 +1135,42 @@ class ProcessamentosView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # ADR-001 Fase 5b (v2.0.0): ?codigos=A,B,C — usado pelo redirect
+        # apos "Executar" num agente em modo Individual (1 Processamento
+        # por arquivo, N criados num unico clique).
+        codigos_raw = self.request.GET.get("codigos", "")
+        codigos = [c.strip() for c in codigos_raw.split(",") if c.strip()] or None
         context["processamentos"] = listar_processamentos_para_portal(
             page_number=self.request.GET.get("page"),
             per_page=10,
+            codigos=codigos,
+        )
+        return context
+
+
+class DocumentosProcessadosView(LoginRequiredMixin, TemplateView):
+    """1 linha por NOME de documento (identidade do documento — mesma
+    regra ja aplicada na descoberta: nome igual = mesmo documento, nao
+    reprocessa se ja concluiu com sucesso; nome diferente = documento
+    novo). Mostra em quantos Processamentos diferentes cada nome apareceu
+    e permite ver esses Processamentos filtrados (reaproveita ?codigos=
+    de ProcessamentosView).
+
+    LoginRequiredMixin simples (nao PagePermissionMixin), pelo mesmo
+    motivo de ProcessamentosView logo acima: a permissao de menu so
+    controla se o link aparece na barra lateral, nao bloqueia acesso
+    direto por URL — mantem o mesmo nivel de enforcement de toda pagina
+    irma do grupo "Operação"."""
+    template_name = "portal_operacional/documentos_processados.html"
+    login_url = reverse_lazy("portal_login")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["documentos_processados"] = listar_documentos_processados_para_portal(
+            page_number=self.request.GET.get("page"),
+            per_page=10,
+            filtro_busca=self.request.GET.get("busca", "").strip(),
+            filtro_agente=self.request.GET.get("agente", "").strip(),
         )
         return context
 
@@ -1577,6 +1675,69 @@ class ProcessamentoDocumentoDownloadView(LoginRequiredMixin, View):
         else:
             base = Path(source_name).stem
         return f"{base}{extension}"
+
+
+class ProcessamentoLogView(LoginRequiredMixin, TemplateView):
+    """ADR-001 Fase 3 (v2.0.0): log proprio por processamento — reaproveita
+    EventoAuditoria (ja tinha FK processamento desde antes desta fase) numa
+    tela dedicada, em vez de um arquivo baixavel."""
+
+    login_url = reverse_lazy("portal_login")
+    template_name = "portal_operacional/processamento_log.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        is_admin = user.is_superuser or user.groups.filter(name="administrador").exists()
+        filtro = {} if is_admin else {"iniciado_por": user}
+        processamento = get_object_or_404(
+            Processamento, codigo=self.kwargs["codigo"], **filtro
+        )
+        context["processamento"] = processamento
+        context["log"] = listar_eventos_do_processamento(
+            processamento,
+            page_number=self.request.GET.get("page"),
+        )
+        return context
+
+
+class ProcessamentoReexecutarView(LoginRequiredMixin, View):
+    """ADR-001 Fase 4 (v2.0.0): botao "Executar" no proprio Processamento
+    (regras 2 e 3) — reexecuta o MESMO Processamento, nao cria um novo.
+    Espelha o tratamento AJAX/nao-AJAX de AgenteExecucaoView._executar_com_
+    payload."""
+
+    login_url = reverse_lazy("portal_login")
+
+    def post(self, request, codigo):
+        is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        user = request.user
+        is_admin = user.is_superuser or user.groups.filter(name="administrador").exists()
+        filtro = {} if is_admin else {"iniciado_por": user}
+        processamento = get_object_or_404(Processamento, codigo=codigo, **filtro)
+
+        try:
+            processamento = reexecutar_processamento_existente(
+                processamento=processamento, actor=user
+            )
+        except OperationalExecutionError as exc:
+            if is_ajax:
+                return JsonResponse({"erro": str(exc)}, status=400)
+            messages.error(request, str(exc))
+            return redirect("portal_processamentos")
+
+        if is_ajax:
+            return JsonResponse(
+                {
+                    "codigo": processamento.codigo,
+                    "status_endpoint": reverse(
+                        "portal_processamento_status",
+                        kwargs={"codigo": processamento.codigo},
+                    ),
+                }
+            )
+        messages.success(request, f"Processamento {processamento.codigo} reexecutado.")
+        return redirect("portal_processamentos")
 
 
 def _proxima_data_limpeza(dia: int):

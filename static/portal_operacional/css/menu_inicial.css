@@ -27,6 +27,24 @@ body {
 body {
   min-height: 100vh;
   overflow: hidden;
+  /* position:fixed trava o body de verdade: `overflow:hidden` sozinho
+     bloqueia scroll por roda do mouse/scrollbar, mas o navegador ainda
+     rola o documento (ignorando overflow:hidden) quando um elemento que
+     recebe foco (ex.: clicar num checkbox/label) nao esta 100% visivel —
+     comportamento nativo de "scroll to focused element". Bug real
+     (30/08/2026): clicar no toggle "IA no assistente Biel" em
+     Configuracoes Gerais quando ele estava perto da borda do scroll
+     interno de .portal-main fazia o <body> (nao .portal-main) rolar
+     ~893px, revelando só o fundo gradiente por baixo do layout de grid
+     (".portal-shell") — tela "toda azul", nada visivel, sem erro no
+     console. position:fixed remove o body do fluxo de scroll do
+     documento por completo; toda rolagem real continua isolada dentro
+     de .portal-sidebar/.portal-main (overflow-y:auto), como já era a
+     intenção.
+  */
+  position: fixed;
+  inset: 0;
+  width: 100%;
   font-family: Arial, Helvetica, sans-serif;
   color: var(--text);
   background:
@@ -304,156 +322,6 @@ a {
   box-shadow: 0 0 16px rgba(0, 216, 255, 0.14);
 }
 
-/* ── Indicador global de progresso (sidebar) ── */
-.processamento-ativo-widget {
-  display: grid;
-  gap: 8px;
-  margin-top: auto;
-}
-
-.processamento-ativo-widget[hidden] {
-  display: none;
-}
-
-.processamento-ativo-list {
-  display: grid;
-  gap: 8px;
-}
-
-.processamento-ativo-item {
-  display: grid;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid rgba(0, 216, 255, 0.22);
-  border-radius: 12px;
-  background: rgba(3, 23, 58, 0.5);
-  box-shadow: inset 0 0 14px rgba(0, 216, 255, 0.06);
-}
-
-.processamento-ativo-item.is-erro {
-  border-color: rgba(255, 91, 110, 0.45);
-  box-shadow: inset 0 0 14px rgba(255, 91, 110, 0.08);
-}
-
-.processamento-ativo-item.is-atencao {
-  border-color: rgba(255, 209, 102, 0.45);
-  box-shadow: inset 0 0 14px rgba(255, 209, 102, 0.08);
-}
-
-.processamento-ativo-item.is-sucesso {
-  border-color: rgba(51, 244, 255, 0.4);
-}
-
-.processamento-ativo-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.processamento-ativo-icone {
-  flex-shrink: 0;
-  font-size: 13px;
-  line-height: 1;
-}
-
-.processamento-ativo-nome {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: #d7f8ff;
-  font-size: 12px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.processamento-ativo-fechar {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.processamento-ativo-fechar:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
-}
-
-.processamento-ativo-track {
-  width: 100%;
-  height: 5px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(2, 13, 34, 0.9);
-}
-
-.processamento-ativo-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--neon), var(--neon-2));
-  transition: width 0.5s ease;
-}
-
-.processamento-ativo-item.is-erro .processamento-ativo-fill {
-  background: var(--danger);
-}
-
-.processamento-ativo-item.is-atencao .processamento-ativo-fill {
-  background: var(--warning);
-}
-
-.processamento-ativo-rodape {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.processamento-ativo-pct {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--neon, #00d8ff);
-}
-
-.processamento-ativo-item.is-erro .processamento-ativo-pct {
-  color: var(--danger);
-}
-
-.processamento-ativo-item.is-atencao .processamento-ativo-pct {
-  color: var(--warning);
-}
-
-.processamento-ativo-mensagem {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.processamento-ativo-link {
-  flex-shrink: 0;
-  color: var(--neon-2);
-  font-size: 11px;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.processamento-ativo-link:hover {
-  text-decoration: underline;
-}
-
 .portal-main {
   min-width: 0;
   padding: 30px clamp(24px, 4vw, 54px);
@@ -461,6 +329,17 @@ a {
 }
 
 .agent-builder-page {
+  /* Cancela o position:fixed/inset da regra base de `body` (ver
+     comentario la): estas paginas (documentacao, criar agente) dependem
+     do documento/viewport crescendo com o conteudo e rolando de verdade
+     (.portal-shell aqui embaixo usa height:auto) — com body fixo, o
+     overflow-y:auto abaixo para de propagar pro viewport (quirk do CSS
+     so vale pra body em fluxo normal) e a pagina inteira trava sem
+     rolar. Confirmado com Playwright (30/08/2026): sem este position:
+     static, a roda do mouse nao rolava nem body nem o viewport aqui,
+     mesmo com scrollHeight bem maior que clientHeight.
+  */
+  position: static;
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -1798,6 +1677,37 @@ button.danger-action:hover {
   min-width: min(100%, 320px);
 }
 
+.processing-log-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--neon, #00d8ff);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  opacity: 0.82;
+}
+
+.processing-log-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+[data-processing-reexecutar-form] {
+  margin-top: 10px;
+}
+
+.processing-reexecutar-btn {
+  min-height: 32px;
+  padding: 0 14px;
+  font-size: 12px;
+}
+
+.processing-reexecutar-bloqueado {
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(232, 251, 255, 0.6);
+}
+
 .processing-progress-column {
   position: relative;
   z-index: 1;
@@ -2029,6 +1939,12 @@ button.danger-action:hover {
 
 .processing-tokens-panel[open] summary {
   border-color: rgba(0, 216, 255, 0.6);
+}
+
+/* Processamento com 1 unico documento (ADR-001 Fase 5b, modo Individual):
+   mostra a lista direto, sem o <summary> de toggle (nada pra "abrir"). */
+.processing-tokens-panel-single .processing-tokens-list {
+  margin-top: 0;
 }
 
 .processing-tokens-list {
@@ -2773,6 +2689,19 @@ button.danger-action:hover {
 .secondary-action.full {
   width: 100%;
   margin-top: 18px;
+}
+
+.secondary-action.disabled {
+  cursor: not-allowed;
+  color: rgba(232, 251, 255, 0.54);
+  border-color: rgba(158, 196, 211, 0.22);
+  background: rgba(135, 152, 168, 0.12);
+  box-shadow: none;
+}
+
+.secondary-action.disabled:hover {
+  border-color: rgba(158, 196, 211, 0.22);
+  box-shadow: none;
 }
 
 .execution-side-panel {
@@ -3806,6 +3735,211 @@ button.danger-action:hover {
   }
 
   .audit-filter-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ─── Documentos Processados (mesmo padrao visual de .audit-*, classes
+   proprias para nao acoplar as duas telas) ─── */
+
+.docproc-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 26px;
+  align-items: center;
+  margin: 28px 0;
+  padding: 28px;
+  border: 1px solid rgba(0, 216, 255, 0.24);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 88% 20%, rgba(51, 244, 255, 0.18), transparent 24%),
+    radial-gradient(circle at 10% 90%, rgba(0, 102, 255, 0.12), transparent 24%),
+    linear-gradient(135deg, rgba(4, 26, 64, 0.92), rgba(1, 9, 27, 0.82));
+  box-shadow:
+    inset 0 0 44px rgba(0, 216, 255, 0.08),
+    0 20px 52px rgba(0, 0, 0, 0.18);
+}
+
+.docproc-hero h2 {
+  max-width: 780px;
+  margin: 8px 0 10px;
+  font-size: clamp(22px, 3.5vw, 36px);
+  line-height: 1.08;
+}
+
+.docproc-hero p:last-child {
+  max-width: 700px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.docproc-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.docproc-metrics article {
+  min-height: 100px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  border: 1px solid rgba(51, 244, 255, 0.28);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(0, 216, 255, 0.18), transparent 42%),
+    rgba(3, 23, 58, 0.56);
+}
+
+.docproc-metrics strong {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.docproc-metrics span {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.docproc-filters {
+  margin-bottom: 20px;
+}
+
+.docproc-filter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.docproc-filter-form .execution-field {
+  min-width: 200px;
+}
+
+.docproc-filter-search {
+  flex: 1;
+  min-width: 240px;
+}
+
+.docproc-filter-btn {
+  height: 44px;
+  padding: 0 22px;
+  white-space: nowrap;
+  margin-top: auto;
+}
+
+.docproc-list {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 30px;
+}
+
+.docproc-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 20px;
+  border: 1px solid rgba(0, 216, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(3, 16, 44, 0.72);
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.docproc-card:hover {
+  border-color: rgba(51, 244, 255, 0.38);
+  background: rgba(4, 22, 56, 0.88);
+}
+
+.docproc-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.docproc-nome {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.docproc-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.docproc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(51, 244, 255, 0.4);
+  background: rgba(0, 216, 255, 0.1);
+  color: var(--neon-2);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  width: fit-content;
+}
+
+.docproc-badge-bloqueado {
+  border-color: rgba(61, 255, 159, 0.4);
+  background: rgba(61, 255, 159, 0.08);
+  color: #3dff9f;
+}
+
+.docproc-badge-liberado {
+  border-color: rgba(255, 209, 102, 0.4);
+  background: rgba(255, 209, 102, 0.08);
+  color: #ffd166;
+}
+
+.docproc-meta {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.docproc-meta strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.docproc-card-actions {
+  display: flex;
+  align-items: center;
+}
+
+.docproc-ver-link {
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .docproc-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .docproc-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .docproc-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .docproc-filter-form {
     flex-direction: column;
     align-items: stretch;
   }

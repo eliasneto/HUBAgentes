@@ -219,6 +219,15 @@
         _showToast(data.erro, data.tipo);
         return;
       }
+      // ADR-001 Fase 5b (v2.0.0): agentes em modo Individual criam 1
+      // Processamento por arquivo num unico clique — nao ha um so
+      // status_endpoint pra acompanhar aqui no card; o servidor manda
+      // redirect_url pra tela de Processamentos, ja filtrada pelos N
+      // criados neste clique.
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+        return;
+      }
       _startProgressTracking(cardForm, data.status_endpoint);
       _maybeAutoContinue(cardForm, data);
     } catch (err) {

@@ -180,6 +180,56 @@ class PublicarSaidaFinalTests(TestCase):
                 source_document_count=1,
             )
 
+    def test_prefere_record_com_arquivo_mesmo_nao_sendo_o_ultimo_da_lista(self):
+        # Caso real em producao (30/08/2026, PROC-20260826130828-16738188):
+        # documento com 3 tentativas de erro (sem arquivo) seguidas de 1
+        # tentativa com sucesso (com arquivo) — output_records vem do mais
+        # novo pro mais velho (DocumentoSaidaProcessamento.Meta.ordering).
+        # Antes desta correcao, output_records[-1] pegava a tentativa mais
+        # ANTIGA (a primeira, sem arquivo) e explodia mesmo com uma saida
+        # valida disponivel na lista.
+        processamento = _make_processamento()
+        record_sucesso = _make_output_record(nome="resultado.json")
+        record_sucesso.arquivo.name = "processamentos/PROC-001/saidas/resultado.json"
+        # Mais novo primeiro (com sucesso), depois as tentativas antigas com erro.
+        output_records = [
+            record_sucesso,
+            _make_output_record(com_arquivo=False),
+            _make_output_record(com_arquivo=False),
+            _make_output_record(com_arquivo=False),
+        ]
+
+        resultado = publicar_saida_final(
+            processamento=processamento,
+            output_records=output_records,
+            output_packaging_mode=AgentOutputPackagingMode.ARQUIVO_UNICO,
+            output_assembly_mode=AgentOutputAssemblyMode.UMA_SAIDA_FINAL,
+            source_document_count=1,
+        )
+
+        self.assertTrue(resultado)
+        self.assertEqual(processamento.arquivo_saida.name, record_sucesso.arquivo.name)
+
+    def test_nenhum_record_com_arquivo_ainda_levanta_erro(self):
+        # Caso real em producao (PROC-20260826181415-4A373EE2): todas as
+        # tentativas terminaram em erro, nenhuma gerou arquivo — continua
+        # sendo um erro genuino, so nao pode mais escolher "o ultimo da
+        # lista" as cegas quando existe uma tentativa bem-sucedida.
+        processamento = _make_processamento()
+        output_records = [
+            _make_output_record(com_arquivo=False),
+            _make_output_record(com_arquivo=False),
+        ]
+
+        with self.assertRaises(OutputPackagingError):
+            publicar_saida_final(
+                processamento=processamento,
+                output_records=output_records,
+                output_packaging_mode=AgentOutputPackagingMode.ARQUIVO_UNICO,
+                output_assembly_mode=AgentOutputAssemblyMode.UMA_SAIDA_FINAL,
+                source_document_count=1,
+            )
+
     @patch("apps.processamentos.services.output_packaging._render_zip")
     def test_sempre_zip_chama_render_zip(self, mock_render_zip):
         mock_render_zip.return_value = ("resultado.zip", b"zipbytes")

@@ -12,7 +12,10 @@ from apps.agentes_ia.models import (
     AgentTriggerMode,
     AgentVisibility,
 )
-from apps.agentes_ia.services import calcular_disponibilidade_agente
+from apps.agentes_ia.services import (
+    agente_bloqueado_por_execucao,
+    calcular_disponibilidade_agente,
+)
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,7 @@ class AgenteLeituraResumo:
     permite_forcar_reprocessamento: bool = False
     caminho_origem: str = ""
     inclui_subpastas: bool = False
+    bloqueado_por_execucao: bool = False
 
 
 def _label_formato_saida(config) -> str:
@@ -164,6 +168,7 @@ def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]
         permite_forcar_reprocessamento = _permite_forcar_reprocessamento(config)
         caminho_origem = _caminho_origem_pasta(config)
         inclui_subpastas = bool(config and config.include_subfolders)
+        bloqueado_por_execucao = agente_bloqueado_por_execucao(agente)
         agentes_resumo.append(
             AgenteLeituraResumo(
                 id=agente.id,
@@ -191,6 +196,7 @@ def _montar_resumos_agentes(queryset, usuario=None) -> list[AgenteLeituraResumo]
                 permite_forcar_reprocessamento=permite_forcar_reprocessamento,
                 caminho_origem=caminho_origem,
                 inclui_subpastas=inclui_subpastas,
+                bloqueado_por_execucao=bloqueado_por_execucao,
             )
         )
     return agentes_resumo

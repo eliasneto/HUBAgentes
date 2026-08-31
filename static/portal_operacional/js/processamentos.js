@@ -221,4 +221,70 @@ document.addEventListener("DOMContentLoaded", function () {
 
   pollCards();
   window.setInterval(pollCards, 8000);
+
+  // ─── Botão "Executar" no próprio Processamento (ADR-001 Fase 4) ─────────
+  // A reexecução é síncrona (o servidor só responde quando termina — pode
+  // levar minutos se o provedor de IA estiver lento/sobrecarregado). Sem
+  // feedback nenhum, o clique parecia "não fazer nada" até a página
+  // recarregar. Envia via AJAX, mostra "0%"/"Executando" imediatamente
+  // (feedback otimista) e, quando a resposta chega, busca o estado real
+  // (já finalizado, dado que é síncrono) via refreshCard — reaproveita o
+  // mesmo applyStatus usado pelo polling normal.
+  document.addEventListener("submit", async function (event) {
+    const form = event.target.closest("[data-processing-reexecutar-form]");
+    if (!form) {
+      return;
+    }
+    event.preventDefault();
+
+    const card = form.closest("[data-processing-card]");
+    const button = form.querySelector("button[type='submit']");
+    const csrfInput = form.querySelector("[name='csrfmiddlewaretoken']");
+    const csrf = csrfInput ? csrfInput.value : "";
+    const textoOriginal = button ? button.textContent : "";
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Executando…";
+    }
+    if (card) {
+      card.dataset.statusCode = "em_processamento";
+      const progressValue = card.querySelector("[data-progress-value]");
+      const progressFill = card.querySelector("[data-progress-fill]");
+      const statusLabel = card.querySelector("[data-status-label]");
+      const stageLabel = card.querySelector("[data-stage-label]");
+      if (progressValue) progressValue.textContent = "0%";
+      if (progressFill) progressFill.style.width = "0%";
+      if (statusLabel) statusLabel.textContent = "Em processamento";
+      if (stageLabel) stageLabel.textContent = "Aguardando reexecução";
+    }
+
+    try {
+      const resp = await fetch(form.action, {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest", "X-CSRFToken": csrf },
+        credentials: "same-origin",
+      });
+      let data;
+      try {
+        data = await resp.json();
+      } catch (_) {
+        data = { erro: "Resposta inesperada do servidor." };
+      }
+      if (data.erro) {
+        window.alert(data.erro);
+        return;
+      }
+      if (card) {
+        await refreshCard(card);
+      }
+    } catch (err) {
+      window.alert("Erro ao reexecutar: " + err.message);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = textoOriginal || "Executar";
+      }
+    }
+  });
 });

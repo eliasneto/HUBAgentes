@@ -260,7 +260,9 @@ class _AtividadeHeartbeat:
         return False
 
 
-def execute_processing(processamento, actor, *, limite_documentos_por_execucao=None):
+def execute_processing(
+    processamento, actor, *, limite_documentos_por_execucao=None, pular_descoberta=False
+):
     integration = (
         processamento.ai_provider_integration_snapshot
         or processamento.agente.ai_provider_integration
@@ -284,55 +286,65 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
     if not processamento.modelo_snapshot:
         processamento.modelo_snapshot = model_name
 
-    limite_novos_documentos = None
-    if limite_documentos_por_execucao is not None:
-        # So a rotina automatica (unico call site que preenche esse limite —
-        # ver operational_execution._executar_rotina_automatica_agente)
-        # readota documentos de rodadas anteriores deste agente que ficaram
-        # PENDENTE aguardando uma 2a chance apos erro pontual do provedor de
-        # IA (ver _marcar_documento_pendente_retentativa). Precisa acontecer
-        # ANTES de prepare_documentos: como eles passam a pertencer a este
-        # processamento, _select_documentos ja os inclui e, por serem mais
-        # antigos (created_at), entram na frente dos arquivos novos no corte
-        # de limite_documentos_por_execucao logo abaixo.
-        adotar_documentos_pendentes_de_retentativa(
-            processamento, limite_documentos_por_execucao
+    resultado_preparo = {}
+    if not pular_descoberta:
+        limite_novos_documentos = None
+        if limite_documentos_por_execucao is not None:
+            # So a rotina automatica (unico call site que preenche esse limite —
+            # ver operational_execution._executar_rotina_automatica_agente)
+            # readota documentos de rodadas anteriores deste agente que ficaram
+            # PENDENTE aguardando uma 2a chance apos erro pontual do provedor de
+            # IA (ver _marcar_documento_pendente_retentativa). Precisa acontecer
+            # ANTES de prepare_documentos: como eles passam a pertencer a este
+            # processamento, _select_documentos ja os inclui e, por serem mais
+            # antigos (created_at), entram na frente dos arquivos novos no corte
+            # de limite_documentos_por_execucao logo abaixo.
+            adotar_documentos_pendentes_de_retentativa(
+                processamento, limite_documentos_por_execucao
+            )
+            # Desconta os ja readotados do teto de NOVOS documentos que a
+            # descoberta pode criar (ver prepare_documentos), pra garantir que
+            # o total (readotados + novos) nunca passe de
+            # limite_documentos_por_execucao — sem isso, a descoberta criava um
+            # DocumentoEntrada pra CADA arquivo da pasta de uma vez (sem teto,
+            # exceto quando o agente le subpastas recursivamente), e so a
+            # EXECUCAO (corte abaixo) respeitava o limite da rodada: o
+            # processamento acabava "descobrindo" mais documentos do que de
+            # fato executava, sobrando pendente(s) dentro de um processamento
+            # ja concluido em vez de ficar de fora pra proxima rodada descobrir
+            # do zero. Caso real: pasta com 11 PDFs, lote=10 — processamento
+            # concluido_sucesso com 10 processados e 1 pendente esquecido dentro
+            # dele mesmo.
+            ja_existentes = processamento.documentos.count()
+            limite_novos_documentos = max(0, limite_documentos_por_execucao - ja_existentes)
+        resultado_preparo = prepare_documentos(
+            processamento, limite_novos_documentos=limite_novos_documentos
         )
-        # Desconta os ja readotados do teto de NOVOS documentos que a
-        # descoberta pode criar (ver prepare_documentos), pra garantir que
-        # o total (readotados + novos) nunca passe de
-        # limite_documentos_por_execucao — sem isso, a descoberta criava um
-        # DocumentoEntrada pra CADA arquivo da pasta de uma vez (sem teto,
-        # exceto quando o agente le subpastas recursivamente), e so a
-        # EXECUCAO (corte abaixo) respeitava o limite da rodada: o
-        # processamento acabava "descobrindo" mais documentos do que de
-        # fato executava, sobrando pendente(s) dentro de um processamento
-        # ja concluido em vez de ficar de fora pra proxima rodada descobrir
-        # do zero. Caso real: pasta com 11 PDFs, lote=10 — processamento
-        # concluido_sucesso com 10 processados e 1 pendente esquecido dentro
-        # dele mesmo.
-        ja_existentes = processamento.documentos.count()
-        limite_novos_documentos = max(0, limite_documentos_por_execucao - ja_existentes)
-    resultado_preparo = prepare_documentos(
-        processamento, limite_novos_documentos=limite_novos_documentos
-    )
-    processamento.total_documentos_ignorados = resultado_preparo.get("ignorados", 0)
-    # Sinaliza para a view/front-end que a descoberta parou antes de
-    # esgotar a pasta (limite de lote atingido — ver document_sources.
-    # _LimiteLoteTracker) e ha mais PDFs pendentes nas subpastas alem
-    # desta execucao; usado para disparar a continuacao automatica do
-    # proximo lote. So pode ser True quando o agente le subpastas
-    # recursivamente (AgenteConfiguracaoOperacional.include_subfolders).
-    processamento.atingiu_limite_lote_subpastas = resultado_preparo.get(
-        "atingiu_limite_lote", False
-    )
-    processamento.save(
-        update_fields=[
-            "total_documentos_ignorados",
-            "atingiu_limite_lote_subpastas",
-            "updated_at",
-        ]
-    )
+        processamento.total_documentos_ignorados = resultado_preparo.get("ignorados", 0)
+        # Sinaliza para a view/front-end que a descoberta parou antes de
+        # esgotar a pasta (limite de lote atingido — ver document_sources.
+        # _LimiteLoteTracker) e ha mais PDFs pendentes nas subpastas alem
+        # desta execucao; usado para disparar a continuacao automatica do
+        # proximo lote. So pode ser True quando o agente le subpastas
+        # recursivamente (AgenteConfiguracaoOperacional.include_subfolders).
+        processamento.atingiu_limite_lote_subpastas = resultado_preparo.get(
+            "atingiu_limite_lote", False
+        )
+        processamento.save(
+            update_fields=[
+                "total_documentos_ignorados",
+                "atingiu_limite_lote_subpastas",
+                "updated_at",
+            ]
+        )
+    # ADR-001 Fase 5b (v2.0.0): pular_descoberta=True (usado so pelos
+    # Processamentos individuais por arquivo, criados ja com seu unico
+    # DocumentoEntrada por criar_e_iniciar_processamentos_individuais_
+    # para_agente) evita que este execute_processing rode prepare_documentos
+    # de novo — que faria uma varredura NOVA da pasta inteira e poderia
+    # capturar outros arquivos irmaos para dentro deste Processamento que
+    # deveria ter exatamente 1 documento. So executa o que ja foi
+    # deliberadamente atribuido a este Processamento.
     documentos = list(_select_documentos(processamento))
     if limite_documentos_por_execucao is not None:
         # Rotina automatica (ver AgenteConfiguracaoOperacional.
@@ -426,6 +438,27 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
         # falharam por sobrecarga continuam ERRO+erro_reprocessavel=True,
         # elegveis para o loop.
         _iniciar_retentativa_sobrecarga(processamento)
+        # ADR-001 Fase 3 (v2.0.0): fica no log deste processamento o inicio
+        # do loop de espera — sem isso, o unico rastro visivel era
+        # etapa_atual (sobrescrito a cada rodada, sem historico). Registrado
+        # aqui (nao dentro de _iniciar_retentativa_sobrecarga) para manter
+        # aquela funcao isolada de I/O de auditoria — ela so muta o estado
+        # do processamento, propositalmente testada sem banco (ver
+        # IniciarRetentativaSobrecargaTests).
+        from apps.auditoria.services import registrar_evento_auditoria
+
+        registrar_evento_auditoria(
+            modulo="processamentos",
+            acao="retentativa_sobrecarga_iniciada",
+            actor=processamento.iniciado_por,
+            processamento=processamento,
+            objeto_tipo="Processamento",
+            objeto_id=processamento.pk,
+            descricao=(
+                f"Processamento {processamento.codigo}: modelo de IA "
+                "sobrecarregado — iniciado loop de reenvio automatico."
+            ),
+        )
         return {
             "documentos_processados": batch_result["total_success"],
             "documentos_com_erro": batch_result["total_errors"],
@@ -452,6 +485,19 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
         processamento.custo_usd = telemetry.get("custo_usd")
         processamento.custo_brl = telemetry.get("custo_brl")
         processamento.finalizado_em = finished_at
+        # ADR-001 Fase 5b (v2.0.0): pelo menos 1 documento ficou adiado
+        # para a proxima rotina automatica (erro pontual do provedor de
+        # IA, 1a falha — ver _marcar_documento_pendente_retentativa) e por
+        # isso nao entrou em total_errors nem em total_success. So possivel
+        # na rotina automatica em modo Individual (unico caminho que passa
+        # permite_adiamento_erro_pontual=True para _execute_documents_
+        # individually). Antes desta fase, isso fechava CONCLUIDO_SUCESSO
+        # mesmo com o documento ainda pendente (quirk documentado na
+        # ADR-001, pendencia 6) — agora ganha um status proprio.
+        tem_documento_pendente = (
+            not batch_result["total_errors"]
+            and processamento.documentos.filter(status=DocumentStatus.PENDENTE).exists()
+        )
         if batch_result["total_errors"]:
             from apps.processamentos.services.operational_execution import _e_situacao_atencao
             msg_erro = batch_result["last_error_message"] or "Uma ou mais execucoes terminaram com erro."
@@ -464,6 +510,10 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
             processamento.mensagem_erro_tecnico = (
                 batch_result["last_technical_error_message"]
             )
+        elif tem_documento_pendente:
+            processamento.status = ProcessingStatus.PENDENTE_RETENTATIVA
+            processamento.mensagem_erro = ""
+            processamento.mensagem_erro_tecnico = ""
         else:
             processamento.status = ProcessingStatus.CONCLUIDO_SUCESSO
             processamento.mensagem_erro = ""
@@ -473,6 +523,8 @@ def execute_processing(processamento, actor, *, limite_documentos_por_execucao=N
             etapa_atual=(
                 "Processamento concluido com erro"
                 if batch_result["total_errors"]
+                else "Aguardando proxima rotina automatica"
+                if tem_documento_pendente
                 else "Processamento concluido com sucesso"
             ),
         )
@@ -630,14 +682,64 @@ def _finalizar_loop_sobrecarga(processamento, *, desistiu_por_timeout=False):
             ),
         )
         if output_records:
-            publicar_saida_final(
-                processamento=processamento,
-                output_records=output_records,
-                output_packaging_mode=processamento.output_packaging_mode_snapshot,
-                output_assembly_mode=processamento.output_assembly_mode_snapshot,
-                source_document_count=processamento.total_documentos or len(output_records),
-            )
+            try:
+                publicar_saida_final(
+                    processamento=processamento,
+                    output_records=output_records,
+                    output_packaging_mode=processamento.output_packaging_mode_snapshot,
+                    output_assembly_mode=processamento.output_assembly_mode_snapshot,
+                    source_document_count=processamento.total_documentos or len(output_records),
+                )
+            except OutputPackagingError as exc:
+                # Nunca deixa a publicacao do arquivo final travar esta
+                # finalizacao — este metodo roda dentro do transaction.
+                # atomic() acima, entao uma excecao aqui reverteria TUDO,
+                # inclusive o reset de retentativa_sobrecarga_ativa (linha
+                # acima) e o status/mensagem ja escolhidos; o processamento
+                # ficaria preso em em_processamento pra sempre, retentando
+                # a cada rodada e batendo no MESMO erro (nada muda entre
+                # tentativas de publicacao do mesmo arquivo ja gerado).
+                # Chamador (retentar_processamentos_com_sobrecarga, worker)
+                # nao tem nenhum try/except ao redor — sem isso, a excecao
+                # tambem derrubava o comando inteiro do worker a cada
+                # rodada (a cada 5min). Caso real em producao (30/08/2026):
+                # PROC-20260826181415-4A373EE2, preso desde 26/08/2026,
+                # nenhum documento chegou a gerar arquivo (todas as
+                # tentativas terminaram em erro) — nunca teve saida
+                # possivel pra publicar. Marca atencao (nunca sucesso, o
+                # arquivo prometido nao existe) em vez de propagar.
+                processamento.status = ProcessingStatus.CONCLUIDO_ATENCAO
+                processamento.mensagem_erro = (
+                    processamento.mensagem_erro
+                    or "O processamento terminou, mas a saida final nao pode ser publicada."
+                )
+                processamento.mensagem_erro_tecnico = (
+                    processamento.mensagem_erro_tecnico or str(exc)
+                )
         processamento.save()
+
+    if desistiu_por_timeout:
+        # ADR-001 Fase 3 (v2.0.0): so a desistencia vira evento (o fim
+        # normal do loop, com ou sem erro, ja e coberto pela finalizacao
+        # padrao de execute_processing) — essa e a informacao que faltava
+        # no log pra explicar por que um processamento demorou e nao
+        # terminou com sucesso.
+        from apps.auditoria.services import registrar_evento_auditoria
+
+        registrar_evento_auditoria(
+            modulo="processamentos",
+            acao="retentativa_sobrecarga_desistiu",
+            actor=processamento.iniciado_por,
+            processamento=processamento,
+            objeto_tipo="Processamento",
+            objeto_id=processamento.pk,
+            descricao=(
+                f"Processamento {processamento.codigo}: loop de retentativa por "
+                "sobrecarga do provedor de IA desistiu apos estourar o teto de "
+                f"{int(LIMITE_RETENTATIVA_SOBRECARGA.total_seconds() // 60)} minutos."
+            ),
+            payload={"total_documentos_com_erro": total_errors},
+        )
 
 
 def _processar_rodada_retentativa_sobrecarga(processamento, *, agora):
@@ -734,7 +836,26 @@ def retentar_processamentos_com_sobrecarga():
 
     resultados = []
     for processamento in elegveis:
-        resultado = _processar_rodada_retentativa_sobrecarga(processamento, agora=agora)
+        try:
+            resultado = _processar_rodada_retentativa_sobrecarga(processamento, agora=agora)
+        except Exception:
+            # Defesa em profundidade: uma excecao nao prevista numa unica
+            # rodada NUNCA pode derrubar o comando inteiro (chamado direto
+            # pelo loop do worker, sem nenhum try/except ao redor — ver
+            # retentar_processamentos_sobrecarga_provedor.py) e bloquear a
+            # rodada de TODOS os outros processamentos elegveis desta
+            # mesma chamada (o for para no primeiro que falhar). Loga e
+            # segue pro proximo; o processamento problematico continua
+            # elegvel e tenta de novo na proxima chamada do worker. Caso
+            # real em producao (30/08/2026): um bug em _finalizar_loop_
+            # sobrecarga (ver OutputPackagingError la) crashava o comando
+            # inteiro a cada 5min havia dias.
+            logger.exception(
+                "Erro inesperado na retentativa por sobrecarga do processamento %s — "
+                "seguindo para os demais elegveis.",
+                processamento.codigo,
+            )
+            resultado = "erro_inesperado_na_rodada"
         resultados.append({"codigo": processamento.codigo, "resultado": resultado})
     return resultados
 
@@ -1004,6 +1125,29 @@ def _execute_documents_individually(
             and documento.tentativas_pontuais == 0
         ):
             _marcar_documento_pendente_retentativa(documento)
+            # ADR-001 Fase 3 (v2.0.0): fica no log do processamento a razao
+            # do adiamento — sem isso, o documento so "some" (nao vira
+            # PROCESSADO nem ERRO) sem explicacao visivel do porque ainda
+            # nao finalizou. Registrado aqui (nao dentro da funcao pura
+            # _marcar_documento_pendente_retentativa) para nao acoplar
+            # aquela funcao a I/O de auditoria — ela so reescreve
+            # status/contador, propositalmente isolada e testada sem banco
+            # (ver MarcarDocumentoPendenteRetentativaTests).
+            from apps.auditoria.services import registrar_evento_auditoria
+
+            registrar_evento_auditoria(
+                modulo="processamentos",
+                acao="documento_adiado_retentativa_pontual",
+                actor=processamento.iniciado_por,
+                processamento=processamento,
+                objeto_tipo="DocumentoEntrada",
+                objeto_id=documento.pk,
+                descricao=(
+                    f'Documento "{documento.nome_arquivo}" adiado para a proxima '
+                    "rotina automatica apos erro pontual do provedor de IA "
+                    f"(tentativa {documento.tentativas_pontuais})."
+                ),
+            )
             return
         _registrar_erro_final(resultado)
 

@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% if modo_gerenciamento_agentes %}Gerenciar agentes{% else %}Agentes{% endif %} - Portal</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260817-toast-1">
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260831-remove-widget-1">
   <style>
     .agent-folder-action input[type="file"] {
       position: absolute !important;
@@ -28,7 +28,7 @@
       white-space: nowrap !important;
     }
   </style>
-  <script src="{% static 'portal_operacional/js/agente_execucao.js' %}?v=20260817-toast-1" defer></script>
+  <script src="{% static 'portal_operacional/js/agente_execucao.js' %}?v=20260830-individual-1" defer></script>
 </head>
 <body>
   <main class="portal-shell">
@@ -131,7 +131,11 @@
             {% endif %}
             {% if modo_gerenciamento_agentes %}
               <div class="agent-actions">
-                <a class="secondary-action" href="{{ agente.editar_url }}">Editar</a>
+                {% if agente.bloqueado_por_execucao %}
+                  <span class="secondary-action disabled" aria-disabled="true" title="Agente em execução agora — aguarde terminar para editar">Editar</span>
+                {% else %}
+                  <a class="secondary-action" href="{{ agente.editar_url }}">Editar</a>
+                {% endif %}
                 <form method="post" action="{{ agente.excluir_url }}" style="display:inline" onsubmit="return confirm('Excluir o agente \'{{ agente.nome|escapejs }}\'? Esta ação não pode ser desfeita.');">
                   {% csrf_token %}
                   <button type="submit" class="secondary-action danger-action">Excluir</button>

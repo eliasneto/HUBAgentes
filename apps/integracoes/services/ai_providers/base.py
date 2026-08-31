@@ -69,6 +69,23 @@ _DOCUMENTO_GRANDE_DEMAIS = (
     "contexto maior ou divida o documento em partes menores."
 )
 
+# Mensagem para quando o 429 indica cota ZERADA (limit: 0) para o modelo no
+# projeto/chave da API — nao um rate limit comum (limite > 0, so estourado
+# no minuto/dia), que continua coberto por _PROVIDER_TEMPORARIAMENTE_
+# INDISPONIVEL acima. Retry nunca resolve sozinho aqui: o provedor nao da
+# nenhuma cota para o modelo enquanto o plano/billing nao mudar. Descoberto
+# em producao (30/08/2026): 31 das 36 falhas do provedor Gemini nos ultimos
+# 30 dias eram este caso (chave sem billing habilitado), nao instabilidade
+# real — mas a mensagem generica de "tente novamente" escondia isso e levava
+# a reexecucoes inuteis. Ver GeminiProviderAdapter._eh_erro_cota_zerada.
+_COTA_ZERADA_PROVEDOR = (
+    "A chave de API do provedor de IA nao tem cota liberada para o modelo "
+    "configurado (cota do plano atual = 0 para este modelo). Executar o "
+    "agente novamente nao vai resolver sozinho: verifique o plano/billing "
+    "da chave no painel do provedor ou troque o modelo configurado na "
+    "integracao."
+)
+
 # Trechos que identificam erro de contexto/tamanho excedido no corpo de um 400.
 # Cobre as variacoes dos provedores: Anthropic ("prompt is too long"),
 # OpenAI ("context_length_exceeded"/"maximum context length") e Gemini
@@ -173,6 +190,16 @@ class BaseAIProviderAdapter:
             f"O provedor '{self.integration.provider_type}' ainda nao suporta execucao agrupada de documentos neste backend."
         )
 
+    def _eh_erro_cota_zerada(self, code, body):
+        """True quando um 429 indica cota ZERADA (nao apenas excedida
+        momentaneamente) para o modelo/projeto da chave — condicao que
+        retry nao resolve sozinho. Generico aqui (sempre False): o formato
+        de corpo que identifica esse caso e especifico de cada provedor
+        (ex.: Gemini manda "RESOURCE_EXHAUSTED" + "limit: 0"). Provedores
+        sem deteccao especifica caem no fluxo padrao (retry normal de 429,
+        ver _RETRYABLE_HTTP_STATUS)."""
+        return False
+
     def build_url(self):
         raise NotImplementedError
 
@@ -237,13 +264,31 @@ class BaseAIProviderAdapter:
                 break
             except error.HTTPError as exc:
                 is_retryable = exc.code in _RETRYABLE_HTTP_STATUS
+                error_body = None
+                if exc.code == 429:
+                    # Le o corpo AGORA (antes de decidir se retenta) so pra
+                    # 429: e o unico caso em que "cota zerada" (retry nunca
+                    # resolve) e indistinguivel de rate limit comum (retry
+                    # resolve) sem olhar o corpo. Os outros codigos
+                    # retryable (5xx/408/etc.) seguem lendo o corpo so
+                    # depois de esgotar as tentativas, como antes.
+                    error_body = exc.read().decode("utf-8", errors="replace")
+                    if self._eh_erro_cota_zerada(exc.code, error_body):
+                        raise AIProviderServiceError(
+                            _COTA_ZERADA_PROVEDOR,
+                            technical_message=http_error_prefix.format(
+                                code=exc.code, body=error_body
+                            ),
+                            retryable=False,
+                        ) from exc
                 if is_retryable and attempt < self.max_transient_retries:
                     delay = self._retry_delay_seconds(attempt, http_error=exc)
                     self._log_retry(request_url, attempt, f"HTTP {exc.code}", delay)
                     time.sleep(delay)
                     attempt += 1
                     continue
-                error_body = exc.read().decode("utf-8", errors="replace")
+                if error_body is None:
+                    error_body = exc.read().decode("utf-8", errors="replace")
                 detalhe_tecnico = http_error_prefix.format(code=exc.code, body=error_body)
                 if is_retryable:
                     # Esgotou as retentativas e o erro era transitorio: o

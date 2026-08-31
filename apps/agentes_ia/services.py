@@ -174,6 +174,39 @@ def calcular_disponibilidade_agente(
     )
 
 
+def agente_bloqueado_por_execucao(agente) -> bool:
+    """True quando o agente tem uma execucao em andamento agora mesmo —
+    usado para desabilitar a edicao do agente enquanto ele executa (evita
+    salvar uma mudanca de prompt/configuracao no meio de um processamento
+    ja em curso, o que poderia divergir do snapshot ja congelado nele).
+
+    Reaproveita o mesmo campo e a mesma janela de auto-recuperacao da trava
+    de concorrencia por agente (`execucao_em_andamento`/
+    `LIMITE_TRAVA_EXECUCAO_MINUTOS`, em
+    `apps.processamentos.services.operational_execution`) para nao mostrar
+    um bloqueio permanente se o processo morreu no meio de uma execucao sem
+    liberar a trava. Import local porque aquele modulo ja importa deste
+    (evita import circular).
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.processamentos.services.operational_execution import (
+        LIMITE_TRAVA_EXECUCAO_MINUTOS,
+    )
+
+    configuracao = getattr(agente, "configuracao_operacional", None)
+    if not configuracao or not configuracao.execucao_em_andamento:
+        return False
+
+    desde = configuracao.execucao_em_andamento_desde
+    if desde is None:
+        return True
+    limite = timezone.now() - timedelta(minutes=LIMITE_TRAVA_EXECUCAO_MINUTOS)
+    return desde >= limite
+
+
 def obter_ou_criar_configuracao_operacional(agente):
     configuracao, _ = AgenteConfiguracaoOperacional.objects.get_or_create(
         agente=agente

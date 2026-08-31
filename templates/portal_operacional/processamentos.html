@@ -6,8 +6,8 @@
   <link rel="icon" type="image/png" href="{% static 'portal_operacional/img/hub-agentes-bot-menu.png' %}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Processamentos - Portal</title>
-  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260817-tokens-doc-1">
-  <script src="{% static 'portal_operacional/js/processamentos.js' %}?v=20260817-tokens-doc-1" defer></script>
+  <link rel="stylesheet" href="{% static 'portal_operacional/css/menu_inicial.css' %}?v=20260831-remove-widget-1">
+  <script src="{% static 'portal_operacional/js/processamentos.js' %}?v=20260830-individual-1" defer></script>
 </head>
 <body>
   <main class="portal-shell">
@@ -26,6 +26,15 @@
           {% for message in messages %}
             <div class="form-alert {% if 'success' in message.tags %}form-alert-success{% endif %}">{{ message }}</div>
           {% endfor %}
+        </section>
+      {% endif %}
+
+      {% if processamentos.filtrado_por_codigos %}
+        <section class="builder-messages" aria-label="Filtro ativo">
+          <div class="form-alert">
+            Mostrando só os processamentos criados neste clique.
+            <a href="{% url 'portal_processamentos' %}" class="processing-log-link">Ver todos</a>
+          </div>
         </section>
       {% endif %}
 
@@ -91,6 +100,7 @@
               <div class="processing-title-block">
                 <p class="processing-code">{{ processamento.codigo }}</p>
                 <h2>{{ processamento.agente }}</h2>
+                <a class="processing-log-link" href="{% url 'portal_processamento_log' processamento.codigo %}">Ver log</a>
               </div>
             </div>
             <div class="processing-progress-column">
@@ -139,6 +149,22 @@
                   <p data-error-message>{{ processamento.erro_operacional|linebreaksbr }}</p>
                 </div>
               </details>
+              {% if processamento.status_codigo == 'concluido_erro' or processamento.status_codigo == 'pendente_retentativa' %}
+                {% if processamento.bloqueado_permanentemente %}
+                  <p class="processing-reexecutar-bloqueado">
+                    Este processamento não pode mais ser executado. Execute o agente novamente para tentar este arquivo em um processamento novo.
+                  </p>
+                {% else %}
+                  <form
+                    method="post"
+                    action="{% url 'portal_processamento_executar' processamento.codigo %}"
+                    data-processing-reexecutar-form
+                  >
+                    {% csrf_token %}
+                    <button type="submit" class="secondary-action processing-reexecutar-btn">Executar</button>
+                  </form>
+                {% endif %}
+              {% endif %}
             </div>
             <dl class="processing-meta">
               <div>
@@ -184,23 +210,50 @@
                 </dd>
               </div>
             </dl>
-            <details class="processing-tokens-panel" data-tokens-panel {% if not processamento.documentos_tokens %}hidden{% endif %}>
-              <summary data-tokens-summary>Ver tokens por documento ({{ processamento.documentos_tokens|length }})</summary>
-              <ul class="processing-tokens-list" data-tokens-list>
-                {% for doc in processamento.documentos_tokens %}
-                  <li>
-                    <span class="processing-tokens-nome">{{ doc.nome_arquivo }}{% if doc.status %} — {{ doc.status }}{% endif %}</span>
-                    <span class="processing-tokens-total">{{ doc.total_tokens }}</span>
-                    {% if doc.download_url %}
-                      <a href="{{ doc.download_url }}" class="processing-tokens-download" title="Baixar este documento">⭳</a>
+            {% if processamento.documentos_tokens|length == 1 %}
+              {% with doc=processamento.documentos_tokens.0 %}
+                <!-- 1 documento = 1 processamento (ADR-001 Fase 5b, modo Individual): mostra o
+                     nome do arquivo direto no card, sem exigir clique num "Ver tokens por
+                     documento" que so fazia sentido quando um processamento podia agrupar varios
+                     arquivos (Grupo unico/Lote por pasta, que continuam usando o <details>
+                     abaixo). data-tokens-panel/data-tokens-list continuam aqui de proposito: o
+                     polling em processamentos.js atualiza esse conteudo enquanto o processamento
+                     esta em andamento, e so procura por esses atributos — a ausencia de <details>/
+                     data-tokens-summary e tratada com seguranca la (guard de null). -->
+                <div class="processing-tokens-panel processing-tokens-panel-single" data-tokens-panel>
+                  <ul class="processing-tokens-list" data-tokens-list>
+                    <li>
+                      <span class="processing-tokens-nome">{{ doc.nome_arquivo }}{% if doc.status %} — {{ doc.status }}{% endif %}</span>
+                      <span class="processing-tokens-total">{{ doc.total_tokens }}</span>
+                      {% if doc.download_url %}
+                        <a href="{{ doc.download_url }}" class="processing-tokens-download" title="Baixar este documento">⭳</a>
+                      {% endif %}
+                    </li>
+                    {% if doc.mensagem_erro %}
+                      <li class="processing-tokens-erro-msg">{{ doc.mensagem_erro }}</li>
                     {% endif %}
-                  </li>
-                  {% if doc.mensagem_erro %}
-                    <li class="processing-tokens-erro-msg">{{ doc.mensagem_erro }}</li>
-                  {% endif %}
-                {% endfor %}
-              </ul>
-            </details>
+                  </ul>
+                </div>
+              {% endwith %}
+            {% else %}
+              <details class="processing-tokens-panel" data-tokens-panel {% if not processamento.documentos_tokens %}hidden{% endif %}>
+                <summary data-tokens-summary>Ver tokens por documento ({{ processamento.documentos_tokens|length }})</summary>
+                <ul class="processing-tokens-list" data-tokens-list>
+                  {% for doc in processamento.documentos_tokens %}
+                    <li>
+                      <span class="processing-tokens-nome">{{ doc.nome_arquivo }}{% if doc.status %} — {{ doc.status }}{% endif %}</span>
+                      <span class="processing-tokens-total">{{ doc.total_tokens }}</span>
+                      {% if doc.download_url %}
+                        <a href="{{ doc.download_url }}" class="processing-tokens-download" title="Baixar este documento">⭳</a>
+                      {% endif %}
+                    </li>
+                    {% if doc.mensagem_erro %}
+                      <li class="processing-tokens-erro-msg">{{ doc.mensagem_erro }}</li>
+                    {% endif %}
+                  {% endfor %}
+                </ul>
+              </details>
+            {% endif %}
           </article>
         {% empty %}
           <article class="empty-agents processing-empty">

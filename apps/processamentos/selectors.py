@@ -2,12 +2,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from django.core.paginator import Paginator
-from django.db.models import Prefetch
+from django.db.models import Count, Max, Prefetch
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from apps.processamentos.models import (
+    DocumentoEntrada,
     DocumentStatus,
     ExecutionScopeType,
     OutputDocumentStatus,
@@ -46,6 +47,7 @@ class ProcessamentoResumo:
     codigo: str
     status: str
     status_codigo: str
+    bloqueado_permanentemente: bool
     agente: str
     origem: str
     formato_saida: str
@@ -88,6 +90,7 @@ class ProcessamentosPortalResumo:
     pagina_anterior: int | None
     proxima_pagina: int | None
     paginas: list
+    filtrado_por_codigos: bool = False
 
 
 @dataclass(frozen=True)
@@ -286,8 +289,14 @@ def listar_processamentos_para_portal(
     *,
     page_number: int | str | None = 1,
     per_page: int = 10,
+    codigos: list[str] | None = None,
 ) -> ProcessamentosPortalResumo:
-    """Retorna somente dados operacionais seguros dos processamentos."""
+    """Retorna somente dados operacionais seguros dos processamentos.
+
+    `codigos` (ADR-001 Fase 5b, v2.0.0): quando informado, mostra so os
+    Processamentos com esses codigos — usado pelo redirect apos "Executar"
+    num agente em modo Individual, que cria N Processamentos (1 por
+    arquivo) num unico clique e precisa mostrar so o lote recem-criado."""
     queryset = (
         Processamento.objects.select_related("agente")
         .prefetch_related(
@@ -302,6 +311,8 @@ def listar_processamentos_para_portal(
         )
         .order_by("-iniciado_em", "-created_at")
     )
+    if codigos:
+        queryset = queryset.filter(codigo__in=codigos)
     paginator = Paginator(queryset, per_page)
     page_obj = paginator.get_page(page_number)
     processamentos = [
@@ -309,6 +320,7 @@ def listar_processamentos_para_portal(
             codigo=processamento.codigo,
             status=processamento.get_status_display(),
             status_codigo=processamento.status,
+            bloqueado_permanentemente=processamento.bloqueado_permanentemente,
             agente=str(processamento.agente),
             origem=processamento.get_input_source_type_display(),
             formato_saida=_resolver_formato_saida_exibido(processamento),
@@ -343,6 +355,9 @@ def listar_processamentos_para_portal(
         ProcessingStatus.CRIADO,
         ProcessingStatus.EM_FILA,
         ProcessingStatus.EM_PROCESSAMENTO,
+        # ADR-001 Fase 5b (v2.0.0): aguardando a proxima rotina automatica —
+        # nao e nem "concluido" nem "com erro" ainda.
+        ProcessingStatus.PENDENTE_RETENTATIVA,
     }
 
     return ProcessamentosPortalResumo(
@@ -376,6 +391,7 @@ def listar_processamentos_para_portal(
                 on_ends=1,
             )
         ],
+        filtrado_por_codigos=bool(codigos),
     )
 
 
@@ -471,6 +487,9 @@ def listar_processamentos_ativos_do_usuario(
         ProcessingStatus.CRIADO,
         ProcessingStatus.EM_FILA,
         ProcessingStatus.EM_PROCESSAMENTO,
+        # ADR-001 Fase 5b (v2.0.0): aguardando a proxima rotina automatica —
+        # nao e nem "concluido" nem "com erro" ainda.
+        ProcessingStatus.PENDENTE_RETENTATIVA,
     }
     recem_finalizado_desde = timezone.now() - timedelta(
         minutes=PROCESSAMENTOS_ATIVOS_JANELA_MINUTOS
@@ -535,11 +554,29 @@ def _total_processados(processamento: Processamento) -> int:
     ).count()
 
 
+_STATUS_TERMINAIS_100_POR_CENTO = {
+    ProcessingStatus.CONCLUIDO_SUCESSO,
+    ProcessingStatus.CONCLUIDO_ERRO,
+    ProcessingStatus.CONCLUIDO_ATENCAO,
+    ProcessingStatus.CANCELADO,
+}
+
+
 def _calcular_percentual(processamento: Processamento) -> int:
+    if processamento.status in _STATUS_TERMINAIS_100_POR_CENTO:
+        # O ciclo deste Processamento ja terminou — 100% significa "todo o
+        # processamento que ia rodar, rodou", nao "todo documento teve
+        # sucesso". Sem isso, um Processamento individual (1 documento, ver
+        # ADR-001 Fase 5b) que terminasse em erro ficava com a barra de
+        # progresso zerada para sempre, como se nada tivesse acontecido —
+        # mesmo apos rodar o processo inteiro (relatado testando no
+        # servidor local, 30/08/2026). PENDENTE_RETENTATIVA fica de fora de
+        # proposito: ainda vai rodar de novo, 100% seria enganoso ali.
+        return 100
     total_documentos = _total_documentos(processamento)
     total_processados = _total_processados(processamento)
     if not total_documentos:
-        return 100 if processamento.status == ProcessingStatus.CONCLUIDO_SUCESSO else 0
+        return 0
     # Enquanto o documento em andamento ainda nao terminou, soma a fracao do
     # sub-progresso dele (0-100, ver Processamento.progresso_etapa_percentual
     # e agent_execution._registrar_progresso_etapa) para o indicador avancar
@@ -595,6 +632,15 @@ def _possivel_travamento(processamento: Processamento) -> bool:
 
 
 @dataclass(frozen=True)
+class ProcessamentoDaRodadaResumo:
+    """ADR-001 Fase 5b (v2.0.0): um dos N Processamentos (1 por arquivo)
+    ligados a uma rodada da rotina automatica de um agente Individual —
+    ver Processamento.rotina_automatica_execucao (FK nova da Fase 5a)."""
+    codigo: str
+    status_label: str
+
+
+@dataclass(frozen=True)
 class RotinaAutomaticaExecucaoResumo:
     id: int
     agente_nome: str
@@ -608,6 +654,7 @@ class RotinaAutomaticaExecucaoResumo:
     total_pendente: int
     motivo: str
     processamento_codigo: str
+    processamentos_da_rodada: list[ProcessamentoDaRodadaResumo]
 
 
 @dataclass(frozen=True)
@@ -639,9 +686,11 @@ def listar_historico_rotina_automatica(
     """Historico de tentativas da rotina automatica (ver
     executar_rotinas_automaticas_agentes), para a tela Administrador >
     Rotina automatica de agentes."""
-    queryset = RotinaAutomaticaExecucao.objects.select_related(
-        "agente", "processamento"
-    ).order_by("-iniciado_em")
+    queryset = (
+        RotinaAutomaticaExecucao.objects.select_related("agente", "processamento")
+        .prefetch_related("processamentos_da_rodada")
+        .order_by("-iniciado_em")
+    )
 
     if filtro_agente:
         queryset = queryset.filter(agente_id=filtro_agente)
@@ -676,6 +725,12 @@ def listar_historico_rotina_automatica(
             processamento_codigo=(
                 execucao.processamento.codigo if execucao.processamento_id else ""
             ),
+            processamentos_da_rodada=[
+                ProcessamentoDaRodadaResumo(
+                    codigo=p.codigo, status_label=p.get_status_display()
+                )
+                for p in execucao.processamentos_da_rodada.all()
+            ],
         )
         for execucao in page_obj.object_list
     ]
@@ -705,4 +760,165 @@ def listar_historico_rotina_automatica(
         agentes_disponiveis=agentes_disponiveis,
         filtro_agente=filtro_agente,
         filtro_status=filtro_status,
+    )
+
+
+@dataclass(frozen=True)
+class DocumentoProcessadoResumo:
+    """1 linha = 1 NOME de arquivo (identidade do documento — mesma regra
+    de negocio de document_sources._arquivo_ja_processado_em_outra_
+    execucao: o nome e a chave, nao o conteudo). Agrega todos os
+    Processamentos, de qualquer agente, que tiveram um DocumentoEntrada
+    com esse nome — N processamentos para 1 documento."""
+    nome_arquivo: str
+    agentes: str
+    total_processamentos: int
+    status_mais_recente: str
+    status_mais_recente_codigo: str
+    pode_reprocessar: bool
+    ultima_execucao_formatada: str
+    ver_processamentos_url: str
+
+
+@dataclass(frozen=True)
+class DocumentosProcessadosPortalResumo:
+    documentos: list[DocumentoProcessadoResumo]
+    total: int
+    pagina_atual: int
+    total_paginas: int
+    itens_por_pagina: int
+    primeiro_item: int
+    ultimo_item: int
+    tem_pagina_anterior: bool
+    tem_proxima_pagina: bool
+    pagina_anterior: int | None
+    proxima_pagina: int | None
+    paginas: list
+    filtro_busca: str
+    filtro_agente: str
+    agentes_disponiveis: list
+
+
+def listar_documentos_processados_para_portal(
+    *,
+    page_number: int | str | None = 1,
+    per_page: int = 10,
+    filtro_busca: str = "",
+    filtro_agente: str = "",
+) -> DocumentosProcessadosPortalResumo:
+    """Tela "Documentos Processados": 1 linha por NOME de documento, com
+    quantos Processamentos diferentes tiveram um arquivo com esse nome e um
+    link para ve-los filtrados (reaproveita o filtro ?codigos= que
+    ProcessamentosView ja suporta desde a Fase 5b do ADR-001).
+
+    `pode_reprocessar=False` so quando algum DocumentoEntrada com esse nome
+    ja chegou a PROCESSADO (concluido com sucesso) — espelha a regra de
+    negocio "documento concluido com sucesso nao e reprocessado, so se
+    mudar de nome" ja aplicada na descoberta de documentos (ver
+    document_sources._arquivo_ja_processado_em_outra_execucao). Esta tela e
+    so leitura/consulta; a aplicacao real da regra continua la, escopada
+    por (agente, pasta) — aqui a aproximacao e global por nome, de proposito
+    mais simples, so para informar o usuario."""
+    queryset = DocumentoEntrada.objects.exclude(nome_arquivo="")
+    if filtro_busca:
+        queryset = queryset.filter(nome_arquivo__icontains=filtro_busca)
+    if filtro_agente:
+        queryset = queryset.filter(processamento__agente_id=filtro_agente)
+
+    agrupado = (
+        queryset.values("nome_arquivo")
+        .annotate(
+            total_entradas=Count("id"),
+            ultima_execucao=Max("processamento__iniciado_em"),
+        )
+        .order_by("-ultima_execucao", "nome_arquivo")
+    )
+
+    paginator = Paginator(agrupado, per_page)
+    page_obj = paginator.get_page(page_number)
+
+    agentes_disponiveis = list(
+        DocumentoEntrada.objects.select_related("processamento__agente")
+        .exclude(processamento__agente_id=None)
+        .values_list("processamento__agente_id", "processamento__agente__nome")
+        .distinct()
+        .order_by("processamento__agente__nome")
+    )
+
+    status_labels = dict(DocumentoEntrada._meta.get_field("status").choices)
+
+    documentos = []
+    for row in page_obj.object_list:
+        nome = row["nome_arquivo"]
+        entradas_qs = DocumentoEntrada.objects.filter(
+            nome_arquivo=nome
+        ).select_related("processamento", "processamento__agente")
+        if filtro_agente:
+            entradas_qs = entradas_qs.filter(processamento__agente_id=filtro_agente)
+        entradas = list(
+            entradas_qs.order_by("-processamento__iniciado_em", "-created_at")
+        )
+
+        agentes_nomes = []
+        codigos = []
+        for entrada in entradas:
+            processamento = entrada.processamento
+            if not processamento:
+                continue
+            if processamento.agente and processamento.agente.nome not in agentes_nomes:
+                agentes_nomes.append(processamento.agente.nome)
+            if processamento.codigo not in codigos:
+                codigos.append(processamento.codigo)
+
+        mais_recente = entradas[0] if entradas else None
+        pode_reprocessar = not any(
+            entrada.status == DocumentStatus.PROCESSADO for entrada in entradas
+        )
+
+        documentos.append(
+            DocumentoProcessadoResumo(
+                nome_arquivo=nome,
+                agentes=", ".join(agentes_nomes) if agentes_nomes else "—",
+                total_processamentos=len(codigos),
+                status_mais_recente=(
+                    status_labels.get(mais_recente.status, mais_recente.status)
+                    if mais_recente
+                    else "—"
+                ),
+                status_mais_recente_codigo=mais_recente.status if mais_recente else "",
+                pode_reprocessar=pode_reprocessar,
+                ultima_execucao_formatada=_format_datetime(row["ultima_execucao"]),
+                ver_processamentos_url=(
+                    reverse("portal_processamentos") + "?codigos=" + ",".join(codigos)
+                    if codigos
+                    else reverse("portal_processamentos")
+                ),
+            )
+        )
+
+    return DocumentosProcessadosPortalResumo(
+        documentos=documentos,
+        total=paginator.count,
+        pagina_atual=page_obj.number,
+        total_paginas=paginator.num_pages,
+        itens_por_pagina=per_page,
+        primeiro_item=page_obj.start_index() if paginator.count else 0,
+        ultimo_item=page_obj.end_index() if paginator.count else 0,
+        tem_pagina_anterior=page_obj.has_previous(),
+        tem_proxima_pagina=page_obj.has_next(),
+        pagina_anterior=page_obj.previous_page_number()
+        if page_obj.has_previous()
+        else None,
+        proxima_pagina=page_obj.next_page_number() if page_obj.has_next() else None,
+        paginas=[
+            "..." if isinstance(page, str) else page
+            for page in paginator.get_elided_page_range(
+                page_obj.number,
+                on_each_side=2,
+                on_ends=1,
+            )
+        ],
+        filtro_busca=filtro_busca,
+        filtro_agente=filtro_agente,
+        agentes_disponiveis=agentes_disponiveis,
     )

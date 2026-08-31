@@ -312,12 +312,13 @@
   <nav class="portal-tabs">
     <a class="tab-link {% if active_nav == 'painel' %}active{% endif %}" href="{% url 'portal_painel' %}">Painel inicial</a>
 
-    {% if 'agentes' in paginas_menu or 'processamentos' in paginas_menu or 'gerenciar_agentes' in paginas_menu or 'fontes_documentos' in paginas_menu %}
-    <details class="sidebar-group" {% if active_nav == 'agentes' or active_nav == 'processamentos' or active_nav == 'gerenciar_agentes' or active_nav == 'fontes_documentos' %}open{% endif %}>
-      <summary class="tab-link group-trigger {% if active_nav == 'agentes' or active_nav == 'processamentos' or active_nav == 'gerenciar_agentes' or active_nav == 'fontes_documentos' %}active{% endif %}">Operação</summary>
+    {% if 'agentes' in paginas_menu or 'processamentos' in paginas_menu or 'documentos_processados' in paginas_menu or 'gerenciar_agentes' in paginas_menu or 'fontes_documentos' in paginas_menu %}
+    <details class="sidebar-group" {% if active_nav == 'agentes' or active_nav == 'processamentos' or active_nav == 'documentos_processados' or active_nav == 'gerenciar_agentes' or active_nav == 'fontes_documentos' %}open{% endif %}>
+      <summary class="tab-link group-trigger {% if active_nav == 'agentes' or active_nav == 'processamentos' or active_nav == 'documentos_processados' or active_nav == 'gerenciar_agentes' or active_nav == 'fontes_documentos' %}active{% endif %}">Operação</summary>
       <div class="sidebar-submenu">
         {% if 'agentes' in paginas_menu %}<a class="tab-link submenu-link {% if active_nav == 'agentes' %}active{% endif %}" href="{% url 'portal_agentes_leitura' %}">Agentes</a>{% endif %}
         {% if 'processamentos' in paginas_menu %}<a class="tab-link submenu-link {% if active_nav == 'processamentos' %}active{% endif %}" href="{% url 'portal_processamentos' %}">Processamentos</a>{% endif %}
+        {% if 'documentos_processados' in paginas_menu %}<a class="tab-link submenu-link {% if active_nav == 'documentos_processados' %}active{% endif %}" href="{% url 'portal_documentos_processados' %}">Documentos Processados</a>{% endif %}
         {% if 'gerenciar_agentes' in paginas_menu %}<a class="tab-link submenu-link {% if active_nav == 'gerenciar_agentes' %}active{% endif %}" href="{% url 'portal_agentes_gerenciar' %}">Gerenciar agentes</a>{% endif %}
         {% if 'fontes_documentos' in paginas_menu %}<a class="tab-link submenu-link {% if active_nav == 'fontes_documentos' %}active{% endif %}" href="{% url 'portal_fontes_documentos' %}">Fontes de documentos</a>{% endif %}
       </div>
@@ -357,11 +358,6 @@
       </div>
     </details>
   </nav>
-
-  <!-- Indicador global de progresso: visivel em qualquer tela do portal -->
-  <div class="processamento-ativo-widget" data-processamento-ativo-widget hidden aria-live="polite">
-    <div class="processamento-ativo-list" data-processamento-ativo-list></div>
-  </div>
 
   {% include "portal_operacional/_sidebar_footer.html" %}
 </aside>
@@ -404,146 +400,6 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeSidebar();
   });
-}());
-</script>
-
-<!-- Indicador global de progresso: consulta processamentos ativos do usuario
-     em qualquer tela do portal, para nao perder a visao ao navegar. -->
-<script>
-(function () {
-  var POLL_INTERVAL_MS = 8000;
-  var STATUS_ENDPOINT = "{% url 'portal_processamentos_ativos' %}";
-  var PROCESSAMENTOS_URL = "{% url 'portal_processamentos' %}";
-  var DISMISS_KEY = 'hub-processamentos-dismissed';
-
-  var widget = document.querySelector('[data-processamento-ativo-widget]');
-  var list = document.querySelector('[data-processamento-ativo-list]');
-  if (!widget || !list) return;
-
-  function getDismissed() {
-    try {
-      return JSON.parse(sessionStorage.getItem(DISMISS_KEY)) || {};
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function dismiss(codigo, statusCodigo) {
-    var dismissed = getDismissed();
-    dismissed[codigo] = statusCodigo;
-    try { sessionStorage.setItem(DISMISS_KEY, JSON.stringify(dismissed)); } catch (e) {}
-  }
-
-  function iconePara(item) {
-    if (!item.finalizado) return '⏳';
-    if (item.status_codigo === 'concluido_sucesso') return '✅';
-    if (item.status_codigo === 'concluido_atencao') return '⚠️';
-    if (item.status_codigo === 'concluido_erro') return '❌';
-    if (item.status_codigo === 'cancelado') return '⛔';
-    return 'ℹ️';
-  }
-
-  function classePara(item) {
-    if (item.status_codigo === 'concluido_erro') return 'is-erro';
-    if (item.status_codigo === 'concluido_atencao' || item.status_codigo === 'cancelado') return 'is-atencao';
-    if (item.finalizado) return 'is-sucesso';
-    return '';
-  }
-
-  function render(items) {
-    list.innerHTML = '';
-    if (!items.length) {
-      widget.hidden = true;
-      return;
-    }
-    items.forEach(function (item) {
-      var div = document.createElement('div');
-      div.className = ('processamento-ativo-item ' + classePara(item)).trim();
-      div.dataset.codigo = item.codigo;
-
-      var head = document.createElement('div');
-      head.className = 'processamento-ativo-head';
-
-      var icone = document.createElement('span');
-      icone.className = 'processamento-ativo-icone';
-      icone.textContent = iconePara(item);
-
-      var nome = document.createElement('span');
-      nome.className = 'processamento-ativo-nome';
-      nome.textContent = item.documento_atual_nome || item.agente || item.codigo;
-      nome.title = nome.textContent;
-
-      var fechar = document.createElement('button');
-      fechar.type = 'button';
-      fechar.className = 'processamento-ativo-fechar';
-      fechar.setAttribute('aria-label', 'Ocultar aviso');
-      fechar.textContent = '×';
-      fechar.addEventListener('click', function () {
-        dismiss(item.codigo, item.status_codigo);
-        poll();
-      });
-
-      head.appendChild(icone);
-      head.appendChild(nome);
-      head.appendChild(fechar);
-
-      var track = document.createElement('div');
-      track.className = 'processamento-ativo-track';
-      var fill = document.createElement('span');
-      fill.className = 'processamento-ativo-fill';
-      fill.style.width = (item.percentual || 0) + '%';
-      track.appendChild(fill);
-
-      var rodape = document.createElement('div');
-      rodape.className = 'processamento-ativo-rodape';
-
-      var pct = document.createElement('span');
-      pct.className = 'processamento-ativo-pct';
-      pct.textContent = (item.percentual || 0) + '%';
-
-      var link = document.createElement('a');
-      link.className = 'processamento-ativo-link';
-      link.href = PROCESSAMENTOS_URL;
-      link.textContent = item.mensagem_erro ? 'Ver erro →' : 'Ver detalhes →';
-
-      rodape.appendChild(pct);
-      rodape.appendChild(link);
-
-      div.appendChild(head);
-      div.appendChild(track);
-      div.appendChild(rodape);
-
-      if (item.mensagem_erro) {
-        var msg = document.createElement('div');
-        msg.className = 'processamento-ativo-mensagem';
-        msg.textContent = item.mensagem_erro;
-        msg.title = item.mensagem_erro;
-        div.appendChild(msg);
-      }
-
-      list.appendChild(div);
-    });
-    widget.hidden = false;
-  }
-
-  function poll() {
-    fetch(STATUS_ENDPOINT, {
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      credentials: 'same-origin',
-    })
-      .then(function (resp) { return resp.ok ? resp.json() : { processamentos: [] }; })
-      .then(function (data) {
-        var dismissed = getDismissed();
-        var items = (data.processamentos || []).filter(function (item) {
-          return dismissed[item.codigo] !== item.status_codigo;
-        });
-        render(items);
-      })
-      .catch(function () {});
-  }
-
-  poll();
-  setInterval(poll, POLL_INTERVAL_MS);
 }());
 </script>
 
